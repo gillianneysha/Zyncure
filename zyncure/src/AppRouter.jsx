@@ -6,6 +6,10 @@ import DoctorLayout from './layouts/DoctorLayout';
 
 import PatientHome from './pages/patient/Home';
 import PatientProfile from './pages/patient/Profile';
+import PatientHealth from './pages/patient/YourHealth';
+import PatientConnections from './pages/patient/Connections';
+import PatientNotifications from './pages/patient/Notifications';
+import PatientAppointments from './pages/patient/Appointments';
 
 import DoctorHome from './pages/doctor/Home';
 import DoctorPatients from './pages/doctor/Patients';
@@ -23,7 +27,10 @@ export default function AppRouter() {
         <Route path="/" element={<PatientLayout />}>
           <Route index element={<PatientHome />} />
           <Route path="profile" element={<PatientProfile />} />
-          {/* Add other patient routes here */}
+          <Route path="health" element={<PatientHealth />} />
+          <Route path="connections" element={<PatientConnections />} />
+          <Route path="notifications" element={<PatientNotifications />} />
+          <Route path="appointments" element={<PatientAppointments />} />
         </Route>
       )}
 
