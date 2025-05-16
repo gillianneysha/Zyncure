@@ -1,7 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import Sidebar, { SidebarItem } from '../components/Sidebar';
+import Sidebar, { SidebarItem, SidebarSubItem } from '../components/Sidebar';
 import Navbar from '../components/Navbar';
-import { CalendarDays, Users, Bell, Heart, House, User } from 'lucide-react';
+import { CalendarDays, Users, Bell, Heart, House, User, ChartPie, Folders } from 'lucide-react';
 
 export default function PatientLayout() {
   const navigate = useNavigate();
@@ -9,6 +9,7 @@ export default function PatientLayout() {
   
   // Determine which menu item is active based on the current path
   const isActive = (path) => location.pathname === path;
+  const isHealthActive = location.pathname.startsWith('/health');
 
   return (
     <div className="flex h-screen">
@@ -28,9 +29,21 @@ export default function PatientLayout() {
         <SidebarItem 
           icon={<Heart size={20} />} 
           text="Your Health" 
-          active={isActive('/health')}
-          onClick={() => navigate('/health')} 
-        />
+          active={isHealthActive}
+        >
+          <SidebarSubItem 
+            icon={<ChartPie size={20} />}
+            text="Tracking" 
+            active={isActive('health/tracking')}
+            onClick={() => navigate('/health/tracking')} 
+          />
+          <SidebarSubItem 
+            icon={<Folders size={20} />}
+            text="Records"
+            active={isActive('/health/records')}
+            onClick={() => navigate('/health/records')} 
+          />
+        </SidebarItem>
         <SidebarItem 
           icon={<Users size={20} />} 
           text="Connections" 
