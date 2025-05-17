@@ -23,8 +23,8 @@ export default function PatientLayout() {
         <SidebarItem 
           icon={<House size={20} />} 
           text="Home" 
-          active={isActive('/')}
-          onClick={() => navigate('/')} 
+          active={isActive('/home')}
+          onClick={() => navigate('/home')} 
         />
         <SidebarItem 
           icon={<Heart size={20} />} 
