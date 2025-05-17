@@ -6,25 +6,24 @@ import { CalendarDays, Users, Bell, Heart, House, User, ChartPie, Folders } from
 export default function PatientLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  
-  // Determine which menu item is active based on the current path
-  const isActive = (path) => location.pathname === path;
-  const isHealthActive = location.pathname.startsWith('/health');
+
+  const isActive = (path) => location.pathname === `/home${path}`;
+  const isHealthActive = location.pathname.includes('/home/health');
 
   return (
     <div className="flex h-screen">
       <Sidebar>
         <SidebarItem 
+          icon={<House size={20} />} 
+          text="Home" 
+          active={isActive('')}
+          onClick={() => navigate('/home')} 
+        />
+        <SidebarItem 
           icon={<User size={20} />} 
           text="Profile" 
           active={isActive('/profile')}
-          onClick={() => navigate('/profile')} 
-        />
-        <SidebarItem 
-          icon={<House size={20} />} 
-          text="Home" 
-          active={isActive('/home')}
-          onClick={() => navigate('/home')} 
+          onClick={() => navigate('/home/profile')} 
         />
         <SidebarItem 
           icon={<Heart size={20} />} 
@@ -34,34 +33,34 @@ export default function PatientLayout() {
           <SidebarSubItem 
             icon={<ChartPie size={20} />}
             text="Tracking" 
-            active={isActive('health/tracking')}
-            onClick={() => navigate('/health/tracking')} 
+            active={isActive('/health/tracking')}
+            onClick={() => navigate('/home/health/tracking')} 
           />
           <SidebarSubItem 
             icon={<Folders size={20} />}
             text="Records"
             active={isActive('/health/records')}
-            onClick={() => navigate('/health/records')} 
+            onClick={() => navigate('/home/health/records')} 
           />
         </SidebarItem>
         <SidebarItem 
           icon={<Users size={20} />} 
           text="Connections" 
           active={isActive('/connections')}
-          onClick={() => navigate('/connections')} 
+          onClick={() => navigate('/home/connections')} 
         />
         <SidebarItem 
           icon={<Bell size={20} />} 
           text="Notifications" 
           active={isActive('/notifications')}
-          onClick={() => navigate('/notifications')} 
+          onClick={() => navigate('/home/notifications')} 
           alert 
         />
         <SidebarItem 
           icon={<CalendarDays size={20} />} 
           text="Appointments" 
           active={isActive('/appointments')}
-          onClick={() => navigate('/appointments')} 
+          onClick={() => navigate('/home/appointments')} 
           alert 
         />
       </Sidebar>
