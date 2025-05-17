@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 // Make sure this returns a user with a 'role'
 import PatientLayout from './layouts/PatientLayout';
 import DoctorLayout from './layouts/DoctorLayout';
+import Registration from './pages/Registration';
+import Login from './pages/Login';
 
 import PatientHome from './pages/patient/Home';
 import PatientProfile from './pages/patient/Profile';
@@ -26,18 +28,22 @@ export default function AppRouter() {
   return (
     <Routes>
       {user.role === 'patient' && (
-        <Route path="/" element={<PatientLayout />}>
-          <Route index element={<PatientHome />} />
-          <Route path="profile" element={<PatientProfile />} />
-          <Route path="health">
-            <Route index element={<PatientHealth />} />
-            <Route path="tracking" element={<PatientTracking />} />
-            <Route path="records" element={<PatientHealthRecords />} />
+        <>
+          <Route path="/" element={<Registration />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/home" element={<PatientLayout />}>
+            <Route index element={<PatientHome />} />
+            <Route path="profile" element={<PatientProfile />} />
+            <Route path="health">
+              <Route index element={<PatientHealth />} />
+              <Route path="tracking" element={<PatientTracking />} />
+              <Route path="records" element={<PatientHealthRecords />} />
+            </Route>
+            <Route path="connections" element={<PatientConnections />} />
+            <Route path="notifications" element={<PatientNotifications />} />
+            <Route path="appointments" element={<PatientAppointments />} />
           </Route>
-          <Route path="connections" element={<PatientConnections />} />
-          <Route path="notifications" element={<PatientNotifications />} />
-          <Route path="appointments" element={<PatientAppointments />} />
-        </Route>
+        </>
       )}
 
       {user.role === 'doctor' && (
