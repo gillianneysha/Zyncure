@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { supabase } from "../client";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
-export default function Login() {
+export default function Login({ setToken }) {
+  let navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -13,16 +15,20 @@ export default function Login() {
     event.preventDefault();
 
     try {
-      // Keep both data and error, ignore the linting warning
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
       if (error) throw error;
-
-      // You can use data here if needed
-      console.log("Signup successful:", data);
+      
+      // Set token using the provided setToken function
+      setToken(data);
+      
+      // Redirect to the page they were trying to access, or to home if none
+      const from = location.state?.from?.pathname || '/home';
+      console.log("Login successful, redirecting to:", from);
+      navigate(from);
     } catch (error) {
       alert(error.message || error);
     }
