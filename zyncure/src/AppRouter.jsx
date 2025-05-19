@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 // import { useUser } from './hooks/useUser';
 import PatientLayout from './layouts/PatientLayout';
 import DoctorLayout from './layouts/DoctorLayout';
-import Registration from './pages/Registration';
-import Login from './pages/Login';
+import Registration from './pages/Authentication';
+// import Login from './pages/Login';
 
 import PatientHome from './pages/patient/Home';
 import PatientProfile from './pages/patient/Profile';
@@ -72,8 +72,8 @@ export default function AppRouter() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<Registration />} />
-      <Route path="/login" element={<Login setToken={setToken} />} />
+      <Route path="/" element={<Registration setToken={setToken} />} />
+      {/* <Route path="/login" element={<Login setToken={setToken} />} /> */}
       
       {/* Protected patient routes */}
       {user.role === 'patient' && (
