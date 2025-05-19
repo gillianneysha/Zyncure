@@ -214,23 +214,91 @@ export function NotificationPage() {
 }
 
 export function BillingPage() {
+  
+
+  const handleOptionClick = (option) => {
+    // Here you would typically navigate to the respective page or open a modal
+    console.log(`Clicked on ${option}`);
+  };
+
+  const SecurityOption = ({ title, onClick }) => {
+    return (
+      <div 
+        className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+        onClick={() => onClick(title)}
+      >
+        <span className="text-mySidebar">{title}</span>
+        <ChevronRight className="text-mySidebar" size={20} />
+      </div>
+    );
+  };
+
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
         <h2 className="text-4xl text-profileHeader font-bold">Billing</h2>
         <p className="text-zyncureOrange text-left">
-          Payment methods and subscriptions are monitored here.
+          Payment methods and subscriptions are monitored here
         </p>
+      </div>
+
+      <div className="mt-8">
+        <SecurityOption 
+          title="Subscriptions" 
+          onClick={handleOptionClick}
+        />
+        <SecurityOption 
+          title="Payment methods" 
+          onClick={handleOptionClick}
+        />
+        <SecurityOption 
+          title="Contact Information" 
+          onClick={handleOptionClick}
+        />
       </div>
     </div>
   );
 }
 
 export function PoliciesPage() {
+ 
+
+  const handleOptionClick = (option) => {
+    // Here you would typically navigate to the respective page or open a modal
+    console.log(`Clicked on ${option}`);
+  };
+
+  const SecurityOption = ({ title, onClick }) => {
+    return (
+      <div 
+        className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+        onClick={() => onClick(title)}
+      >
+        <span className="text-mySidebar">{title}</span>
+        <ChevronRight className="text-mySidebar" size={20} />
+      </div>
+    );
+  };
+
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
         <h2 className="text-4xl text-profileHeader font-bold">Policies and Standards</h2>
+      </div>
+
+      <div className="mt-8">
+        <SecurityOption 
+          title="Terms of Service" 
+          onClick={handleOptionClick}
+        />
+        <SecurityOption 
+          title="Privacy Policy" 
+          onClick={handleOptionClick}
+        />
+        <SecurityOption 
+          title="Community Standards" 
+          onClick={handleOptionClick}
+        />
       </div>
     </div>
   );
@@ -239,9 +307,33 @@ export function PoliciesPage() {
 export function DeleteAccountPage() {
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
-      <div className="mb-6">
-        <h2 className="text-4xl text-profileHeader font-bold">Saying Goodbye?</h2>
-        
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-4xl text-profileHeader font-bold">
+          Saying Goodbye?
+        </h2>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-mySidebar mb-1">Email</label>
+          <input
+            type="text"
+            className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-mySidebar mb-1">Password</label>
+          <input
+            type="text"
+            className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+          />
+        </div>
+        <div className="flex justify-center mt-6">
+          <button className="bg-profileHeader text-white px-6 py-2 rounded-xl font-bold hover:bg-red-600 transition-colors">
+            Delete Account
+          </button>
+        </div>
       </div>
     </div>
   );
