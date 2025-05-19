@@ -68,7 +68,7 @@ export default function PatientLayout() {
       <div className="flex flex-col flex-1">
         <Navbar />
 
-        <main className="flex-1 w-full p-6 bg-gray-50 text-gray-800">
+        <main className="flex-1 w-full p-6 bg-mainBg text-gray-800">
           <Outlet />
         </main>
       </div>

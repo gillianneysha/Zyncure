@@ -1,18 +1,66 @@
-import {useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
+import { PersonalInfoForm } from "../../components/IndividualPage.jsx";
+import { SecurityPage } from "../../components/IndividualPage.jsx";
+import { NotificationPage } from "../../components/IndividualPage.jsx";
+import { BillingPage } from "../../components/IndividualPage.jsx";
+import { PoliciesPage } from "../../components/IndividualPage.jsx";
+import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
 
-export default function Profile() {
-  let navigate = useNavigate();
 
-  function handleLogout() {
+export default function ProfilePage() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("My Profile");
+
+  const handleLogout = () => {
     sessionStorage.removeItem('token');
-    navigate('/')
-  }
+    navigate('/');
+  };
+
+  // Tabs configuration
+  const tabs = [
+    { id: "My Profile", component: <PersonalInfoForm /> },
+    { id: "Security", component: <SecurityPage /> },
+    { id: "Notification", component: <NotificationPage /> },
+    { id: "Billing", component: <BillingPage /> },
+    { id: "Policies and Standards", component: <PoliciesPage /> },
+    { id: "Delete Account", component: <DeleteAccountPage /> }
+  ];
 
   return (
-    <>
-      <h1 className="text-3xl font-bold mb-4 text-myHeader text-left">Profile</h1>
+    <div className="flex flex-row">
+      {/* Sidebar navigation */}
+      <div className="w-80 p-6 space-y-2">
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            className={`p-4 rounded-3xl cursor-pointer transition-colors ${
+              activeTab === tab.id
+                ? "bg-profileBg text-profileText font-bold"
+                : "bg-profileBg hover:bg-rose-200 text-profileText"
+            }`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.id}
+          </div>
+        ))}
+        
+        {/* Logout button */}
+        <div 
+          className="flex items-center p-4 rounded-lg cursor-pointer hover:bg-profileBg text-profileText mt-4"
+          onClick={handleLogout}
+        >
+          <LogOut size={20} className="mr-2" />
+          <span>Log out</span>
+        </div>
+      </div>
 
-      <button onClick={handleLogout}>Logout</button>
-    </>
+      {/* Main content area */}
+      <div className="flex-1 p-6">
+        {tabs.find(tab => tab.id === activeTab)?.component}
+      </div>
+    </div>
   );
 }
+
