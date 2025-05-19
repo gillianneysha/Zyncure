@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { MoreHorizontal, Download, Share } from 'lucide-react';
+
 export default function Home() {
   return (
     <>
@@ -6,5 +9,5 @@ export default function Home() {
         Here are some of your weekly and monthly records to help you track your health.
       </p>
     </>
-  );
+  )
 }
