@@ -19,6 +19,7 @@ export default {
         profileBg: "#FEDED2",
         mainBg: "#FFEDE7",
         profileHeader: "#55A1A4",
+        profileSubtext: "#FB8F67"
       },
     },
   },
