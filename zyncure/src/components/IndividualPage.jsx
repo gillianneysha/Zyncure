@@ -1,4 +1,5 @@
-import { PencilIcon } from "lucide-react";
+import { PencilIcon, ChevronRight } from "lucide-react";
+
 
 export function PersonalInfoForm() {
   return (
@@ -67,6 +68,25 @@ export function PersonalInfoForm() {
 }
 
 export function SecurityPage() {
+  
+
+  const handleOptionClick = (option) => {
+    // Here you would typically navigate to the respective page or open a modal
+    console.log(`Clicked on ${option}`);
+  };
+
+  const SecurityOption = ({ title, onClick }) => {
+    return (
+      <div 
+        className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+        onClick={() => onClick(title)}
+      >
+        <span className="text-mySidebar">{title}</span>
+        <ChevronRight className="text-mySidebar" size={20} />
+      </div>
+    );
+  };
+
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
@@ -74,6 +94,17 @@ export function SecurityPage() {
         <p className="text-zyncureOrange text-left">
           Manage account password and login preferences.
         </p>
+      </div>
+
+      <div className="mt-8">
+        <SecurityOption 
+          title="Change password" 
+          onClick={handleOptionClick}
+        />
+        <SecurityOption 
+          title="Two-factor authentication" 
+          onClick={handleOptionClick}
+        />
       </div>
     </div>
   );
