@@ -14,6 +14,12 @@ export default {
         zyncureBlack: "#333333",
         zyncureLightPink: "#FEDED2",
         zyncureSearchBar:"#FFEDE7",
+        // PROFILE PAGE
+        profileText: "#F15629",
+        profileBg: "#FEDED2",
+        mainBg: "#FFEDE7",
+        profileHeader: "#55A1A4",
+        profileSubtext: "#FB8F67"
       },
     },
   },
