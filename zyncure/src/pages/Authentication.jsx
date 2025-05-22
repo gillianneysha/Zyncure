@@ -20,7 +20,7 @@ export default function AuthContainer({ setToken }) {
                 alt="Zyncure Logo"
                 className="block mb-6 w-52 h-auto"
             />
-            {/* Tabs for Login and Register */}
+            {/* Tabs - Login + Register */}
             <div className="flex text-white text-center w-[500px] max-w-[600px] mx-auto mb-0 mt-4">
                 <div
                     className={`w-1/2 py-3 px-4 cursor-pointer transition-colors duration-300 z-10 ${
