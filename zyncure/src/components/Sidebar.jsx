@@ -37,10 +37,10 @@ export function SidebarItem({ icon, text, active, alert, onClick, children }) {
   const { expanded } = useContext(SidebarContext);
   const [isOpen, setIsOpen] = useState(false);
   
-  // Check if the item has children (submenu items)
+  // submenu items
   const hasChildren = children && children.length > 0;
   
-  // Handle item click
+  // item click
   const handleClick = () => {
     if (hasChildren) {
       setIsOpen(!isOpen);

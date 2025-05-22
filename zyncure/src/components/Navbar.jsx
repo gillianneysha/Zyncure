@@ -9,35 +9,32 @@ export default function Navbar() {
   });
 
   useEffect(() => {
-    // Function to get user data
+    
     const getUserData = async () => {
       try {
-        // Get token from session storage
+        // get token 
         const tokenStr = sessionStorage.getItem('token');
         if (!tokenStr) return;
         
         const token = JSON.parse(tokenStr);
         
-        // Check if we have a session with user data
+        // Check session 
         if (token?.session?.user) {
           const { user } = token.session;
           
-          // First, use what we have in the session
-          const initialName = user.user_metadata?.full_name || 
-                              user.user_metadata?.name || 
+          const initialName = user.user_metadata?.first_name || 
                               user.email?.split('@')[0] || 
                               'User';
           
           setUserData({
             name: initialName,
-            id: user.id.substring(0, 4) // Just showing first 4 chars of UUID for brevity
+            id: user.id.substring(0, 4) 
           });
           
-          // Then, try to get more detailed user info from database if needed
-          // This assumes you have a profiles table linked to auth.users
-          // Remove or adjust this part if you don't have such a setup
+         
+
           const { data, error } = await supabase
-            .from('profiles') // Change to your actual table name if different
+            .from('profiles') 
             .select('full_name, display_name')
             .eq('id', user.id)
             .single();
@@ -57,7 +54,7 @@ export default function Navbar() {
     getUserData();
   }, []);
 
-  // Get first name only if there are multiple names
+  // get first name 
   const firstName = userData.name.includes(' ') 
     ? userData.name.split(' ')[0] 
     : userData.name;

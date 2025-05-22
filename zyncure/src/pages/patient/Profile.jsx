@@ -18,7 +18,7 @@ export default function ProfilePage() {
     navigate('/');
   };
 
-  // Tabs configuration
+  // tabs!
   const tabs = [
     { id: "My Profile", component: <PersonalInfoForm /> },
     { id: "Security", component: <SecurityPage /> },
@@ -30,7 +30,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-row">
-      {/* Sidebar navigation */}
+      {/* sidebarrr  */}
       <div className="w-80 p-6 space-y-2">
         {tabs.map((tab) => (
           <div
@@ -46,7 +46,7 @@ export default function ProfilePage() {
           </div>
         ))}
         
-        {/* Logout button */}
+        {/* Logout*/}
         <div 
           className="flex items-center p-4 rounded-lg cursor-pointer hover:bg-profileBg text-profileText mt-4"
           onClick={handleLogout}
