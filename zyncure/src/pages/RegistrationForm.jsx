@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { supabase } from "../client";
+// import { useNavigate } from "react-router-dom"; 
 
 export default function RegistrationForm() {
+  // const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -36,6 +38,17 @@ export default function RegistrationForm() {
   function validateForm() {
     const newErrors = {};
 
+    if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
+    if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    if (!formData.userType) newErrors.userType = "User type is required";
+
+     // email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.email && !emailRegex.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+
     // password 
     if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters long";
@@ -64,75 +77,61 @@ export default function RegistrationForm() {
     return Object.keys(newErrors).length === 0;
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+async function handleSubmit(event) {
+  event.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
+  if (!validateForm()) {
+    return;
+  }
 
-    setIsLoading(true);
-    setErrors({});
-    setSuccessMessage("");
+  setIsLoading(true);
+  setErrors({});
+  setSuccessMessage("");
 
-    try {
-      // Create auth user with profile data in metadata
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            contact_number: formData.contactNumber,
-            birthdate: formData.birthdate,
-            user_type: formData.userType,
-          },
-        },
-      });
-
-      if (authError) throw authError;
-
-      // Manually create profile if trigger doesnt work
-      if (authData.user) {
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: authData.user.id,
+  try {
+    // create user
+    const { error: authError } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
           first_name: formData.firstName,
           last_name: formData.lastName,
           contact_number: formData.contactNumber,
           birthdate: formData.birthdate,
           user_type: formData.userType,
-        });
+        },
+      },
+    });
 
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-        }
-      }
+    if (authError) throw authError;
 
-      setSuccessMessage(
-        "Registration successful! Please check your email for verification."
-      );
+    // user confirm email 
+    setSuccessMessage(
+      "Registration successful! Please check your email to confirm your account."
+    );
 
-      // Clear form
-      setFormData({
-        firstName: "",
-        lastName: "",
-        contactNumber: "",
-        birthdate: "",
-        userType: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-      });
-    } catch (error) {
-      console.error("Registration error:", error);
-      setErrors({
-        submit: error.message || "Registration failed. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    // Clear the form
+    setFormData({
+      firstName: "",
+      lastName: "",
+      contactNumber: "",
+      birthdate: "",
+      userType: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    setErrors({
+      submit: error.message || "Registration failed. Please try again.",
+    });
+  } finally {
+    setIsLoading(false);
   }
+}
+
 
   return (
     <form onSubmit={handleSubmit}>
