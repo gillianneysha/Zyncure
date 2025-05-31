@@ -1,6 +1,6 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
-// import { useUser } from './hooks/useUser';
+import { useUser } from './hooks/useUser';
 import PatientLayout from './layouts/PatientLayout';
 import DoctorLayout from './layouts/DoctorLayout';
 import Registration from './pages/Authentication';
@@ -17,37 +17,33 @@ import PatientAppointments from './pages/patient/Appointments';
 import DoctorHome from './pages/doctor/Home';
 import DoctorPatients from './pages/doctor/Patients';
 
-// ensures user has session token
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
   const authToken = sessionStorage.getItem('token');
   
   if (!authToken) {
     console.log("No token found, redirecting to login");
-    // Redirect to login page if no token, saving current location for redirect after login
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
   
   return children;
 };
 
 export default function AppRouter() {
-  //   const { user } = useUser();  DO NOT REMOVE - ysha
-  // This must return { role: 'patient' } or { role: 'doctor' }
-  const user = { role: 'patient' }; // temporarily hardcoded for testing !! - ysha
+    const { user } = useUser();  
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   
-  // Check if user is authenticated on mount and when token changes
+  // Check if user is authenticated and when token changes
   useEffect(() => {
     const checkAuth = () => {
       const token = sessionStorage.getItem('token');
       setIsAuthenticated(!!token);
     };
 
-    // Initial check
+    // check
     checkAuth();
 
-    // Setup event listener for storage changes (in case token is changed in another tab)
+    // event listener for storage changes (in case token is changed in another tab)
     window.addEventListener('storage', checkAuth);
     
     return () => {
@@ -55,7 +51,6 @@ export default function AppRouter() {
     };
   }, []);
 
-  // Function to set token in sessionStorage and update authentication state
   const setToken = (data) => {
     if (data) {
       sessionStorage.setItem('token', JSON.stringify(data));
@@ -66,6 +61,21 @@ export default function AppRouter() {
     }
   };
   
+  const navigate = useNavigate();
+
+
+  useEffect(() => {
+  if (!user) return;
+  //  navigate if at the root path
+  if (location.pathname === '/') {
+    if (user.role === 'patient') {
+      navigate('/home');
+    } else if (user.role === 'doctor') {
+      navigate('/doctor');
+    }
+  }
+}, [user, navigate, location]);
+
   if (!user) return <p>Loading...</p>;
 
   return (
@@ -99,7 +109,7 @@ export default function AppRouter() {
       {/* Protected doctor routes */}
       {user.role === 'doctor' && (
         <Route 
-          path="/" 
+          path="/doctor" 
           element={
             <ProtectedRoute>
               <DoctorLayout />
