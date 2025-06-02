@@ -1,95 +1,252 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../client";
+
+// Moved FormField outside the component and memoized it
+const FormField = React.memo(({ 
+  label, 
+  name, 
+  type = "text", 
+  placeholder, 
+  required = true,
+  value,
+  onChange,
+  error,
+  disabled
+}) => (
+  <div className="mb-3">
+    <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
+      {label}:
+    </label>
+    <input
+      type={type}
+      name={name}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
+        error ? "ring-2 ring-red-400" : ""
+      }`}
+      required={required}
+      disabled={disabled}
+    />
+    {error && (
+      <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
+        {error}
+      </p>
+    )}
+  </div>
+));
 
 export default function LoginForm({ setToken }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    loginEmail: "",
-    loginPassword: "",
+    email: "",
+    password: "",
   });
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  function handleChange(event) {
+  // Memoized handleChange function
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target;
-    setFormData({ ...formData, [name]: value });
-  }
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
-  async function handleSubmit(event) {
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ""
+      }));
+    }
+  }, [errors]);
+
+  // Memoized validateForm function - only depends on formData
+  const validateForm = useCallback(() => {
+    const newErrors = {};
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = "Please enter a valid email address";
+      }
+    }
+
+    if (!formData.password.trim()) {
+      newErrors.password = "Password is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData]);
+
+  // Memoized handleSubmit function
+  const handleSubmit = useCallback(async (event) => {
     event.preventDefault();
+
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    setErrors({});
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.loginEmail,
-        password: formData.loginPassword,
+        email: formData.email,
+        password: formData.password,
       });
 
       if (error) throw error;
-      setToken(data);
-      // Get user type from profiles
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("user_type")
-        .eq("id", data.user.id)
-        .single();
 
-      // Route based on user type
-      if (profile?.user_type === "patient") {
-        navigate("/home");
-      } else if (profile?.user_type === "doctor") {
-        navigate("/doctor");
-      }
+      setToken(data);
+
+      const userRole = data.user.user_metadata.user_type;
+      const redirectPath = userRole === "medical_professional" ? "/doctor" : "/home";
+      navigate(redirectPath);
+
     } catch (error) {
-      alert(error);
+      console.error("Login error:", error);
+      setErrors({
+        submit: error.message || "Login failed. Please check your credentials and try again."
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }
+  }, [formData, validateForm, setToken, navigate]);
+
+  // Memoized handleGoogleSignIn function
+  const handleGoogleSignIn = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setErrors({});
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error("Google sign in error:", error);
+      setErrors({
+        submit: "Google sign in failed. Please try again."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Memoized resetForm function
+  // const resetForm = useCallback(() => {
+  //   setFormData({
+  //     email: "",
+  //     password: "",
+  //   });
+  //   setErrors({});
+  // }, []);
+
+  const handleForgotPassword = async () => {
+    if (!formData.email) {
+      setErrors({ email: "Please enter your email address first" });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+
+      if (error) throw error;
+
+      alert("Password reset email sent! Please check your inbox.");
+    } catch (error) {
+      console.error("Password reset error:", error);
+      setErrors({
+        submit: "Failed to send password reset email. Please try again."
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit}>
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Email:
-      </label>
-      <input
-        type="email"
-        name="loginEmail"
-        value={formData.loginEmail}
+      {/* Error Message */}
+      {errors.submit && (
+        <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
+          {errors.submit}
+        </div>
+      )}
+
+      <FormField 
+        label="Email" 
+        name="email" 
+        type="email" 
+        placeholder="Email" 
+        value={formData.email}
         onChange={handleChange}
-        placeholder="Email"
-        className="w-4/5 block mx-auto mb-3 p-2 bg-[#E5E7DD] border-none rounded-[15.5px]"
-        required
+        error={errors.email}
+        disabled={isLoading}
       />
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Password:
-      </label>
-      <input
-        type="password"
-        name="loginPassword"
-        value={formData.loginPassword}
+
+      <FormField 
+        label="Password" 
+        name="password" 
+        type="password" 
+        placeholder="Password" 
+        value={formData.password}
         onChange={handleChange}
-        placeholder="Password"
-        className="w-4/5 block mx-auto mb-3 p-2 bg-[#E5E7DD] border-none rounded-[15.5px]"
-        required
+        error={errors.password}
+        disabled={isLoading}
       />
+
       <div className="w-4/5 mx-auto text-right mb-4">
-        <a href="#" className="text-xs text-[#F5E0D9] hover:underline">
+        <button
+          type="button"
+          onClick={handleForgotPassword}
+          className="text-xs text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+          disabled={isLoading}
+        >
           Forgot Password?
-        </a>
+        </button>
       </div>
+
       <button
         type="submit"
-        className="w-4/5 block mx-auto py-2 mt-4 bg-[#55A1A4] hover:bg-[#368487] text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200"
+        disabled={isLoading}
+        className={`w-4/5 block mx-auto py-2 mt-4 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
+          isLoading
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-[#55A1A4] hover:bg-[#368487]"
+        }`}
       >
-        Log In
+        {isLoading ? "Logging In..." : "Log In"}
       </button>
+
       <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
         <div className="flex items-center justify-center my-4">
           <div className="flex-grow h-px bg-[#FEDED2]"></div>
           <span className="px-2">OR</span>
           <div className="flex-grow h-px bg-[#FEDED2]"></div>
         </div>
+
         <button
           type="button"
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg hover:shadow-xl transition mx-auto"
+          onClick={handleGoogleSignIn}
+          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg hover:shadow-xl transition mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Sign in with Google"
-        ></button>
+          disabled={isLoading}
+        >
+          {/* Add Google icon here or use an icon library */}
+          <span className="text-2xl">G</span>
+        </button>
         <p className="mt-2">Log in using your Google account</p>
       </div>
     </form>
