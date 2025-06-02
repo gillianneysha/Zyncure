@@ -1,27 +1,34 @@
 import React, { useState } from 'react';
 import { supabase } from '../../client';
+
 import { Droplet } from 'lucide-react';
 import { FileDown, FileUp } from 'lucide-react';
+
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 
 const PeriodTracker = () => {
+
   const [selectedFlow, setSelectedFlow] = useState('Moderate');
   const [date, setDate] = useState(new Date());
 
   const handleFlowSelect = (flow) => setSelectedFlow(flow);
 
   const handleSave = async () => {
+
     const { error } = await supabase
       .from('period_logs')
       .insert([{ flow: selectedFlow, date: date.toISOString().split('T')[0] }]);
 
     if (error) {
+
       console.error('Error saving data:', error);
+
     } else {
       alert(`Flow saved: ${selectedFlow} on ${date.toDateString()}`);
     }
   };
+
 
   const flowOptions = ['Light', 'Moderate', 'Heavy'];
   const iconSizes = {
@@ -32,6 +39,7 @@ const PeriodTracker = () => {
 
   return (
     <div className="bg-[#FFF0EA] min-h-screen flex flex-col items-center px-6 py-6 font-sans relative text-[#B65C4B] text-sm pb-16 -translate-y-2">
+
 
     {/* Calendar */}
     <div className="mb-2 text-xs scale-[0.92] shadow-lg rounded-lg">
@@ -51,13 +59,16 @@ const PeriodTracker = () => {
     </div>
 
 
+
       {/* Tabs */}
       <div className="w-full max-w-md mb-2 flex gap-2 justify-center">
         {['Period', 'Feelings', 'Skin', 'Metabolism'].map((tab) => (
           <div
             key={tab}
+
             className={`text-sm px-6 py-2 rounded-full cursor-pointer ${
               tab === 'Period'
+
                 ? 'bg-[#F98679] text-white'
                 : 'bg-[#FFD8C9] text-[#B65C4B]'
             }`}
@@ -66,6 +77,7 @@ const PeriodTracker = () => {
           </div>
         ))}
       </div>
+
 
       {/* Flow Selection */}
       <div className="border border-[#F8C8B6] bg-[#FFEFE9] p-5 rounded-lg w-full max-w-2xl flex justify-between mb-5">
@@ -113,3 +125,4 @@ const PeriodTracker = () => {
 };
 
 export default PeriodTracker;
+
