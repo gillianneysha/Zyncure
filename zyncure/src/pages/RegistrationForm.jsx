@@ -1,9 +1,47 @@
-import React, { useState } from "react";
+import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
-// import { useNavigate } from "react-router-dom"; 
+
+// Move FormField OUTSIDE the component to prevent recreation
+const FormField = memo(({ 
+  label, 
+  name, 
+  type = "text", 
+  placeholder, 
+  required = true, 
+  children,
+  value,
+  onChange,
+  error,
+  disabled
+}) => (
+  <div className="mb-3">
+    <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
+      {label}:
+    </label>
+    {children || (
+      <input
+        type={type}
+        name={name}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
+          error ? "ring-2 ring-red-400" : ""
+        }`}
+        required={required}
+        disabled={disabled}
+      />
+    )}
+    {error && (
+      <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
+        {error}
+      </p>
+    )}
+  </div>
+));
 
 export default function RegistrationForm() {
-  // const navigate = useNavigate();
+  console.log('RegistrationForm rendered');
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -19,77 +57,92 @@ export default function RegistrationForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  function handleChange(event) {
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: value
     }));
+  }, []);
 
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
-    }
-  }
-
-  function validateForm() {
+  // Memoize validation to prevent unnecessary recalculations
+  const validateForm = useCallback(() => {
     const newErrors = {};
 
+    // Required fields
     if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
     if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
     if (!formData.email.trim()) newErrors.email = "Email is required";
     if (!formData.userType) newErrors.userType = "User type is required";
+    if (!formData.contactNumber.trim()) newErrors.contactNumber = "Contact number is required";
+    if (!formData.birthdate) newErrors.birthdate = "Birthdate is required";
 
-     // email
+    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
     }
 
-    // password 
-    if (formData.password.length < 6) {
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters long";
     }
 
-    // confirm password 
+    // Confirm password validation
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords don't match";
     }
 
-    // contact number 
+    // Contact number validation
     const phoneRegex = /^\+?[\d\s\-()]+$/;
-    if (!phoneRegex.test(formData.contactNumber)) {
+    if (formData.contactNumber && !phoneRegex.test(formData.contactNumber)) {
       newErrors.contactNumber = "Please enter a valid contact number";
     }
 
-    // age  
-    const birthDate = new Date(formData.birthdate);
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
-    if (age < 18) {
-      newErrors.birthdate = "You must be at least 18 years old to register";
+    // Age validation
+    if (formData.birthdate) {
+      const birthDate = new Date(formData.birthdate);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      const dayDiff = today.getDate() - birthDate.getDate();
+      
+      if (age < 18 || (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)))) {
+        newErrors.birthdate = "You must be at least 18 years old to register";
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }
+  }, [formData]);
 
-async function handleSubmit(event) {
+  const resetForm = useCallback(() => {
+    setFormData({
+      firstName: "",
+      lastName: "",
+      contactNumber: "",
+      birthdate: "",
+      userType: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
+  }, []);
+
+// Updated handleSubmit for database trigger method
+const handleSubmit = useCallback(async (event) => {
   event.preventDefault();
 
-  if (!validateForm()) {
-    return;
-  }
+  if (!validateForm()) return;
 
   setIsLoading(true);
   setErrors({});
   setSuccessMessage("");
 
   try {
-    // create user
+    // Only do Supabase Auth signup - database insertion handled by trigger
     const { error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
@@ -101,27 +154,19 @@ async function handleSubmit(event) {
           birthdate: formData.birthdate,
           user_type: formData.userType,
         },
+        // Optional: Set redirect URL for after email confirmation
+        emailRedirectTo: `${window.location.origin}/dashboard`
       },
     });
 
     if (authError) throw authError;
 
-    // user confirm email 
+    // Success! The database trigger will handle inserting user data when they confirm email
     setSuccessMessage(
-      "Registration successful! Please check your email to confirm your account."
+      "Registration successful! Please check your email and click the confirmation link to activate your account."
     );
+    resetForm();
 
-    // Clear the form
-    setFormData({
-      firstName: "",
-      lastName: "",
-      contactNumber: "",
-      birthdate: "",
-      userType: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    });
   } catch (error) {
     console.error("Registration error:", error);
     setErrors({
@@ -130,8 +175,28 @@ async function handleSubmit(event) {
   } finally {
     setIsLoading(false);
   }
-}
+}, [formData, validateForm, resetForm]);
 
+  const handleGoogleSignUp = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error("Google sign up error:", error);
+      setErrors({
+        submit: "Google sign up failed. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -149,185 +214,108 @@ async function handleSubmit(event) {
         </div>
       )}
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        First Name:
-      </label>
-      <input
+      <FormField 
+        label="First Name" 
+        name="firstName" 
         placeholder="First Name"
-        name="firstName"
         value={formData.firstName}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
-          errors.firstName ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.firstName}
         disabled={isLoading}
       />
-      {errors.firstName && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.firstName}
-        </p>
-      )}
-      <div className="mb-3"></div>
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Last Name:
-      </label>
-      <input
+      <FormField 
+        label="Last Name" 
+        name="lastName" 
         placeholder="Last Name"
-        name="lastName"
         value={formData.lastName}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
-          errors.lastName ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.lastName}
         disabled={isLoading}
       />
-      {errors.lastName && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.lastName}
-        </p>
-      )}
-      <div className="mb-3"></div>
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Contact Number:
-      </label>
-      <input
+      <FormField 
+        label="Contact Number" 
+        name="contactNumber" 
         placeholder="Contact Number"
-        name="contactNumber"
         value={formData.contactNumber}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
-          errors.contactNumber ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.contactNumber}
         disabled={isLoading}
       />
-      {errors.contactNumber && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.contactNumber}
-        </p>
-      )}
-      <div className="mb-3"></div>
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Birthdate:
-      </label>
-      <input
+      <FormField 
+        label="Birthdate" 
+        name="birthdate" 
         type="date"
-        name="birthdate"
         value={formData.birthdate}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] placeholder:text-[#b0b0b0] ${
-          errors.birthdate ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.birthdate}
         disabled={isLoading}
       />
-      {errors.birthdate && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.birthdate}
-        </p>
-      )}
-      <div className="mb-3"></div>
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        User Type:
-      </label>
-      <select
+      <FormField 
+        label="User Type" 
         name="userType"
         value={formData.userType}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] text-[#b0b0b0] ${
-          errors.userType ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.userType}
         disabled={isLoading}
       >
-        <option value="" className="text-[#b0b0b0]">
-          Select user type
-        </option>
-        <option value="patient" className="text-black">
-          Patient
-        </option>
-        <option value="doctor" className="text-black">
-          Doctor
-        </option>
-      </select>
-      {errors.userType && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.userType}
-        </p>
-      )}
-      <div className="mb-3"></div>
+        <select
+          name="userType"
+          value={formData.userType}
+          onChange={handleChange}
+          className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] text-[#b0b0b0] ${
+            errors.userType ? "ring-2 ring-red-400" : ""
+          }`}
+          required
+          disabled={isLoading}
+        >
+          <option value="" className="text-[#b0b0b0]">
+            Select user type
+          </option>
+          <option value="patient" className="text-black">
+            Patient
+          </option>
+          <option value="doctor" className="text-black">
+            Doctor
+          </option>
+        </select>
+      </FormField>
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Email:
-      </label>
-      <input
+      <FormField 
+        label="Email" 
+        name="email" 
+        type="email" 
         placeholder="Email"
-        name="email"
-        type="email"
         value={formData.email}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
-          errors.email ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.email}
         disabled={isLoading}
       />
-      {errors.email && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.email}
-        </p>
-      )}
-      <div className="mb-3"></div>
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Password:
-      </label>
-      <input
+      <FormField 
+        label="Password" 
+        name="password" 
+        type="password" 
         placeholder="Password (min 6 characters)"
-        name="password"
-        type="password"
         value={formData.password}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
-          errors.password ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.password}
         disabled={isLoading}
       />
-      {errors.password && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.password}
-        </p>
-      )}
-      <div className="mb-3"></div>
 
-      <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
-        Confirm Password:
-      </label>
-      <input
+      <FormField 
+        label="Confirm Password" 
+        name="confirmPassword" 
+        type="password" 
         placeholder="Confirm Password"
-        name="confirmPassword"
-        type="password"
         value={formData.confirmPassword}
         onChange={handleChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
-          errors.confirmPassword ? "ring-2 ring-red-400" : ""
-        }`}
-        required
+        error={errors.confirmPassword}
         disabled={isLoading}
       />
-      {errors.confirmPassword && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-          {errors.confirmPassword}
-        </p>
-      )}
-      <div className="mb-4"></div>
 
       <button
         type="submit"
@@ -343,8 +331,8 @@ async function handleSubmit(event) {
 
       <div className="mt-2 w-4/5 mx-auto text-[#F5E0D9] text-xs text-left">
         By creating an account, you agree to our{" "}
-        <span className="underline">Terms</span> and have read and acknowledge
-        the <span className="underline">Privacy Agreement</span>.
+        <span className="underline cursor-pointer">Terms</span> and have read and acknowledge
+        the <span className="underline cursor-pointer">Privacy Agreement</span>.
       </div>
 
       <div className="w-full flex items-center justify-center mt-8 mb-8">
@@ -356,10 +344,13 @@ async function handleSubmit(event) {
       <div className="flex flex-col items-center mb-8">
         <button
           type="button"
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg hover:shadow-xl transition"
+          onClick={handleGoogleSignUp}
+          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Sign up with Google"
           disabled={isLoading}
-        ></button>
+        >
+          <span className="text-2xl">G</span>
+        </button>
         <span className="mt-3 text-[#F5E0D9] text-sm">
           Sign up using your Google account
         </span>
