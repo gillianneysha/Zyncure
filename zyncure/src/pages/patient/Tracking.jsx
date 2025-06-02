@@ -136,7 +136,7 @@ const PeriodTracker = () => {
                       : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6]'
                   }`}
                 >
-                  <Icon size={22} />
+                  {Icon && <Icon size={22} />}
                 </div>
                 <span className={`mt-1 ${selectedFeeling === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'}`}>
                   {name}
