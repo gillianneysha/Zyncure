@@ -1,50 +1,48 @@
 import { Search } from "lucide-react";
-import { useState, useEffect } from 'react';
-import { supabase } from "../client"; // Adjust the import path as needed
+import { useState, useEffect } from "react";
+// import { supabase } from "../client"; 
 
 export default function Navbar() {
   const [userData, setUserData] = useState({
-    name: 'User',
-    id: '----'
+    name: "User",
+    id: "----",
   });
 
   useEffect(() => {
-    
     const getUserData = async () => {
       try {
-        // get token 
-        const tokenStr = sessionStorage.getItem('token');
+        // get token
+        const tokenStr = sessionStorage.getItem("token");
         if (!tokenStr) return;
-        
+
         const token = JSON.parse(tokenStr);
-        
-        // Check session 
+
+        // Check session
         if (token?.session?.user) {
           const { user } = token.session;
-          
-          const initialName = user.user_metadata?.first_name || 
-                              user.email?.split('@')[0] || 
-                              'User';
-          
+
+          const initialName =
+            user.user_metadata?.first_name ||
+            user.email?.split("@")[0] ||
+            "User";
+
           setUserData({
             name: initialName,
-            id: user.id.substring(0, 4) 
+            id: user.id.substring(0, 4),
           });
-          
-         
 
-          const { data, error } = await supabase
-            .from('profiles') 
-            .select('full_name, display_name')
-            .eq('id', user.id)
-            .single();
-            
-          if (data && !error) {
-            setUserData(prevState => ({
-              ...prevState,
-              name: data.full_name || data.display_name || prevState.name
-            }));
-          }
+          // const { data, error } = await supabase
+          //   .from("profiles")
+          //   .select("full_name, display_name")
+          //   .eq("id", user.id)
+          //   .single();
+
+          // if (data && !error) {
+          //   setUserData((prevState) => ({
+          //     ...prevState,
+          //     name: data.full_name || data.display_name || prevState.name,
+          //   }));
+          // }
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -54,9 +52,9 @@ export default function Navbar() {
     getUserData();
   }, []);
 
-  // get first name 
-  const firstName = userData.name.includes(' ') 
-    ? userData.name.split(' ')[0] 
+  // get first name
+  const firstName = userData.name.includes(" ")
+    ? userData.name.split(" ")[0]
     : userData.name;
 
   return (
@@ -78,7 +76,9 @@ export default function Navbar() {
           <span className="text-sm text-white">ID: {userData.id}</span>
         </div>
         <img
-          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=c7d2fe&color=3730a3`}
+          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+            userData.name
+          )}&background=c7d2fe&color=3730a3`}
           alt="User Avatar"
           className="w-10 h-10 rounded-full border-2 border-indigo-300"
         />
