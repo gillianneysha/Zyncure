@@ -60,7 +60,7 @@ export default function Navbar() {
     : userData.name;
 
   return (
-    <nav className="h-16 bg-mySidebar shadow-md px-6 flex items-center justify-between">
+    <nav className="h-16 bg-mySidebar shadow-md px-8 py-6 flex items-center justify-between">
       {/* Search bar */}
       <div className="relative w-full max-w-sm">
         <input
