@@ -20,6 +20,7 @@ import {
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 
+
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Period');
   const [selectedFlow, setSelectedFlow] = useState('Moderate');
@@ -27,38 +28,47 @@ const PeriodTracker = () => {
   const [selectedSkin, setSelectedSkin] = useState('');
   const [date, setDate] = useState(new Date());
 
+
   const handleFlowSelect = (flow) => setSelectedFlow(flow);
   const handleFeelingSelect = (feeling) => setSelectedFeeling(feeling);
   const handleSkinSelect = (skin) => setSelectedSkin(skin);
+
 
   const handleSavePeriod = async () => {
     const { error } = await supabase
       .from('SymptomLogs')
       .insert([{ Period: selectedFlow, date: date.toISOString().split('T')[0] }]);
 
+
     if (error) console.error('Error saving period:', error);
     else alert(`Flow saved: ${selectedFlow} on ${date.toDateString()}`);
   };
+
 
   const handleSaveFeeling = async () => {
     const { error } = await supabase
       .from('SymptomLogs')
       .insert([{ Feeling: selectedFeeling, date: date.toISOString().split('T')[0] }]);
 
+
     if (error) console.error('Error saving feeling:', error);
     else alert(`Feeling saved: ${selectedFeeling} on ${date.toDateString()}`);
   };
+
 
   const handleSaveSkin = async () => {
     const { error } = await supabase
       .from('SymptomLogs')
       .insert([{ Skin: selectedSkin, date: date.toISOString().split('T')[0] }]);
 
+
     if (error) console.error('Error saving skin:', error);
     else alert(`Skin type saved: ${selectedSkin} on ${date.toDateString()}`);
   };
 
+
   const [selectedMetabolism, setSelectedMetabolism] = useState('');
+
 
   const handleMetabolismSelect = (metabolism) => setSelectedMetabolism(metabolism);
   const handleSaveMetabolism = async () => {
@@ -66,11 +76,13 @@ const PeriodTracker = () => {
     .from('SymptomLogs')
     .insert([{ Metabolism: selectedMetabolism, date: date.toISOString().split('T')[0] }]);
 
+
   if (error) console.error('Error saving metabolism:', error);
   else alert(`Metabolism saved: ${selectedMetabolism} on ${date.toDateString()}`);
 };
 
-  
+
+ 
   const flowOptions = ['Light', 'Moderate', 'Heavy'];
   const iconSizes = {
     Light: 20,
@@ -78,8 +90,10 @@ const PeriodTracker = () => {
     Heavy: 34,
   };
 
+
   return (
     <div className="bg-[#FFF0EA] min-h-screen flex flex-col items-center px-6 py-6 font-sans relative text-[#B65C4B] text-sm pb-16 -translate-y-2">
+
 
       {/* Calendar */}
       <div className="mb-2 text-xs scale-[0.92] shadow-lg rounded-lg">
@@ -98,6 +112,7 @@ const PeriodTracker = () => {
         />
       </div>
 
+
       {/* Tabs */}
       <div className="w-full max-w-md mb-2 flex gap-2 justify-center">
         {['Period', 'Feelings', 'Skin', 'Metabolism'].map((tab) => (
@@ -114,6 +129,7 @@ const PeriodTracker = () => {
           </div>
         ))}
       </div>
+
 
       {/* Period Tab */}
       {selectedTab === 'Period' && (
@@ -146,6 +162,7 @@ const PeriodTracker = () => {
           </button>
         </>
       )}
+
 
       {/* Feelings Tab */}
       {selectedTab === 'Feelings' && (
@@ -186,6 +203,7 @@ const PeriodTracker = () => {
         </>
       )}
 
+
       {/* Skin Tab */}
       {selectedTab === 'Skin' && (
         <>
@@ -224,7 +242,7 @@ const PeriodTracker = () => {
           </button>
         </>
       )}
-      
+     
       {/* Metabolism Tab */}
       {selectedTab === 'Metabolism' && (
   <>
@@ -265,6 +283,8 @@ const PeriodTracker = () => {
 )}
 
 
+
+
       {/* Report Buttons */}
       <div className="absolute bottom-16 right-4 bg-[#FFEFE9] border border-[#F8C8B6] rounded-xl px-6 py-4 flex gap-6 shadow-sm">
         <button className="flex flex-col items-center text-[#B65C4B] text-xs bg-transparent border-none">
@@ -280,4 +300,11 @@ const PeriodTracker = () => {
   );
 };
 
+
 export default PeriodTracker;
+
+
+
+
+
+
