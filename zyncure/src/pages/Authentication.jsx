@@ -18,12 +18,13 @@ export default function AuthContainer({ setToken }) {
 
     return (
         <div
-            className="min-h-screen flex flex-col items-center justify-center bg-[#F46B5D] py-16"
+            className="min-h-screen flex flex-col items-center justify-center bg-[#F46B5D] py-16 bg-fixed"
             style={{
-                backgroundImage: "url('/zyncure_register_bg.png')",
+                backgroundImage: "url('/zyncure_login_bg.png')",
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
+                backgroundRepeat: 'no-repeat',
+                backgroundAttachment: 'absolute',
             }}
         >
             <img
