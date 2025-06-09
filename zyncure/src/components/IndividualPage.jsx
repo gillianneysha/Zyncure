@@ -82,7 +82,7 @@ export function SecurityPage() {
         </div>
         <div className="mt-8">
           <div
-            className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors bg-red-100"
+            className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
             onClick={() => setShowChangePassword(true)}
           >
             <span className="text-mySidebar">Change password</span>
@@ -114,7 +114,7 @@ export function SecurityPage() {
           <label className="block text-profileText mb-2 text-lg font-normal">Old Password</label>
           <input
             type="password"
-            className="w-full p-4 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+            className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
             placeholder="Old Password"
           />
         </div>
@@ -122,7 +122,7 @@ export function SecurityPage() {
           <label className="block text-profileText mb-2 text-lg font-normal">New Password</label>
           <input
             type="password"
-            className="w-full p-4 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+            className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
             placeholder="New Password"
           />
         </div>
@@ -130,7 +130,7 @@ export function SecurityPage() {
           <label className="block text-profileText mb-2 text-lg font-normal">Re-enter New Password</label>
           <input
             type="password"
-            className="w-full p-4 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+            className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
             placeholder="Re-enter New Password"
           />
         </div>
