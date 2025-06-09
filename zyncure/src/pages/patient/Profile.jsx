@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
+import LogoutModal from "../../components/LogoutModal";
 import { PersonalInfoForm } from "../../components/IndividualPage.jsx";
 import { SecurityPage } from "../../components/IndividualPage.jsx";
 import { NotificationPage } from "../../components/IndividualPage.jsx";
@@ -8,17 +9,28 @@ import { BillingPage } from "../../components/IndividualPage.jsx";
 import { PoliciesPage } from "../../components/IndividualPage.jsx";
 import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
 
-
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("My Profile");
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = () => {
+  // Show modal instead of logging out immediately
+  const handleLogoutClick = () => {
+    setShowLogoutModal(true);
+  };
+
+  // Called when user confirms logout
+  const handleLogoutConfirm = () => {
     sessionStorage.removeItem('token');
+    setShowLogoutModal(false);
     navigate('/');
   };
 
-  // tabs!
+  // Called when user cancels logout
+  const handleLogoutCancel = () => {
+    setShowLogoutModal(false);
+  };
+
   const tabs = [
     { id: "My Profile", component: <PersonalInfoForm /> },
     { id: "Security", component: <SecurityPage /> },
@@ -49,7 +61,7 @@ export default function ProfilePage() {
         {/* Logout*/}
         <div 
           className="flex items-center p-4 rounded-lg cursor-pointer hover:bg-profileBg text-profileText mt-4"
-          onClick={handleLogout}
+          onClick={handleLogoutClick} // <-- use modal trigger
         >
           <LogOut size={20} className="mr-2" />
           <span>Log out</span>
@@ -60,6 +72,13 @@ export default function ProfilePage() {
       <div className="flex-1 p-6">
         {tabs.find(tab => tab.id === activeTab)?.component}
       </div>
+
+      {/* Logout Modal */}
+      <LogoutModal
+        open={showLogoutModal}
+        onCancel={handleLogoutCancel}
+        onConfirm={handleLogoutConfirm}
+      />
     </div>
   );
 }
