@@ -1,4 +1,4 @@
-import { PencilIcon, ChevronRight } from "lucide-react";
+import { PencilIcon, ChevronRight, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 
 
@@ -69,7 +69,7 @@ export function PersonalInfoForm() {
 }
 
 export function SecurityPage() {
-  
+
 
   const handleOptionClick = (option) => {
     // Here you would typically navigate to the respective page or open a modal
@@ -78,7 +78,7 @@ export function SecurityPage() {
 
   const SecurityOption = ({ title, onClick }) => {
     return (
-      <div 
+      <div
         className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
         onClick={() => onClick(title)}
       >
@@ -98,12 +98,12 @@ export function SecurityPage() {
       </div>
 
       <div className="mt-8">
-        <SecurityOption 
-          title="Change password" 
+        <SecurityOption
+          title="Change password"
           onClick={handleOptionClick}
         />
-        <SecurityOption 
-          title="Two-factor authentication" 
+        <SecurityOption
+          title="Two-factor authentication"
           onClick={handleOptionClick}
         />
       </div>
@@ -116,7 +116,7 @@ export function NotificationPage() {
   const [reminderNotifications, setReminderNotifications] = useState(true);
   const [reminderPush, setReminderPush] = useState(true);
   const [reminderEmail, setReminderEmail] = useState(true);
-  
+
   const [eventNotifications, setEventNotifications] = useState(true);
   const [eventPush, setEventPush] = useState(true);
   const [eventEmail, setEventEmail] = useState(true);
@@ -126,25 +126,23 @@ export function NotificationPage() {
     return (
       <button
         type="button"
-        className={`relative inline-flex h-6 w-11 items-center rounded-full ${
-          enabled ? "bg-profileHeader" : "bg-gray-200"
-        }`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full ${enabled ? "bg-profileHeader" : "bg-gray-200"
+          }`}
         onClick={() => onChange(!enabled)}
       >
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-            enabled ? "translate-x-6" : "translate-x-1"
-          }`}
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${enabled ? "translate-x-6" : "translate-x-1"
+            }`}
         />
       </button>
     );
   };
 
   // Notification category component
-  const NotificationCategory = ({ 
-    title, 
-    description, 
-    mainEnabled, 
+  const NotificationCategory = ({
+    title,
+    description,
+    mainEnabled,
     setMainEnabled,
     pushEnabled,
     setPushEnabled,
@@ -155,26 +153,26 @@ export function NotificationPage() {
       <div className="mb-8 ">
         <div className="text-profileText font-bold text-lg">{title}</div>
         <div className="text-profileSubtext text-base mb-2">Manage {description} notifications.</div>
-        
+
         <div className="bg-profileBg rounded-lg p-4 border border-mySidebar">
           <div className="flex justify-between items-center py-2">
             <span className="text-mySidebar">Allow reminder notifications</span>
             <Toggle enabled={mainEnabled} onChange={setMainEnabled} />
           </div>
-          
+
           <div className="flex justify-between items-center py-2 ">
             <span className="text-mySidebar">Push</span>
-            <Toggle 
-              enabled={mainEnabled && pushEnabled} 
-              onChange={setPushEnabled} 
+            <Toggle
+              enabled={mainEnabled && pushEnabled}
+              onChange={setPushEnabled}
             />
           </div>
-          
+
           <div className="flex justify-between items-center py-2">
             <span className="text-mySidebar">Email</span>
-            <Toggle 
-              enabled={mainEnabled && emailEnabled} 
-              onChange={setEmailEnabled} 
+            <Toggle
+              enabled={mainEnabled && emailEnabled}
+              onChange={setEmailEnabled}
             />
           </div>
         </div>
@@ -187,7 +185,7 @@ export function NotificationPage() {
       <div className="mb-6">
         <h2 className="text-4xl text-profileHeader font-bold">Notifications</h2>
       </div>
-      
+
       <NotificationCategory
         title="Reminders"
         description="reminders"
@@ -198,7 +196,7 @@ export function NotificationPage() {
         emailEnabled={reminderEmail}
         setEmailEnabled={setReminderEmail}
       />
-      
+
       <NotificationCategory
         title="Events"
         description="events"
@@ -214,7 +212,7 @@ export function NotificationPage() {
 }
 
 export function BillingPage() {
-  
+
 
   const handleOptionClick = (option) => {
     // Here you would typically navigate to the respective page or open a modal
@@ -223,7 +221,7 @@ export function BillingPage() {
 
   const SecurityOption = ({ title, onClick }) => {
     return (
-      <div 
+      <div
         className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
         onClick={() => onClick(title)}
       >
@@ -243,16 +241,16 @@ export function BillingPage() {
       </div>
 
       <div className="mt-8">
-        <SecurityOption 
-          title="Subscriptions" 
+        <SecurityOption
+          title="Subscriptions"
           onClick={handleOptionClick}
         />
-        <SecurityOption 
-          title="Payment methods" 
+        <SecurityOption
+          title="Payment methods"
           onClick={handleOptionClick}
         />
-        <SecurityOption 
-          title="Contact Information" 
+        <SecurityOption
+          title="Contact Information"
           onClick={handleOptionClick}
         />
       </div>
@@ -260,43 +258,187 @@ export function BillingPage() {
   );
 }
 
+export function TermsOfServicePage({ onBack }) {
+  return (
+    <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
+      <button onClick={onBack} className="flex items-center text-mySidebar mb-6 hover:underline">
+        <ArrowLeft className="mr-2" size={20} /> Back to Policies
+      </button>
+      <h2 className="text-4xl text-profileHeader font-bold mb-4">ZynCure’s Terms and Conditions</h2>
+      <div className="text-mySidebar space-y-4 text-base max-w-3xl">
+        <h3 className="font-bold text-lg mt-4 mb-2">I. Introduction</h3>
+        <p>
+          Welcome to ZynCure! ZynCure is a patient-centered digital health record system designed to enhance accessibility and management of electronic health records (EHR) for patients and medical professionals. By using ZynCure, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions. If you do not agree, please discontinue use immediately.
+        </p>
+        <h3 className="font-bold text-lg mt-4 mb-2">II. User Agreement</h3>
+        <ul className="list-disc ml-6">
+          <li>You are at least 18 years old or have legal capacity to enter into contracts.</li>
+          <li>You have provided accurate and truthful information when registering for an account.</li>
+          <li>You will not use the platform for unlawful or harmful purposes.</li>
+          <li>You will not violate the intellectual property rights of others.</li>
+          <li>You agree to ZynCure’s privacy policy and data security practices.</li>
+          <li>You agree to be bound by ZynCure’s dispute resolution process.</li>
+        </ul>
+        <p>
+          ZynCure may modify these Terms and Conditions at any time. Users will be notified via email or in-app notifications. Continued use of ZynCure after modifications implies acceptance of the updated terms.
+        </p>
+        <h3 className="font-bold text-lg mt-4 mb-2">III. Patient Registration and Services</h3>
+        <ul className="list-disc ml-6">
+          <li><b>Overview:</b> ZynCure provides an online platform where patients can upload, store, and access personal health records.</li>
+          <li><b>Registration:</b> Patients must provide complete and accurate personal information. Any falsification may result in account suspension or termination.</li>
+          <li><b>Data Access:</b> Patients can view their medical records, including medical professional notes and past consultations. Medical providers can only access patient records with explicit patient permission.</li>
+          <li><b>System Features:</b>
+            <ul className="list-decimal ml-6">
+              <li>Account Creation and Management: Users can create and manage personal accounts.</li>
+              <li>Medical Record Viewing: Patients can view, update, and download their medical records.</li>
+              <li>Data Sharing: Patients can grant time-limited, revocable access to healthcare providers to ensure controlled data sharing.</li>
+              <li>Security and Encryption: All data transmissions are encrypted to protect sensitive health information.</li>
+              <li>Medical Professional’s Consultation Tracking: Patients can track their consultation history, including diagnoses and prescribed treatments.</li>
+              <li>User Role Management: Different access levels for patients and healthcare providers to ensure secure system interactions.</li>
+              <li>Audit Logs: Tracks all user activity within the system for security and compliance purposes.</li>
+              <li>Multi-Factor Authentication (MFA): Provides an extra layer of security for user accounts.</li>
+              <li>Offline Data Access: Limited offline functionality for reviewing previously downloaded records.</li>
+              <li>Automated Notifications: Alerts and reminders for patients regarding updates or access requests.</li>
+            </ul>
+          </li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">IV. Data Privacy and Security</h3>
+        <ul className="list-disc ml-6">
+          <li>ZynCure complies with relevant data privacy laws, including the Data Privacy Act of 2012.</li>
+          <li><b>Data Collection:</b> ZynCure collects personal and medical information for service delivery, system improvements, and compliance with legal obligations.</li>
+          <li><b>Data Protection:</b>
+            <ul className="list-decimal ml-6">
+              <li>Encryption: All health records are encrypted using end-to-end encryption (E2EE).</li>
+              <li>Role-Based Access Control (RBAC): Only authorized personnel can access patient records, reducing data breaches.</li>
+              <li>Multi-Factor Authentication (MFA): Users must verify their identity before accessing or modifying records.</li>
+              <li>Data Storage: ZynCure stores records in secure cloud-based servers with continuous monitoring.</li>
+            </ul>
+          </li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">V. Patient Control and Record Management</h3>
+        <ul className="list-disc ml-6">
+          <li>Patient-Controlled Access: Patients have full control over who can view and edit their records.</li>
+          <li>Permission-Based Sharing: Patients can grant and revoke access to medical professionals through unique time-limited access links.</li>
+          <li>Medical Record Updates: Medical professionals can update patient records only with patient consent.</li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">VI. Payment and Fees</h3>
+        <ul className="list-disc ml-6">
+          <li><b>Freemium Model & Subscription Tiers:</b> ZynCure operates on a freemium model, where basic access is free, and additional premium features require a subscription.
+            <ul className="list-decimal ml-6">
+              <li>
+                <b>Tier 1: Free (Basic Access)</b> – View and manage personal health records.
+                <ul className="list-disc ml-6">
+                  <li>Upload and store up to 2GB of medical files.</li>
+                  <li>Share records with up to 3 healthcare providers.</li>
+                  <li>Track up to 3 symptoms with the ability to add custom symptoms.</li>
+                  <li>Basic notifications for upcoming medical appointments.</li>
+                  <li>Access to a health dashboard.</li>
+                  <li>Ability to export health records in a standard format (e.g., PDF).</li>
+                </ul>
+              </li>
+              <li>
+                <b>Tier 2: Premium (Enhanced Access)</b> – Paid Subscription
+                <ul className="list-disc ml-6">
+                  <li>All features in the Free tier</li>
+                  <li>Increased storage capacity up to 5GB.</li>
+                  <li>Track all predefined symptoms and custom symptoms.</li>
+                  <li>Share records with unlimited healthcare providers.</li>
+                </ul>
+              </li>
+              <li>
+                <b>Tier 3: Pro (Comprehensive Access)</b> – Paid Subscription
+                <ul className="list-disc ml-6">
+                  <li>All features in the Premium tier</li>
+                  <li>Priority support for technical issues</li>
+                  <li>Early access to future feature expansions and integrations.</li>
+                  <li>Unlimited storage for medical files.</li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li>Transactions: All payments must be processed through Maya’s secure payment gateway.</li>
+          <li>Refunds: Any payment disputes will be resolved through ZynCure’s support team.</li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">VII. Intellectual Property</h3>
+        <ul className="list-disc ml-6">
+          <li>All content, including software, text, graphics, and logos, is the property of ZynCure or its licensors. Users may not copy, distribute, or modify content without permission.</li>
+          <li>If you believe your intellectual property rights have been infringed, contact ZynCure with supporting documentation.</li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">VIII. Limitations of Liability</h3>
+        <ul className="list-disc ml-6">
+          <li>ZynCure provides services "as is" and does not guarantee uninterrupted or error-free service.</li>
+          <li>ZynCure is not responsible for inaccuracies in user-provided data.</li>
+          <li>ZynCure is not liable for indirect, incidental, or consequential damages resulting from platform use.</li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">IX. Account Termination and Suspension</h3>
+        <ul className="list-disc ml-6">
+          <li>ZynCure may suspend or terminate accounts that violate these terms or engage in prohibited activities.</li>
+          <li>Users may request account deletion by contacting ZynCure’s support team.</li>
+          <li>Inactive accounts may be archived, but user data will be maintained according to data retention policies.</li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">X. Dispute Resolution</h3>
+        <ul className="list-disc ml-6">
+          <li>Users are encouraged to resolve disputes through ZynCure’s support channels.</li>
+          <li>If a resolution is not reached, disputes may be escalated to arbitration or legal proceedings as permitted by law.</li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">XI. Governing Law</h3>
+        <ul className="list-disc ml-6">
+          <li>These Terms and Conditions shall be governed by and interpreted in accordance with the laws of the Philippines.</li>
+        </ul>
+        <h3 className="font-bold text-lg mt-4 mb-2">XII. Amendments and Contact Information</h3>
+        <ul className="list-disc ml-6">
+          <li>ZynCure reserves the right to amend these Terms and Conditions at any time.</li>
+          <li>Users will be notified of significant changes through email or in-app notifications.</li>
+          <li>For questions or concerns, contact ZynCure Support at <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a>.</li>
+        </ul>
+        <p>
+          By using ZynCure, you acknowledge and agree to these Terms and Conditions. If you do not agree, please discontinue use immediately.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function PoliciesPage() {
- 
+  const [showTerms, setShowTerms] = useState(false);
 
   const handleOptionClick = (option) => {
-    // Here you would typically navigate to the respective page or open a modal
-    console.log(`Clicked on ${option}`);
+    if (option === "Terms of Service") setShowTerms(true);
+    // Optionally add similar for Privacy Policy, etc.
   };
 
-  const SecurityOption = ({ title, onClick }) => {
-    return (
-      <div 
-        className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
-        onClick={() => onClick(title)}
-      >
-        <span className="text-mySidebar">{title}</span>
-        <ChevronRight className="text-mySidebar" size={20} />
-      </div>
-    );
-  };
+  const SecurityOption = ({ title, onClick }) => (
+    <div
+      className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+      onClick={() => onClick(title)}
+    >
+      <span className="text-mySidebar">{title}</span>
+      <ChevronRight className="text-mySidebar" size={20} />
+    </div>
+  );
 
+  // When showTerms is true, render the TermsOfServicePage with a back button
+  if (showTerms) {
+    return <TermsOfServicePage onBack={() => setShowTerms(false)} />;
+  }
+
+  // Otherwise, render the policies list
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
         <h2 className="text-4xl text-profileHeader font-bold">Policies and Standards</h2>
       </div>
-
       <div className="mt-8">
-        <SecurityOption 
-          title="Terms of Service" 
+        <SecurityOption
+          title="Terms of Service"
           onClick={handleOptionClick}
         />
-        <SecurityOption 
-          title="Privacy Policy" 
+        <SecurityOption
+          title="Privacy Policy"
           onClick={handleOptionClick}
         />
-        <SecurityOption 
-          title="Community Standards" 
+        <SecurityOption
+          title="Community Standards"
           onClick={handleOptionClick}
         />
       </div>
