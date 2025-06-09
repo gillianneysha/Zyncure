@@ -69,44 +69,80 @@ export function PersonalInfoForm() {
 }
 
 export function SecurityPage() {
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
-
-  const handleOptionClick = (option) => {
-    // Here you would typically navigate to the respective page or open a modal
-    console.log(`Clicked on ${option}`);
-  };
-
-  const SecurityOption = ({ title, onClick }) => {
+  if (!showChangePassword) {
     return (
-      <div
-        className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
-        onClick={() => onClick(title)}
-      >
-        <span className="text-mySidebar">{title}</span>
-        <ChevronRight className="text-mySidebar" size={20} />
+      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+        <div className="mb-6">
+          <h2 className="text-4xl text-profileHeader font-bold">Security</h2>
+          <p className="text-zyncureOrange text-left">
+            Manage account password and login preferences.
+          </p>
+        </div>
+        <div className="mt-8">
+          <div
+            className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors bg-red-100"
+            onClick={() => setShowChangePassword(true)}
+          >
+            <span className="text-mySidebar">Change password</span>
+            <ChevronRight className="text-mySidebar" size={20} />
+          </div>
+          <div
+            className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+          >
+            <span className="text-mySidebar">Two-factor authentication</span>
+            <ChevronRight className="text-mySidebar" size={20} />
+          </div>
+        </div>
       </div>
     );
-  };
+  }
 
+  // Change Password Page
   return (
-    <div className="bg-profileBg rounded-xl p-8 h-[700px]">
-      <div className="mb-6">
-        <h2 className="text-4xl text-profileHeader font-bold">Security</h2>
-        <p className="text-zyncureOrange text-left">
-          Manage account password and login preferences.
-        </p>
-      </div>
-
-      <div className="mt-8">
-        <SecurityOption
-          title="Change password"
-          onClick={handleOptionClick}
-        />
-        <SecurityOption
-          title="Two-factor authentication"
-          onClick={handleOptionClick}
-        />
-      </div>
+    <div className="bg-profileBg rounded-xl p-8 h-[700px] flex flex-col">
+      <button
+        onClick={() => setShowChangePassword(false)}
+        className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
+      >
+        <ArrowLeft className="mr-2" size={20} /> Back to Security
+      </button>
+      <h2 className="text-4xl text-profileHeader font-bold mb-8">Change Password</h2>
+      <form className="flex flex-col gap-6 max-w-3xl w-full">
+        <div>
+          <label className="block text-profileText mb-2 text-lg font-normal">Old Password</label>
+          <input
+            type="password"
+            className="w-full p-4 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+            placeholder="Old Password"
+          />
+        </div>
+        <div>
+          <label className="block text-profileText mb-2 text-lg font-normal">New Password</label>
+          <input
+            type="password"
+            className="w-full p-4 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+            placeholder="New Password"
+          />
+        </div>
+        <div>
+          <label className="block text-profileText mb-2 text-lg font-normal">Re-enter New Password</label>
+          <input
+            type="password"
+            className="w-full p-4 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+            placeholder="Re-enter New Password"
+          />
+        </div>
+        <div className="flex justify-center mt-4">
+          <button
+            type="submit"
+            className="bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
+          >
+            Update
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -486,7 +522,8 @@ export function PrivacyPolicyPage({ onBack }) {
         <p>
           If you have any questions, concerns, or requests regarding this Privacy Agreement or your data, please contact us at:<br />
           <b>Email:</b> <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a><br />
-          <b>Phone:</b> +63 (2) 1234-5678  
+          <b>Phone:</b> +63 (2) 1234-5678 
+ 
         </p>
         <p>
           Thank you for trusting ZynCure with your health information. We are committed to supporting you on your PCOS journey while protecting your privacy every step of the way.
