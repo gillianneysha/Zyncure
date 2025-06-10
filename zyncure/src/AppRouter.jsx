@@ -12,8 +12,15 @@ import PatientNotifications from "./pages/patient/Notifications";
 import PatientHealthRecords from "./pages/patient/Records";
 import PatientTracking from "./pages/patient/Tracking";
 import PatientHealth from "./pages/patient/YourHealth";
+
+
 import DoctorHome from "./pages/doctor/Home";
 import DoctorPatients from "./pages/doctor/Patients";
+import DoctorProfile from "./pages/doctor/Profile";
+import DoctorAppointments from "./pages/doctor/Appointments";
+import DoctorReports from "./pages/doctor/Reports";
+import DoctorConnections from "./pages/doctor/Connections";
+import DoctorNotifications from "./pages/doctor/Notifications";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { user, isLoading } = useUser();
@@ -133,7 +140,15 @@ export default function AppRouter() {
         }
       >
         <Route index element={<DoctorHome />} />
-        <Route path="patients" element={<DoctorPatients />} />
+        {/* <Route path="patients" element={<DoctorPatients />} /> */}
+        <Route path="profile" element={<DoctorProfile />} />
+        <Route path="patients">
+          <Route index element={<DoctorPatients />} />
+          <Route path="appointments" element={<DoctorAppointments/>} />
+          <Route path="reports" element={<DoctorReports />} />
+        </Route>
+        <Route path="connections" element={<DoctorConnections />} />
+        <Route path="notifications" element={<DoctorNotifications />} />
       </Route>
 
       {/* Catch-all route */}
