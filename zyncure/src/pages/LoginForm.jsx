@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../client";
+import { Eye, EyeOff } from "lucide-react";
+import PasswordInput from "../components/PasswordInput";
 
 // Moved FormField outside the component and memoized it
 const FormField = React.memo(({ 
@@ -46,6 +48,7 @@ export default function LoginForm({ setToken }) {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Memoized handleChange function
   const handleChange = useCallback((event) => {
@@ -196,18 +199,30 @@ export default function LoginForm({ setToken }) {
         disabled={isLoading}
       />
 
-      <FormField 
-        label="Password" 
-        name="password" 
-        type="password" 
-        placeholder="Password" 
-        value={formData.password}
-        onChange={handleChange}
-        error={errors.password}
-        disabled={isLoading}
-      />
+      <div className="w-4/5 mx-auto">
+        <PasswordInput
+          label="Password"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="Password"
+          error={errors.password}
+          disabled={isLoading}
+        />
+      </div>
 
-      <div className="w-4/5 mx-auto text-right mb-4">
+      <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <input
+            id="rememberMe"
+            type="checkbox"
+            className="mr-2 accent-[#55A1A4] w-4 h-4 rounded"
+            // You can add checked/onChange logic if you want to handle the value
+          />
+          <label htmlFor="rememberMe" className="text-[#F5E0D9] text-sm select-none">
+            Remember me
+          </label>
+        </div>
         <button
           type="button"
           onClick={handleForgotPassword}
@@ -229,6 +244,18 @@ export default function LoginForm({ setToken }) {
       >
         {isLoading ? "Logging In..." : "Log In"}
       </button>
+
+      <div className="w-4/5 mx-auto mt-2 text-left">
+        <span className="text-[#F5E0D9] text-sm">
+          Don’t have an account?{" "}
+          <a
+            href="/register"
+            className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+          >
+            Register Here
+          </a>
+        </span>
+      </div>
 
       <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
         <div className="flex items-center justify-center my-4">
