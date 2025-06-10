@@ -1,4 +1,4 @@
-import { PencilIcon, ChevronRight, ArrowLeft } from "lucide-react";
+import { PencilIcon, ChevronRight, ArrowLeft, Eye } from "lucide-react";
 import { useState } from "react";
 
 
@@ -70,79 +70,130 @@ export function PersonalInfoForm() {
 
 export function SecurityPage() {
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false); // <-- Add this
 
-  if (!showChangePassword) {
+  if (showChangePassword) {
     return (
-      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
-        <div className="mb-6">
-          <h2 className="text-4xl text-profileHeader font-bold">Security</h2>
-          <p className="text-zyncureOrange text-left">
-            Manage account password and login preferences.
-          </p>
-        </div>
-        <div className="mt-8">
-          <div
-            className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
-            onClick={() => setShowChangePassword(true)}
-          >
-            <span className="text-mySidebar">Change password</span>
-            <ChevronRight className="text-mySidebar" size={20} />
+      <div className="bg-profileBg rounded-xl p-8 h-[700px] flex flex-col">
+        <button
+          onClick={() => setShowChangePassword(false)}
+          className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
+        >
+          <ArrowLeft className="mr-2" size={20} /> Back to Security
+        </button>
+        <h2 className="text-4xl text-profileHeader font-bold mb-8">Change Password</h2>
+        <form className="flex flex-col gap-6 max-w-3xl w-full">
+          <div>
+            <label className="block text-profileText mb-2 text-lg font-normal">Old Password</label>
+            <input
+              type="password"
+              className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+              placeholder="Old Password"
+            />
           </div>
-          <div
-            className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
-          >
-            <span className="text-mySidebar">Two-factor authentication</span>
-            <ChevronRight className="text-mySidebar" size={20} />
+          <div>
+            <label className="block text-profileText mb-2 text-lg font-normal">New Password</label>
+            <input
+              type="password"
+              className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+              placeholder="New Password"
+            />
+          </div>
+          <div>
+            <label className="block text-profileText mb-2 text-lg font-normal">Re-enter New Password</label>
+            <input
+              type="password"
+              className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
+              placeholder="Re-enter New Password"
+            />
+          </div>
+          <div className="flex justify-center mt-4">
+            <button
+              type="submit"
+              className="bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
+            >
+              Update
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  if (showTwoFactor) {
+    // Toggle component (same as NotificationPage)
+    const Toggle = ({ enabled, onChange }) => (
+      <button
+        type="button"
+        className={`relative inline-flex h-6 w-11 items-center rounded-full ${enabled ? "bg-profileHeader" : "bg-gray-200"}`}
+        onClick={() => onChange(!enabled)}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${enabled ? "translate-x-6" : "translate-x-1"}`}
+        />
+      </button>
+    );
+
+    return (
+      <div className="bg-profileBg rounded-xl p-8 h-[700px] flex flex-col">
+        <button
+          onClick={() => setShowTwoFactor(false)}
+          className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
+        >
+          <ArrowLeft className="mr-2" size={20} /> Back to Security
+        </button>
+        <h2 className="text-4xl text-profileHeader font-bold mb-8">Two-factor Authentication</h2>
+        <div className="border border-[#F46B5D] rounded-xl bg-profileBg w-full max-w-4xl">
+          <div className="flex items-center justify-between px-6 pt-5 pb-2">
+            <div>
+              <span className="block text-[#F46B5D] font-semibold text-base mb-1">
+                Enable Two-factor Authentication
+              </span>
+              <span className="block text-[#F46B5D] text-sm mb-1">
+                m*****@gmail.com
+              </span>
+            </div>
+            <Toggle enabled={twoFactorEnabled} onChange={setTwoFactorEnabled} />
+          </div>
+          <div className="border-t border-[#F46B5D] px-6 py-4">
+            <button
+              type="button"
+              className="text-profileHeader font-semibold underline hover:text-[#368487] transition text-base"
+            >
+              Use a different email address
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
-  // Change Password Page
+  // --- Main Security Page ---
   return (
-    <div className="bg-profileBg rounded-xl p-8 h-[700px] flex flex-col">
-      <button
-        onClick={() => setShowChangePassword(false)}
-        className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
-      >
-        <ArrowLeft className="mr-2" size={20} /> Back to Security
-      </button>
-      <h2 className="text-4xl text-profileHeader font-bold mb-8">Change Password</h2>
-      <form className="flex flex-col gap-6 max-w-3xl w-full">
-        <div>
-          <label className="block text-profileText mb-2 text-lg font-normal">Old Password</label>
-          <input
-            type="password"
-            className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
-            placeholder="Old Password"
-          />
+    <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+      <div className="mb-6">
+        <h2 className="text-4xl text-profileHeader font-bold">Security</h2>
+        <p className="text-zyncureOrange text-left">
+          Manage account password and login preferences.
+        </p>
+      </div>
+      <div className="mt-8">
+        <div
+          className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+          onClick={() => setShowChangePassword(true)}
+        >
+          <span className="text-mySidebar">Change password</span>
+          <ChevronRight className="text-mySidebar" size={20} />
         </div>
-        <div>
-          <label className="block text-profileText mb-2 text-lg font-normal">New Password</label>
-          <input
-            type="password"
-            className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
-            placeholder="New Password"
-          />
+        <div
+          className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+          onClick={() => setShowTwoFactor(true)}
+        >
+          <span className="text-mySidebar">Two-factor authentication</span>
+          <ChevronRight className="text-mySidebar" size={20} />
         </div>
-        <div>
-          <label className="block text-profileText mb-2 text-lg font-normal">Re-enter New Password</label>
-          <input
-            type="password"
-            className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
-            placeholder="Re-enter New Password"
-          />
-        </div>
-        <div className="flex justify-center mt-4">
-          <button
-            type="submit"
-            className="bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
-          >
-            Update
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }
