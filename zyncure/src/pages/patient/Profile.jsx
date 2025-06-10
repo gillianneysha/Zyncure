@@ -9,7 +9,7 @@ import { BillingPage } from "../../components/IndividualPage.jsx";
 import { PoliciesPage } from "../../components/IndividualPage.jsx";
 import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
 
-export default function ProfilePage() {
+export default function ProfilePage({ setIsAuthenticated }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("My Profile");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -20,11 +20,15 @@ export default function ProfilePage() {
   };
 
   // Called when user confirms logout
-  const handleLogoutConfirm = () => {
+  const handleLogoutConfirm = async () => {
+    // First update auth state
+    setIsAuthenticated(false); // Add this prop from AppRouter
+    // Then clear storage
     sessionStorage.removeItem('token');
     setShowLogoutModal(false);
-    navigate('/');
-  };
+    // Finally navigate
+    navigate('/', { replace: true });
+};
 
   // Called when user cancels logout
   const handleLogoutCancel = () => {

@@ -3,7 +3,7 @@ import Sidebar, { SidebarItem, SidebarSubItem } from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { CalendarDays, Users, Bell, Heart, House, User, ChartPie, Folders } from 'lucide-react';
 
-export default function PatientLayout() {
+export default function DoctorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
