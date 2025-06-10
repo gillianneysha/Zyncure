@@ -1,76 +1,69 @@
-import React, { useState, useEffect } from 'react';
-import { Search, MoreHorizontal, Plus, UserPlus, Check, UserMinus, Trash2 } from 'lucide-react';
-
-// Mock Supabase client for demonstration
-const mockSupabase = {
-  from: () => ({
-    select: () => ({
-      ilike: (column, pattern) => ({
-        limit: () => Promise.resolve({
-          data: [
-            {
-              med_id: 'abcd-1234-5678-90ef',
-              first_name: 'Dr. John',
-              last_name: 'Yappy',
-              specialty: 'Cardiologist',
-              hospital: 'Metro General'
-            },
-            {
-              med_id: 'abcd-9876-5432-10ab',
-              first_name: 'Dr. Sarah',
-              last_name: 'Via',
-              specialty: 'Neurologist',
-              hospital: 'City Medical'
-            },
-            {
-              med_id: 'abcd-5555-7777-99cc',
-              first_name: 'Dr. Michael',
-              last_name: 'Manny',
-              specialty: 'Pediatrician',
-              hospital: 'Children\'s Hospital'
-            }
-          ].filter(doc => doc.med_id.toLowerCase().startsWith(pattern.replace('%', '').toLowerCase())),
-          error: null
-        })
-      })
-    }),
-    insert: () => Promise.resolve({ data: null, error: null }),
-    delete: () => ({ eq: () => Promise.resolve({ error: null }) })
-  })
-};
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, MoreHorizontal, UserPlus, Check, UserMinus } from 'lucide-react';
+import { supabase } from '../../client'; 
 
 const ConnectionsPage = () => {
+  // ========================================
+  // STATE MANAGEMENT
+  // ========================================
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [connections, setConnections] = useState([
-    {
-      id: 1,
-      med_id: 'doc1-1234-5678-90ab',
-      name: 'Doc Yappy',
-      specialty: 'Cardiologist',
-      hospital: 'Metro General'
-    },
-    {
-      id: 2,
-      med_id: 'doc2-5678-9012-34cd',
-      name: 'Doc Via',
-      specialty: 'Neurologist', 
-      hospital: 'City Medical'
-    },
-    {
-      id: 3,
-      med_id: 'doc3-9012-3456-78ef',
-      name: 'Doc Manny',
-      specialty: 'Pediatrician',
-      hospital: 'Children\'s Hospital'
-    }
-  ]);
+  const [connections, setConnections] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [addedConnections, setAddedConnections] = useState(new Set());
   const [showDropdown, setShowDropdown] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // Search for doctors by first 4 characters of UUID
-  const searchDoctors = async (term) => {
+  // ========================================
+  // USER AUTHENTICATION & INITIALIZATION
+  // ========================================
+  useEffect(() => {
+    getCurrentUser();
+    loadConnections();
+  }, []);
+
+  const getCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error getting current user:', error);
+    }
+  };
+
+  // ========================================
+  // DATA LOADING FUNCTIONS
+  // ========================================
+  const loadConnections = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get connections using the view we created for detailed information
+      const { data, error } = await supabase
+        .from('connection_details')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setConnections(data || []);
+      
+      // Track which doctors are already connected
+      const connectedDoctorIds = new Set(data?.map(conn => conn.med_id) || []);
+      setAddedConnections(connectedDoctorIds);
+      
+    } catch (error) {
+      console.error('Error loading connections:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ========================================
+  // SEARCH FUNCTIONALITY
+  // ========================================
+  const searchDoctors = useCallback(async (term) => {
     if (term.length < 3) {
       setSearchResults([]);
       return;
@@ -78,72 +71,29 @@ const ConnectionsPage = () => {
 
     setIsSearching(true);
     try {
-      // In real implementation, replace with actual Supabase client
-      const { data, error } = await mockSupabase
-        .from('medicalprofessionals')
-        .select('med_id, first_name, last_name, specialty, hospital')
-        .ilike('med_id', `${term}%`)
-        .limit(10);
+      // Use the search function we created
+      const { data, error } = await supabase
+        .rpc('search_medical_professional_by_short_id', { 
+          search_id: term.toUpperCase() 
+        });
 
       if (error) throw error;
-      setSearchResults(data || []);
+      
+      // Filter out already connected doctors
+      const filteredResults = (data || []).filter(
+        doctor => !addedConnections.has(doctor.med_id)
+      );
+      
+      setSearchResults(filteredResults);
     } catch (error) {
       console.error('Error searching doctors:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [addedConnections]);
 
-  // Remove doctor from connections
-  const removeConnection = async (connectionId, doctorId) => {
-    try {
-      // In real implementation, delete from connections table
-      await mockSupabase.from('connections').delete().eq('id', connectionId);
-
-      // Update local state
-      setConnections(prev => prev.filter(conn => conn.id !== connectionId));
-      setAddedConnections(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(doctorId);
-        return newSet;
-      });
-    } catch (error) {
-      console.error('Error removing connection:', error);
-    }
-  };
-  const addConnection = async (doctor) => {
-    try {
-      // In real implementation, you'd insert into a connections table
-      const connectionData = {
-        user_id: 'current-user-id', // Get from auth context
-        doctor_id: doctor.med_id,
-        created_at: new Date().toISOString()
-      };
-
-      // Mock API call
-      await mockSupabase.from('connections').insert(connectionData);
-
-      // Update local state
-      const newConnection = {
-        id: Date.now(),
-        med_id: doctor.med_id,
-        name: `${doctor.first_name} ${doctor.last_name}`,
-        specialty: doctor.specialty,
-        hospital: doctor.hospital
-      };
-
-      setConnections(prev => [...prev, newConnection]);
-      setAddedConnections(prev => new Set([...prev, doctor.med_id]));
-      
-      // Remove from search results
-      setSearchResults(prev => prev.filter(d => d.med_id !== doctor.med_id));
-    } catch (error) {
-      console.error('Error adding connection:', error);
-    }
-  };
-
-  // Handle search input
+  // Handle search input with debouncing
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm) {
@@ -154,135 +104,286 @@ const ConnectionsPage = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  }, [searchTerm, searchDoctors]);
 
+  // ========================================
+  // CONNECTION MANAGEMENT - ADDING
+  // ========================================
+  const addConnection = async (doctor) => {
+    if (!currentUser) {
+      alert('Please log in to add connections');
+      return;
+    }
+
+    try {
+      // Get current user's patient_id
+      const { data: patientData, error: patientError } = await supabase
+        .from('patients')
+        .select('patient_id')
+        .eq('patient_id', currentUser.id)
+        .single();
+
+      if (patientError) throw patientError;
+
+      // Insert new connection
+      const { data, error } = await supabase
+        .from('connections')
+        .insert({
+          patient_id: patientData.patient_id,
+          med_id: doctor.med_id,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update local state
+      const newConnection = {
+        id: data.id,
+        patient_id: data.patient_id,
+        med_id: doctor.med_id,
+        status: data.status,
+        created_at: data.created_at,
+        doctor_first_name: doctor.first_name,
+        doctor_last_name: doctor.last_name,
+        doctor_type: doctor.user_type,
+        doctor_email: doctor.email,
+        doctor_short_id: doctor.short_id
+      };
+
+      setConnections(prev => [newConnection, ...prev]);
+      setAddedConnections(prev => new Set([...prev, doctor.med_id]));
+      
+      // Remove from search results
+      setSearchResults(prev => prev.filter(d => d.med_id !== doctor.med_id));
+      
+      alert('Connection request sent successfully!');
+      
+    } catch (error) {
+      console.error('Error adding connection:', error);
+      alert('Failed to add connection. Please try again.');
+    }
+  };
+
+  // ========================================
+  // CONNECTION MANAGEMENT - REMOVING
+  // ========================================
+  const removeConnection = async (connectionId, doctorId) => {
+    if (!confirm('Are you sure you want to remove this connection?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('connections')
+        .delete()
+        .eq('id', connectionId);
+
+      if (error) throw error;
+
+      // Update local state
+      setConnections(prev => prev.filter(conn => conn.id !== connectionId));
+      setAddedConnections(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(doctorId);
+        return newSet;
+      });
+
+      alert('Connection removed successfully!');
+      
+    } catch (error) {
+      console.error('Error removing connection:', error);
+      alert('Failed to remove connection. Please try again.');
+    }
+  };
+
+  // ========================================
+  // UI HELPER FUNCTIONS
+  // ========================================
+  const getStatusBadge = (status) => {
+    const statusColors = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      accepted: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800'
+    };
+
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  const formatDoctorName = (firstName, lastName) => {
+    return `Dr. ${firstName} ${lastName}`;
+  };
+
+  // ========================================
+  // RENDER COMPONENT
+  // ========================================
   return (
-    <div className="min-h-*bg-gradient-to-br to-pink-50 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-myHeader">Connections</h1>
-          <MoreHorizontal className="w-6 h-6 text-gray-400" />
+    <div className="max-w-6xl mx-auto">
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-myHeader">My Connections</h1>
+          <p className="text-gray-600 mt-1">Connect with medical professionals</p>
+        </div>
+        <MoreHorizontal className="w-6 h-6 text-gray-400" />
+      </div>
+
+      {/* Search Section */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Find Medical Professionals</h2>
+          <p className="text-sm text-gray-600">Enter the first 4 characters of a doctor's ID to search</p>
+        </div>
+        
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Enter first 4 characters (e.g., A1B2)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
+            maxLength={4}
+            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase tracking-wider"
+          />
+        </div>
+        
+        {/* Search Results */}
+        {searchTerm && (
+          <div className="mt-4">
+            {isSearching ? (
+              <div className="text-center py-6">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p className="text-gray-500 mt-2">Searching...</p>
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 mb-3">Found {searchResults.length} medical professional(s):</p>
+                {searchResults.map((doctor) => (
+                  <div key={doctor.med_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900">
+                        {formatDoctorName(doctor.first_name, doctor.last_name)}
+                      </h3>
+                      <p className="text-sm text-blue-600 font-medium">{doctor.user_type}</p>
+                      <p className="text-sm text-gray-600">{doctor.email}</p>
+                      <p className="text-xs text-gray-500 font-mono mt-1">ID: {doctor.short_id}</p>
+                    </div>
+                    <button
+                      onClick={() => addConnection(doctor)}
+                      disabled={addedConnections.has(doctor.med_id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        addedConnections.has(doctor.med_id)
+                          ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {addedConnections.has(doctor.med_id) ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Connected
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4" />
+                          Connect
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : searchTerm.length >= 3 ? (
+              <div className="text-center py-6">
+                <p className="text-gray-500">No medical professionals found with ID starting with "{searchTerm}"</p>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-500">Enter at least 3 characters to search</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Connections List */}
+      <div className="bg-white rounded-xl shadow-sm">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Your Connections</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            {connections.length} connection{connections.length !== 1 ? 's' : ''}
+          </p>
         </div>
 
-        {/* Search Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by Doctor UUID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            />
-          </div>
-          
-          {/* Search Results */}
-          {searchTerm && (
-            <div className="mt-4">
-              {isSearching ? (
-                <div className="text-center py-4">
-                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600"></div>
-                  <p className="text-gray-500 mt-2">Searching...</p>
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600 mb-3">Found {searchResults.length} doctors:</p>
-                  {searchResults.map((doctor) => (
-                    <div key={doctor.med_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {doctor.first_name} {doctor.last_name}
-                        </p>
-                        <p className="text-sm text-gray-600">{doctor.specialty}</p>
-                        <p className="text-xs text-gray-500">{doctor.hospital}</p>
-                        <p className="text-xs text-gray-400 font-mono">ID: {doctor.med_id.substring(0, 8)}...</p>
-                      </div>
-                      <button
-                        onClick={() => addConnection(doctor)}
-                        disabled={addedConnections.has(doctor.med_id)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          addedConnections.has(doctor.med_id)
-                            ? 'bg-green-100 text-green-700 cursor-not-allowed'
-                            : 'bg-teal-600 text-white hover:bg-teal-700'
-                        }`}
-                      >
-                        {addedConnections.has(doctor.med_id) ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Added
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="w-4 h-4" />
-                            Add
-                          </>
-                        )}
-                      </button>
+        <div className="divide-y divide-gray-200">
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-gray-500 mt-2">Loading connections...</p>
+            </div>
+          ) : connections.length > 0 ? (
+            connections.map((connection) => (
+              <div key={connection.id} className="p-6 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-medium text-gray-900">
+                        {formatDoctorName(connection.doctor_first_name, connection.doctor_last_name)}
+                      </h3>
+                      {getStatusBadge(connection.status)}
                     </div>
-                  ))}
+                    <p className="text-sm text-blue-600 font-medium">{connection.doctor_type}</p>
+                    <p className="text-sm text-gray-600">{connection.doctor_email}</p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                      <span className="font-mono">ID: {connection.doctor_short_id}</span>
+                      <span>Connected: {new Date(connection.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowDropdown(showDropdown === connection.id ? null : connection.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <MoreHorizontal className="w-5 h-5 text-gray-400" />
+                    </button>
+                    
+                    {/* Dropdown Menu */}
+                    {showDropdown === connection.id && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setShowDropdown(null)}
+                        ></div>
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                          <button
+                            onClick={() => {
+                              removeConnection(connection.id, connection.med_id);
+                              setShowDropdown(null);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <UserMinus className="w-4 h-4" />
+                            Remove Connection
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-              ) : searchTerm.length >= 3 ? (
-                <p className="text-gray-500 text-center py-4">No doctors found matching "{searchTerm}"</p>
-              ) : (
-                <p className="text-gray-500 text-center py-4">Enter at least 3 characters to search</p>
-              )}
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-12">
+              <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">No connections yet</p>
+              <p className="text-gray-400 text-sm">Search for medical professionals above to start connecting</p>
             </div>
           )}
         </div>
-
-        {/* Connections List */}
-        <div className="space-y-3">
-          {connections.map((connection) => (
-            <div key={connection.id} className="bg-white rounded-xl shadow-sm p-4 relative">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 mb-1">{connection.name}</h3>
-                  <p className="text-sm text-gray-600">{connection.specialty}</p>
-                  <p className="text-xs text-gray-500">{connection.hospital}</p>
-                </div>
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowDropdown(showDropdown === connection.id ? null : connection.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <MoreHorizontal className="w-5 h-5 text-gray-400" />
-                  </button>
-                  
-                  {/* Dropdown Menu */}
-                  {showDropdown === connection.id && (
-                    <>
-                      <div 
-                        className="fixed inset-0 z-10" 
-                        onClick={() => setShowDropdown(null)}
-                      ></div>
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-                        <button
-                          onClick={() => {
-                            removeConnection(connection.id, connection.med_id);
-                            setShowDropdown(null);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <UserMinus className="w-4 h-4" />
-                          Remove Connection
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {connections.length === 0 && !searchTerm && (
-          <div className="text-center py-12">
-            <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No connections yet. Search for doctors to add them.</p>
-          </div>
-        )}
       </div>
     </div>
   );
