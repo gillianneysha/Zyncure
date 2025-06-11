@@ -300,6 +300,7 @@ export function NotificationPage() {
 
 export function BillingPage() {
   const [showPlans, setShowPlans] = useState(false);
+  const [selectedTier, setSelectedTier] = useState(""); // Add this at the top of BillingPage
 
   const handleOptionClick = (option) => {
     if (option === "Subscriptions") setShowPlans(true);
@@ -318,62 +319,89 @@ export function BillingPage() {
 
   if (showPlans) {
     return (
-      <div className="flex flex-row gap-8 bg-[#FFEFE9] rounded-xl p-8 h-[700px]">
-        <div className="flex-1">
+      <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
+        <button
+          onClick={() => setShowPlans(false)}
+          className="flex items-center text-mySidebar mb-6 hover:underline"
+        >
+          <ArrowLeft className="mr-2" size={20} /> Back to Billing
+        </button>
+        <h2 className="text-4xl text-[#55A1A4] font-bold mb-2">Upgrade to Premium</h2>
+        <p className="text-[#55A1A4] mb-8">Enjoy an enhanced experience</p>
+        <div className="flex gap-6">
+          {/* Tier 1 */}
+          <div className="bg-[#FFEDE7] rounded-2xl p-6 flex-1 relative">
+            <h3 className="font-bold text-[#F46B5D] mb-2">
+              Tier 1: Free <span className="font-normal text-sm">(Basic Access)</span>
+            </h3>
+            <ul className="text-[#F46B5D] text-sm space-y-2">
+              <li>✓ View and manage personal health records.</li>
+              <li>✓ Upload and store up to 2GB of medical files.</li>
+              <li>✓ Share records with up to 3 healthcare providers.</li>
+              <li>✓ Track up to 3 symptoms with the ability to add custom symptoms.</li>
+              <li>✓ Basic notifications for upcoming medical appointments.</li>
+              <li>✓ Access to a health dashboard.</li>
+              <li>✓ Ability to export health records in a standard format (e.g., PDF).</li>
+            </ul>
+          </div>
+          {/* Tier 2 */}
+          <div className="bg-[#FFEDE7] rounded-2xl p-6 flex-1 relative">
+            <input
+              type="radio"
+              name="subscriptionTier"
+              value="premium"
+              checked={selectedTier === "premium"}
+              onChange={() => setSelectedTier("premium")}
+              className="absolute top-6 right-6 w-5 h-5 accent-[#F46B5D] cursor-pointer"
+              aria-label="Select Premium"
+              style={{
+                borderWidth: "1.5px",
+                borderColor: "#F46B5D"
+              }}
+            />
+            <h3 className="font-bold text-[#F46B5D] mb-2">
+              Tier 2: Premium <span className="font-normal text-sm">(Enhanced Access)</span>
+            </h3>
+            <ul className="text-[#F46B5D] text-sm space-y-2">
+              <li>✓ All features in the Free tier</li>
+              <li>✓ Increased storage capacity up to 5GB.</li>
+              <li>✓ Track all predefined symptoms and custom symptoms.</li>
+              <li>✓ Share records with unlimited healthcare providers.</li>
+            </ul>
+          </div>
+          {/* Tier 3 */}
+          <div className="bg-[#FFEDE7] rounded-2xl p-6 flex-1 relative">
+            <input
+              type="radio"
+              name="subscriptionTier"
+              value="pro"
+              checked={selectedTier === "pro"}
+              onChange={() => setSelectedTier("pro")}
+              className="absolute top-6 right-6 w-5 h-5 accent-[#F46B5D] cursor-pointer"
+              aria-label="Select Pro"
+              style={{
+                borderWidth: "1.5px",
+                borderColor: "#F46B5D"
+              }}
+            />
+            <h3 className="font-bold text-[#F46B5D] mb-2">
+              Tier 3: Pro <span className="font-normal text-sm">(Comprehensive Access)</span>
+            </h3>
+            <ul className="text-[#F46B5D] text-sm space-y-2">
+              <li>✓ All features in the Premium tier</li>
+              <li>✓ Priority support for technical issues</li>
+              <li>✓ Early access to future feature expansions and integrations.</li>
+              <li>✓ Unlimited storage for medical files.</li>
+            </ul>
+          </div>
+        </div>
+        <div className="flex justify-center mt-8">
           <button
-            onClick={() => setShowPlans(false)}
-            className="flex items-center text-mySidebar mb-6 hover:underline"
+            className="bg-[#55A1A4] text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
+            disabled={!selectedTier}
           >
-            <ArrowLeft className="mr-2" size={20} /> Back to Billing
+            Subscribe
           </button>
-          <h2 className="text-4xl text-[#55A1A4] font-bold mb-2">Upgrade to Premium</h2>
-          <p className="text-[#55A1A4] mb-8">Enjoy an enhanced experience</p>
-          <div className="flex gap-6">
-            {/* Tier 1 */}
-            <div className="bg-[#FFE0D2] rounded-2xl p-6 flex-1">
-              <h3 className="font-bold text-[#F46B5D] mb-2">
-                Tier 1: Free <span className="font-normal text-sm">(Basic Access)</span>
-              </h3>
-              <ul className="text-[#F46B5D] text-sm space-y-2">
-                <li>✓ View and manage personal health records.</li>
-                <li>✓ Upload and store up to 2GB of medical files.</li>
-                <li>✓ Share records with up to 3 healthcare providers.</li>
-                <li>✓ Track up to 3 symptoms with the ability to add custom symptoms.</li>
-                <li>✓ Basic notifications for upcoming medical appointments.</li>
-                <li>✓ Access to a health dashboard.</li>
-                <li>✓ Ability to export health records in a standard format (e.g., PDF).</li>
-              </ul>
-            </div>
-            {/* Tier 2 */}
-            <div className="bg-[#FFE0D2] rounded-2xl p-6 flex-1">
-              <h3 className="font-bold text-[#F46B5D] mb-2">
-                Tier 2: Premium <span className="font-normal text-sm">(Enhanced Access)</span>
-              </h3>
-              <ul className="text-[#F46B5D] text-sm space-y-2">
-                <li>✓ All features in the Free tier</li>
-                <li>✓ Increased storage capacity up to 5GB.</li>
-                <li>✓ Track all predefined symptoms and custom symptoms.</li>
-                <li>✓ Share records with unlimited healthcare providers.</li>
-              </ul>
-            </div>
-            {/* Tier 3 */}
-            <div className="bg-[#FFE0D2] rounded-2xl p-6 flex-1">
-              <h3 className="font-bold text-[#F46B5D] mb-2">
-                Tier 3: Pro <span className="font-normal text-sm">(Comprehensive Access)</span>
-              </h3>
-              <ul className="text-[#F46B5D] text-sm space-y-2">
-                <li>✓ All features in the Premium tier</li>
-                <li>✓ Priority support for technical issues</li>
-                <li>✓ Early access to future feature expansions and integrations.</li>
-                <li>✓ Unlimited storage for medical files.</li>
-              </ul>
-            </div>
-          </div>
-          <div className="flex justify-center mt-8">
-            <button className="bg-[#55A1A4] text-white px-12 py-3 rounded-xl font-semibold text-lg hover:bg-[#368487] transition">
-              Subscribe
-            </button>
-          </div>
         </div>
       </div>
     );
