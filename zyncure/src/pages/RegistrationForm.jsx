@@ -1,5 +1,6 @@
 import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
+import PasswordInput from "../components/PasswordInput";
 
 // Move FormField OUTSIDE the component to prevent recreation
 const FormField = memo(({ 
@@ -262,26 +263,34 @@ const handleSubmit = useCallback(async (event) => {
         error={errors.userType}
         disabled={isLoading}
       >
-        <select
-          name="userType"
-          value={formData.userType}
-          onChange={handleChange}
-          className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] text-[#b0b0b0] ${
-            errors.userType ? "ring-2 ring-red-400" : ""
-          }`}
-          required
-          disabled={isLoading}
-        >
-          <option value="" className="text-[#b0b0b0]">
-            Select user type
-          </option>
-          <option value="patient" className="text-black">
-            Patient
-          </option>
-          <option value="doctor" className="text-black">
-            Doctor
-          </option>
-        </select>
+        <div className="relative w-4/5 mx-auto">
+          <select
+            name="userType"
+            value={formData.userType}
+            onChange={handleChange}
+            className={`appearance-none w-full mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] text-[#b0b0b0] ${
+              errors.userType ? "ring-2 ring-red-400" : ""
+            }`}
+            required
+            disabled={isLoading}
+          >
+            <option value="" className="text-[#b0b0b0]">
+              Select user type
+            </option>
+            <option value="patient" className="text-black">
+              Patient
+            </option>
+            <option value="doctor" className="text-black">
+              Doctor
+            </option>
+          </select>
+          {/* Custom down arrow */}
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b0b0]">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+              <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </span>
+        </div>
       </FormField>
 
       <FormField 
@@ -295,27 +304,29 @@ const handleSubmit = useCallback(async (event) => {
         disabled={isLoading}
       />
 
-      <FormField 
-        label="Password" 
-        name="password" 
-        type="password" 
-        placeholder="Password (min 6 characters)"
-        value={formData.password}
-        onChange={handleChange}
-        error={errors.password}
-        disabled={isLoading}
-      />
+      <div className="w-4/5 mx-auto">
+        <PasswordInput
+          label="Password"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          placeholder="Password (min 6 characters)"
+          error={errors.password}
+          disabled={isLoading}
+        />
+      </div>
 
-      <FormField 
-        label="Confirm Password" 
-        name="confirmPassword" 
-        type="password" 
-        placeholder="Confirm Password"
-        value={formData.confirmPassword}
-        onChange={handleChange}
-        error={errors.confirmPassword}
-        disabled={isLoading}
-      />
+      <div className="w-4/5 mx-auto">
+        <PasswordInput
+          label="Confirm Password"
+          name="confirmPassword"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+          placeholder="Confirm Password"
+          error={errors.confirmPassword}
+          disabled={isLoading}
+        />
+      </div>
 
       <button
         type="submit"
