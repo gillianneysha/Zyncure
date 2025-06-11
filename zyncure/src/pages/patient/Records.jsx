@@ -1,304 +1,226 @@
-import React, { useState } from 'react';
-import { supabase } from '../../client';
-import {
-  Droplet,
-  Droplets,
-  FileDown,
-  FileUp,
-  CloudSun,
-  Leaf,
-  Sun,
-  Moon,
-  Bubbles,
-  Rainbow,
-  Flame,
-  Check,
-  Lollipop,
-  Scale,
-  CircleAlert,
-} from 'lucide-react';
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
+import { SquarePlus, LayoutGrid, Rows3, MoreVertical, FileText, Share, Cross } from 'lucide-react';
+import { useState, useRef } from 'react';
 
+export default function Records() {
+  const fileInputRef = useRef(null);
+  const [fileName, setFileName] = useState('');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  
+  // Sample data for folders
+  const folders = [
+    { id: 1, name: "Hi-Precision" },
+    { id: 2, name: "St. Lukes" },
+    { id: 3, name: "Makati Med" },
+    { id: 4, name: "Doc Alvin" },
+  ];
 
-const PeriodTracker = () => {
-  const [selectedTab, setSelectedTab] = useState('Period');
-  const [selectedFlow, setSelectedFlow] = useState('Moderate');
-  const [selectedFeeling, setSelectedFeeling] = useState('');
-  const [selectedSkin, setSelectedSkin] = useState('');
-  const [date, setDate] = useState(new Date());
+  // Sample data for files
+  const files = [
+    { id: 1, name: "09/29/24 - PCOS", preview: "/api/placeholder/400/320" },
+    { id: 2, name: "Doc Glinda - Uri...", preview: "/api/placeholder/400/320" },
+    { id: 3, name: "Untitled", preview: "/api/placeholder/400/320" },
+    { id: 4, name: "Copy - Updated...", preview: "/api/placeholder/400/320" },
+    { id: 5, name: "10/10/24 - San L...", preview: "/api/placeholder/400/320" },
+    { id: 6, name: "Copy - Doc Glin...", preview: "/api/placeholder/400/320" },
+    { id: 7, name: "Counseling - PC...", preview: "/api/placeholder/400/320" },
+    { id: 8, name: "Scanned - Platel...", preview: "/api/placeholder/400/320" },
+  ];
 
-
-  const handleFlowSelect = (flow) => setSelectedFlow(flow);
-  const handleFeelingSelect = (feeling) => setSelectedFeeling(feeling);
-  const handleSkinSelect = (skin) => setSelectedSkin(skin);
-
-
-  const handleSavePeriod = async () => {
-    const { error } = await supabase
-      .from('SymptomLogs')
-      .insert([{ Period: selectedFlow, date: date.toISOString().split('T')[0] }]);
-
-
-    if (error) console.error('Error saving period:', error);
-    else alert(`Flow saved: ${selectedFlow} on ${date.toDateString()}`);
+  const handleUploadClick = () => {
+    // Trigger the hidden file input click
+    fileInputRef.current.click();
   };
 
-
-  const handleSaveFeeling = async () => {
-    const { error } = await supabase
-      .from('SymptomLogs')
-      .insert([{ Feeling: selectedFeeling, date: date.toISOString().split('T')[0] }]);
-
-
-    if (error) console.error('Error saving feeling:', error);
-    else alert(`Feeling saved: ${selectedFeeling} on ${date.toDateString()}`);
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileName(file.name);
+      // Here you would handle the file upload to your server
+      console.log('File selected:', file);
+    }
   };
-
-
-  const handleSaveSkin = async () => {
-    const { error } = await supabase
-      .from('SymptomLogs')
-      .insert([{ Skin: selectedSkin, date: date.toISOString().split('T')[0] }]);
-
-
-    if (error) console.error('Error saving skin:', error);
-    else alert(`Skin type saved: ${selectedSkin} on ${date.toDateString()}`);
-  };
-
-
-  const [selectedMetabolism, setSelectedMetabolism] = useState('');
-
-
-  const handleMetabolismSelect = (metabolism) => setSelectedMetabolism(metabolism);
-  const handleSaveMetabolism = async () => {
-  const { error } = await supabase
-    .from('SymptomLogs')
-    .insert([{ Metabolism: selectedMetabolism, date: date.toISOString().split('T')[0] }]);
-
-
-  if (error) console.error('Error saving metabolism:', error);
-  else alert(`Metabolism saved: ${selectedMetabolism} on ${date.toDateString()}`);
-};
-
-
- 
-  const flowOptions = ['Light', 'Moderate', 'Heavy'];
-  const iconSizes = {
-    Light: 20,
-    Moderate: 28,
-    Heavy: 34,
-  };
-
 
   return (
-    <div className="bg-[#FFF0EA] min-h-screen flex flex-col items-center px-6 py-6 font-sans relative text-[#B65C4B] text-sm pb-16 -translate-y-2">
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold text-myHeader text-left">Medical Records</h1>
+        
+        <div className="relative flex">
+          <button 
+            onClick={handleUploadClick}
+            className="flex items-center gap-2 px-2 py-2 text-mySidebar rounded-md hover:bg-indigo-200 transition-colors"
+          >
+            <SquarePlus size={20} />
+          </button>
 
-
-      {/* Calendar */}
-      <div className="mb-2 text-xs scale-[0.92] shadow-lg rounded-lg">
-        <Calendar
-          onChange={setDate}
-          value={date}
-          className="!border-none !bg-[#FFD8C9] rounded-lg p-1 text-xs"
-          tileClassName={({ date: d }) =>
-            d.toDateString() === date.toDateString() ? '!bg-[#3BA4A0] !text-white rounded-full' : ''
-          }
-          formatShortWeekday={(locale, date) =>
-            date.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase()
-          }
-          next2Label={null}
-          prev2Label={null}
-        />
-      </div>
-
-
-      {/* Tabs */}
-      <div className="w-full max-w-md mb-2 flex gap-2 justify-center">
-        {['Period', 'Feelings', 'Skin', 'Metabolism'].map((tab) => (
-          <div
-            key={tab}
-            onClick={() => setSelectedTab(tab)}
-            className={`text-sm px-6 py-2 rounded-full cursor-pointer ${
-              selectedTab === tab
-                ? 'bg-[#F98679] text-white'
-                : 'bg-[#FFD8C9] text-[#B65C4B]'
+          {/* View as List */}
+          <button
+            title="List View"
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-2 px-2 py-2 rounded-md hover:bg-indigo-200 transition-colors ${
+              viewMode === 'list' ? 'bg-indigo-200 text-mySidebar' : 'text-mySidebar'
             }`}
           >
-            {tab}
-          </div>
+            <Rows3 size={20} />
+          </button>
+
+          {/* View as Grid */}
+          <button
+            title="Grid View"
+            onClick={() => setViewMode('grid')}
+            className={`flex items-center gap-2 px-2 py-2 rounded-md hover:bg-indigo-200 transition-colors ${
+              viewMode === 'grid' ? 'bg-indigo-200 text-mySidebar' : 'text-mySidebar'
+            }`}
+          >
+            <LayoutGrid size={20} />
+          </button>
+          
+          {/* Hidden file input */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            className="hidden" 
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+          />
+        </div>
+      </div>
+      
+      {/* Display selected file name if available */}
+      {fileName && (
+        <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
+          <span className="font-medium">Selected file:</span>
+          <span className="ml-2">{fileName}</span>
+        </div>
+      )}
+
+      <div className="flex gap-1 mb-4">
+        <button className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center justify-between min-w-[70px] hover:border-[#549294] transition-colors">
+          Type
+          <span className="ml-1 text-[#e37859] text-xs">▼</span>
+        </button>
+        <button className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center justify-between min-w-[70px] hover:border-[#549294] transition-colors">
+          History
+          <span className="ml-1 text-[#e37859] text-xs">▼</span>
+        </button>
+        <button className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center justify-between min-w-[70px] hover:border-[#549294] transition-colors">
+          All
+          <span className="ml-1 text-[#e37859] text-xs">▼</span>
+        </button>
+      </div>
+
+      {/* Folders Row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        {folders.map((folder) => (
+          <FolderCard key={folder.id} name={folder.name} />
         ))}
       </div>
 
-
-      {/* Period Tab */}
-      {selectedTab === 'Period' && (
-        <>
-          <div className="border border-[#F8C8B6] bg-[#FFEFE9] p-5 rounded-lg w-full max-w-2xl flex justify-between mb-5">
-            {flowOptions.map((flow) => (
-              <div
-                key={flow}
-                className="flex flex-col items-center cursor-pointer w-full"
-                onClick={() => handleFlowSelect(flow)}
-              >
-                <div
-                  className={`w-14 h-14 flex items-center justify-center rounded-full mb-2 border-2 transition-colors ${
-                    selectedFlow === flow
-                      ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0]'
-                      : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6]'
-                  }`}
-                >
-                  <Droplet size={iconSizes[flow]} />
-                </div>
-                <span className="text-xs">{flow}</span>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={handleSavePeriod}
-            className="bg-[#3BA4A0] text-white text-medium px-10 py-2 rounded-full mb-12"
-          >
-            Save
-          </button>
-        </>
-      )}
-
-
-      {/* Feelings Tab */}
-      {selectedTab === 'Feelings' && (
-        <>
-          <div className="border border-[#F8C8B6] bg-[#FFEFE9] p-5 rounded-lg w-full max-w-2xl flex justify-around mb-5">
-            {[
-              { name: 'Mood Swings', icon: CloudSun },
-              { name: 'Fine', icon: Leaf },
-              { name: 'Happy', icon: Sun },
-              { name: 'Sad', icon: Moon },
-            ].map(({ name, icon: Icon }) => (
-              <div
-                key={name}
-                onClick={() => handleFeelingSelect(name)}
-                className="flex flex-col items-center cursor-pointer text-xs"
-              >
-                <div
-                  className={`w-14 h-14 flex items-center justify-center rounded-full border-2 transition-colors ${
-                    selectedFeeling === name
-                      ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0]'
-                      : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6]'
-                  }`}
-                >
-                  {Icon && <Icon size={22} />}
-                </div>
-                <span className={`mt-1 ${selectedFeeling === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'}`}>
-                  {name}
-                </span>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={handleSaveFeeling}
-            className="bg-[#3BA4A0] text-white text-medium px-10 py-2 rounded-full mb-12"
-          >
-            Save Feeling
-          </button>
-        </>
-      )}
-
-
-      {/* Skin Tab */}
-      {selectedTab === 'Skin' && (
-        <>
-          <div className="border border-[#F8C8B6] bg-[#FFEFE9] p-5 rounded-lg w-full max-w-2xl flex justify-around mb-5">
-            {[
-              { name: 'Oily', icon: Droplets },
-              { name: 'Acne', icon: Bubbles },
-              { name: 'Normal', icon: Rainbow },
-              { name: 'Dry', icon: Flame },
-            ].map(({ name, icon: Icon }) => (
-              <div
-                key={name}
-                onClick={() => handleSkinSelect(name)}
-                className="flex flex-col items-center cursor-pointer text-xs"
-              >
-                <div
-                  className={`w-14 h-14 flex items-center justify-center rounded-full border-2 transition-colors ${
-                    selectedSkin === name
-                      ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0]'
-                      : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6]'
-                  }`}
-                >
-                  {Icon && <Icon size={22} />}
-                </div>
-                <span className={`mt-1 ${selectedSkin === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'}`}>
-                  {name}
-                </span>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={handleSaveSkin}
-            className="bg-[#3BA4A0] text-white text-medium px-10 py-2 rounded-full mb-12"
-          >
-            Save Skin Type
-          </button>
-        </>
-      )}
-     
-      {/* Metabolism Tab */}
-      {selectedTab === 'Metabolism' && (
-  <>
-    <div className="border border-[#F8C8B6] bg-[#FFEFE9] p-5 rounded-lg w-full max-w-2xl flex justify-around mb-5">
-      {[
-        { name: 'Healthy', icon: Check },
-        { name: 'High Sugar', icon: Lollipop },
-        { name: 'Overweight', icon: Scale },
-        { name: 'Metabolic Risk', icon: CircleAlert },
-      ].map(({ name, icon: Icon }) => (
-        <div
-          key={name}
-          onClick={() => handleMetabolismSelect(name)}
-          className="flex flex-col items-center cursor-pointer text-xs"
-        >
-          <div
-            className={`w-14 h-14 flex items-center justify-center rounded-full border-2 transition-colors ${
-              selectedMetabolism === name
-                ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0]'
-                : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6]'
-            }`}
-          >
-            {Icon && <Icon size={22} />}
-          </div>
-          <span className={`mt-1 ${selectedMetabolism === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'}`}>
-            {name}
-          </span>
+      {/* Files Grid or List */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {files.map((file) => (
+            <FileCard key={file.id} name={file.name} previewUrl={file.preview} />
+          ))}
         </div>
-      ))}
+      ) : (
+        <div className="flex flex-col gap-2">
+          {files.map((file) => (
+            <FileListItem key={file.id} name={file.name} previewUrl={file.preview} />
+          ))}
+        </div>
+      )}
+
+      {/* Share Report Button */}
+      <div className="fixed bottom-4 right-4">
+        <button className="bg-red-50 text-red-400 p-4 rounded-lg shadow-md flex flex-col items-center">
+          <Share className="w-6 h-6 mb-1" />
+          <span className="text-xs">Share Report</span>
+        </button>
+      </div>
+    </>
+  );
+}
+
+// Folder Card Component
+function FolderCard({ name }) {
+  return (
+    <div className="bg-[#55A1A4] text-white p-4 rounded-lg shadow-md flex justify-between items-center">
+      <div className="flex items-center">
+        <div className="mr-2 text-white">
+          <Cross className="mr-2 text-white" />
+        </div>
+        <span className="font-medium">{name}</span>
+      </div>
+      <button>
+        <MoreVertical className="w-5 h-5" />
+      </button>
     </div>
-    <button
-      onClick={handleSaveMetabolism}
-      className="bg-[#3BA4A0] text-white text-medium px-10 py-2 rounded-full mb-12"
-    >
-      Save Metabolism
-    </button>
-  </>
-)}
+  );
+}
 
-
-
-
-      {/* Report Buttons */}
-      <div className="absolute bottom-16 right-4 bg-[#FFEFE9] border border-[#F8C8B6] rounded-xl px-6 py-4 flex gap-6 shadow-sm">
-        <button className="flex flex-col items-center text-[#B65C4B] text-xs bg-transparent border-none">
-          <FileDown size={14} />
-          <span className="mt-1 text-[12px] font-medium">Download Report</span>
+// File Card Component (Grid View)
+function FileCard({ name, previewUrl }) {
+  return (
+    <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden">
+      <div className="p-2 flex justify-between items-center">
+        <div className="flex items-center">
+          <FileText className="mr-2 text-white" />
+          <span className="text-white text-sm font-medium">{name}</span>
+        </div>
+        <button>
+          <MoreVertical className="w-5 h-5 text-white" />
         </button>
-        <button className="flex flex-col items-center text-[#B65C4B] text-xs bg-transparent border-none">
-          <FileUp size={14} />
-          <span className="mt-1 text-[12px] font-medium">Share Report</span>
-        </button>
+      </div>
+      <div className="bg-white p-2">
+        <img 
+          src={previewUrl} 
+          alt={`Preview of ${name}`} 
+          className="w-full h-40 object-cover rounded"
+        />
+      </div>
+      <div className="p-2 text-white">
+        <div className="text-xs">Records</div>
+        <div className="flex justify-between items-center mt-1">
+          <div className="text-xs">Type: Medical</div>
+          <div className="text-xs">Date: 2024</div>
+        </div>
       </div>
     </div>
   );
-};
+}
 
-
-export default PeriodTracker;
+// File List Item Component (List View)
+function FileListItem({ name, previewUrl }) {
+  return (
+    <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden">
+      <div className="flex p-2">
+        <div className="w-16 h-16 bg-white rounded mr-3 flex-shrink-0">
+          <img 
+            src={previewUrl} 
+            alt={`Preview of ${name}`} 
+            className="w-full h-full object-cover rounded"
+          />
+        </div>
+        <div className="flex-grow">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <FileText className="mr-1 text-white" />
+              <span className="text-white text-sm font-medium">{name}</span>
+            </div>
+            <button>
+              <MoreVertical className="w-5 h-5 text-white" />
+            </button>
+          </div>
+          <div className="text-white">
+            <div className="text-xs">Records</div>
+            <div className="flex justify-between items-center mt-1">
+              <div className="text-xs">Type: Medical</div>
+              <div className="text-xs">Date: 2024</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

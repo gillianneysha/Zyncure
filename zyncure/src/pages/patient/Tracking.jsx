@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Droplet,
   Droplets,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { supabase } from '../../client'; // ✅ make sure this path is correct
+import { supabase } from '../../client';
 
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Period');
@@ -27,6 +27,25 @@ const PeriodTracker = () => {
   const [selectedSkin, setSelectedSkin] = useState('');
   const [selectedMetabolism, setSelectedMetabolism] = useState('');
   const [date, setDate] = useState(new Date());
+  const [loggedDates, setLoggedDates] = useState([]);
+
+  useEffect(() => {
+    const fetchLoggedDates = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('symptomlog')
+        .select('date_logged, symptoms')
+        .eq('patients_id', user.id);
+
+      if (!error && data) {
+        setLoggedDates(data);
+      }
+    };
+
+    fetchLoggedDates();
+  }, []);
 
   const handleFlowSelect = (flow) => setSelectedFlow(flow);
   const handleFeelingSelect = (feeling) => setSelectedFeeling(feeling);
@@ -34,86 +53,85 @@ const PeriodTracker = () => {
   const handleMetabolismSelect = (metabolism) => setSelectedMetabolism(metabolism);
 
   const handleSave = async () => {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  if (userError || !user) {
-    alert('You must be logged in to save your data.');
-    console.error('User fetch error:', userError);
-    return;
-  }
+    if (userError || !user) {
+      alert('You must be logged in to save your data.');
+      console.error('User fetch error:', userError);
+      return;
+    }
 
-  const dataMap = {
-    Period: { field: 'period', value: selectedFlow },
-    Feelings: { field: 'feelings', value: selectedFeeling },
-    Skin: { field: 'skin', value: selectedSkin },
-    Metabolism: { field: 'metabolism', value: selectedMetabolism },
+    const selectedValues = {
+      Period: selectedFlow,
+      Feelings: selectedFeeling,
+      Skin: selectedSkin,
+      Metabolism: selectedMetabolism,
+    };
+
+    const selectedValue = selectedValues[selectedTab];
+
+    if (!selectedValue) {
+      alert(`Please select a ${selectedTab.toLowerCase()} option`);
+      return;
+    }
+
+    const normalizedDate = new Date(date);
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    const dataToSave = {
+      symptoms: selectedTab,
+      severity: selectedValue,
+      date_logged: normalizedDate.toISOString(),
+      patients_id: user.id,
+    };
+
+    const { error } = await supabase.from('symptomlog').insert([dataToSave]);
+
+    if (error) {
+      console.error('Supabase insert error:', error);
+      alert(`Failed to save: ${error.message || JSON.stringify(error)}`);
+    } else {
+      alert(`${selectedTab} saved as ${selectedValue} on ${normalizedDate.toDateString()}`);
+      setLoggedDates((prev) => [...prev, dataToSave]);
+    }
   };
-
-  const { field, value } = dataMap[selectedTab];
-
-  if (!value) {
-    alert(`Please select a ${selectedTab.toLowerCase()} option`);
-    return;
-  }
-
-  const normalizedDate = new Date(date);
-  normalizedDate.setHours(0, 0, 0, 0);
-
-  const dataToSave = {
-    [field]: value,
-    date_logged: normalizedDate.toISOString(),
-    patients_id: user.id, // ✅ uses the authenticated user's ID
-  };
-
-  const { error } = await supabase.from('symptomlogs').insert([dataToSave]);
-
-  if (error) {
-    console.error('Supabase insert error:', error);
-    alert(`Failed to save: ${error.message || JSON.stringify(error)}`);
-  } else {
-    alert(`${selectedTab} saved: ${value} on ${normalizedDate.toDateString()}`);
-  }
-};
-
-
-
 
   const tabConfigs = {
     Period: {
       options: [
-        { name: 'Light', icon: Droplet, size: 20 },
-        { name: 'Moderate', icon: Droplet, size: 28 },
-        { name: 'Heavy', icon: Droplet, size: 34 },
+        { name: 'Light', icon: Droplet, size: 40 },
+        { name: 'Moderate', icon: Droplet, size: 52 },
+        { name: 'Heavy', icon: Droplet, size: 64 },
       ],
       selected: selectedFlow,
       onSelect: handleFlowSelect,
     },
     Feelings: {
       options: [
-        { name: 'Mood Swings', icon: CloudSun },
-        { name: 'Fine', icon: Leaf },
-        { name: 'Happy', icon: Sun },
-        { name: 'Sad', icon: Moon },
+        { name: 'Mood Swings', icon: CloudSun, size: 48 },
+        { name: 'Fine', icon: Leaf, size: 48 },
+        { name: 'Happy', icon: Sun, size: 48 },
+        { name: 'Sad', icon: Moon, size: 48 },
       ],
       selected: selectedFeeling,
       onSelect: handleFeelingSelect,
     },
     Skin: {
       options: [
-        { name: 'Oily', icon: Droplets },
-        { name: 'Acne', icon: Circle },
-        { name: 'Normal', icon: Rainbow },
-        { name: 'Dry', icon: Flame },
+        { name: 'Oily', icon: Droplets, size: 48 },
+        { name: 'Acne', icon: Circle, size: 48 },
+        { name: 'Normal', icon: Rainbow, size: 48 },
+        { name: 'Dry', icon: Flame, size: 48 },
       ],
       selected: selectedSkin,
       onSelect: handleSkinSelect,
     },
     Metabolism: {
       options: [
-        { name: 'Healthy', icon: Check },
-        { name: 'High Sugar', icon: Lollipop },
-        { name: 'Overweight', icon: Scale },
-        { name: 'Metabolic Risk', icon: CircleAlert },
+        { name: 'Healthy', icon: Check, size: 48 },
+        { name: 'High Sugar', icon: Lollipop, size: 48 },
+        { name: 'Overweight', icon: Scale, size: 48 },
+        { name: 'Metabolic Risk', icon: CircleAlert, size: 48 },
       ],
       selected: selectedMetabolism,
       onSelect: handleMetabolismSelect,
@@ -122,16 +140,33 @@ const PeriodTracker = () => {
 
   const currentConfig = tabConfigs[selectedTab];
 
+  const getTileContent = ({ date: d }) => {
+    const normalized = new Date(d);
+    normalized.setHours(0, 0, 0, 0);
+    const match = loggedDates.find(
+      (entry) => new Date(entry.date_logged).toDateString() === normalized.toDateString()
+    );
+    if (match) {
+      return (
+        <div className="flex flex-col items-center">
+          <span className="block mt-1 h-2 w-2 rounded-full bg-[#B65C4B]" />
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-<div className="bg-[#FFF0EA] min-h-[100dvh] overflow-x-hidden font-sans text-[#B65C4B] relative">
-      <div className="flex flex-col items-center px-4 py-4 max-w-full w-full space-y-6">
+    <div className="bg-[#FFF0EA] min-h-[100svh] w-full overflow-x-hidden font-sans text-[#B65C4B] relative">
+      <div className="flex flex-col items-center px-2 sm:px-4 md:px-8 py-8 space-y-10 w-full max-w-screen-md mx-auto">
         <Calendar
           onChange={setDate}
           value={date}
-          className="!border-none !bg-[#FFD8C9] rounded-lg p-2 text-xs w-full max-w-md shadow-md"
+          className="!border-none !bg-[#FFD8C9] rounded-2xl p-4 text-base md:text-lg w-full shadow-lg"
+          tileContent={getTileContent}
           tileClassName={({ date: d }) =>
             d.toDateString() === date.toDateString()
-              ? '!bg-[#3BA4A0] !text-white rounded-full'
+              ? '!bg-[#C2EDEA] !text-[#3BA4A0] rounded-full'
               : ''
           }
           formatShortWeekday={(locale, date) =>
@@ -141,51 +176,56 @@ const PeriodTracker = () => {
           prev2Label={null}
         />
 
-        <div className="flex flex-wrap gap-2 justify-center w-full max-w-md">
+        <div className="flex flex-wrap gap-3 justify-center w-full">
           {Object.keys(tabConfigs).map((tab) => (
             <button
               key={tab}
               onClick={() => setSelectedTab(tab)}
-              className={`text-xs px-6 py-2.5 rounded-full ${
-                selectedTab === tab
-                  ? 'bg-[#F98679] text-white'
-                  : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
-              }`}
+              className={`
+                  text-base md:text-lg px-7 py-3 rounded-full font-semibold transition-all
+                  ${selectedTab === tab
+                    ? 'bg-[#F98679] text-white shadow-lg scale-105'
+                    : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
+                  }
+                `}
+              style={{ minWidth: 110 }}
             >
               {tab}
             </button>
           ))}
         </div>
 
-        <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 rounded-lg w-full max-w-md">
-          <div
-            className={`${
-              selectedTab === 'Period'
-                ? 'flex justify-between'
-                : 'grid grid-cols-2 gap-4 sm:flex sm:justify-around sm:gap-2'
-            }`}
-          >
+        <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 sm:p-6 rounded-2xl w-full">
+          <div className={
+            selectedTab === 'Period'
+              ? 'flex justify-between gap-4'
+              : 'grid grid-cols-2 gap-4 md:flex md:justify-around md:gap-4'
+          }>
             {currentConfig.options.map(({ name, icon: Icon, size }) => (
               <div
                 key={name}
                 onClick={() => currentConfig.onSelect(name)}
-                className="flex flex-col items-center cursor-pointer w-full max-w-[80px]"
+                className="flex flex-col items-center cursor-pointer w-full max-w-[110px] py-2"
               >
                 <div
-                  className={`w-14 h-14 flex items-center justify-center rounded-full border-2 ${
-                    currentConfig.selected === name
-                      ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0]'
+                  className={`
+                    w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-full border-4 transition-all
+                    ${currentConfig.selected === name
+                      ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md'
                       : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6] hover:border-[#3BA4A0] hover:bg-[#F0F9F9]'
-                  }`}
+                    }
+                  `}
                 >
-                  {Icon && <Icon size={size || 20} />}
+                  {Icon && <Icon size={size || 40} />}
                 </div>
                 <span
-                  className={`mt-2 text-xs font-medium text-center ${
-                    currentConfig.selected === name
+                  className={`
+                    mt-3 text-base md:text-lg font-semibold text-center transition-all
+                    ${currentConfig.selected === name
                       ? 'text-[#3BA4A0]'
                       : 'text-[#F98679]'
-                  }`}
+                    }
+                  `}
                 >
                   {name}
                 </span>
@@ -196,18 +236,20 @@ const PeriodTracker = () => {
 
         <button
           onClick={handleSave}
-          className="bg-[#3BA4A0] hover:bg-[#2E8B87] text-white text-sm px-6 py-2.5 rounded-full transition-all shadow-md active:scale-95"
+          className="bg-[#3BA4A0] hover:bg-[#2E8B87] text-white text-lg md:text-xl px-10 py-3 rounded-full transition-all shadow-lg active:scale-95"
         >
-          
-
-      <div className="fixed bottom-4 right-4 bg-[#FFEFE9] border border-[#F8C8B6] rounded-2xl px-4 py-3 flex flex-wrap gap-4 justify-center items-center shadow-lg max-w-full sm:flex-nowrap z-50">
-        <button className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition w-20">
-          <FileDown size={26} />
-          <span className="text-xs mt-1 font-semibold">Download</span>
+          Save {selectedTab}
         </button>
-        <button className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition w-20">
-          <FileUp size={26} />
-          <span className="text-xs mt-1 font-semibold">Share</span>
+      </div>
+
+      <div className="fixed bottom-4 right-2 sm:right-4 bg-[#FFEFE9] border border-[#F8C8B6] rounded-2xl px-4 py-4 flex flex-wrap gap-6 justify-center items-center shadow-xl max-w-full sm:flex-nowrap z-50">
+        <button className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition w-24">
+          <FileDown size={28} />
+          <span className="text-base mt-2 font-bold">Download</span>
+        </button>
+        <button className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition w-24">
+          <FileUp size={28} />
+          <span className="text-base mt-2 font-bold">Share</span>
         </button>
       </div>
     </div>
