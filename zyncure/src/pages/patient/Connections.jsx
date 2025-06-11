@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, MoreHorizontal, UserPlus, Check, UserMinus } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X } from 'lucide-react';
 import { supabase } from '../../client'; 
 
 const ConnectionsPage = () => {
@@ -14,6 +14,7 @@ const ConnectionsPage = () => {
   const [addedConnections, setAddedConnections] = useState(new Set());
   const [showDropdown, setShowDropdown] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
 
   // ========================================
   // USER AUTHENTICATION & INITIALIZATION
@@ -21,6 +22,7 @@ const ConnectionsPage = () => {
   useEffect(() => {
     getCurrentUser();
     loadConnections();
+    loadPendingRequests();
   }, []);
 
   const getCurrentUser = async () => {
@@ -57,6 +59,21 @@ const ConnectionsPage = () => {
       console.error('Error loading connections:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadPendingRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('connection_details')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPendingRequests(data || []);
+    } catch (error) {
+      console.error('Error loading pending requests:', error);
     }
   };
 
@@ -167,6 +184,39 @@ const ConnectionsPage = () => {
   };
 
   // ========================================
+  // CONNECTION REQUEST MANAGEMENT
+  // ========================================
+  const handleConnectionRequest = async (connectionId, action) => {
+    try {
+      const status = action === 'accept' ? 'accepted' : 'rejected';
+      
+      const { error } = await supabase
+        .from('connections')
+        .update({ status })
+        .eq('id', connectionId);
+
+      if (error) throw error;
+
+      // Update local state
+      setConnections(prev => 
+        prev.map(conn => 
+          conn.id === connectionId 
+            ? { ...conn, status }
+            : conn
+        )
+      );
+
+      setPendingRequests(prev => prev.filter(req => req.id !== connectionId));
+      
+      alert(`Connection request ${action}ed successfully!`);
+      
+    } catch (error) {
+      console.error(`Error ${action}ing connection:`, error);
+      alert(`Failed to ${action} connection. Please try again.`);
+    }
+  };
+
+  // ========================================
   // CONNECTION MANAGEMENT - REMOVING
   // ========================================
   const removeConnection = async (connectionId, doctorId) => {
@@ -232,6 +282,48 @@ const ConnectionsPage = () => {
         </div>
         <MoreHorizontal className="w-6 h-6 text-gray-400" />
       </div>
+
+      {/* Pending Requests Section */}
+      {pendingRequests.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Pending Connection Requests</h2>
+            <p className="text-sm text-gray-600">{pendingRequests.length} request(s) waiting for your response</p>
+          </div>
+          
+          <div className="space-y-3">
+            {pendingRequests.map((request) => (
+              <div key={request.id} className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900">
+                    {formatDoctorName(request.doctor_first_name, request.doctor_last_name)}
+                  </h3>
+                  <p className="text-sm text-blue-600 font-medium">{request.doctor_type}</p>
+                  <p className="text-sm text-gray-600">{request.doctor_email}</p>
+                  <p className="text-xs text-gray-500 font-mono mt-1">Doctor ID: {request.doctor_short_id}</p>
+                  <p className="text-xs text-gray-500">Requested: {new Date(request.created_at).toLocaleDateString()}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleConnectionRequest(request.id, 'accept')}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    Accept
+                  </button>
+                  <button
+                    onClick={() => handleConnectionRequest(request.id, 'reject')}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search Section */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
