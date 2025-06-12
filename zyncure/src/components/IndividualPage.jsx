@@ -1,6 +1,7 @@
 import { PencilIcon, ChevronRight, ArrowLeft, Eye } from "lucide-react";
 import { useState } from "react";
-
+import { supabase } from "../client";
+import PasswordSuccessModal from "./PasswordSuccessModal";
 
 export function PersonalInfoForm() {
   return (
@@ -73,7 +74,74 @@ export function SecurityPage() {
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false); // <-- Add this
 
+  // For change password form
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   if (showChangePassword) {
+    const handleChangePassword = async (e) => {
+      e.preventDefault();
+      setError("");
+      setSuccess("");
+
+      if (!oldPassword || !newPassword || !confirmPassword) {
+        setError("All fields are required.");
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setError("New passwords do not match.");
+        return;
+      }
+      if (newPassword.length < 6) {
+        setError("Password must be at least 6 characters.");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // Re-authenticate user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+
+        // Try signing in with old password to verify
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: oldPassword,
+        });
+        if (signInError) {
+          setError("Old password is incorrect.");
+          setLoading(false);
+          return;
+        }
+
+        // Update password
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+        if (updateError) throw updateError;
+
+        setShowSuccessModal(true);
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } catch (err) {
+        setError(err.message || "Failed to update password.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleModalClose = () => {
+      setShowSuccessModal(false);
+      // Optionally reset form fields or redirect
+      setShowChangePassword(false); // Go back to security page
+    };
+
     return (
       <div className="bg-profileBg rounded-xl p-8 h-[700px] flex flex-col">
         <button
@@ -83,13 +151,18 @@ export function SecurityPage() {
           <ArrowLeft className="mr-2" size={20} /> Back to Security
         </button>
         <h2 className="text-4xl text-profileHeader font-bold mb-8">Change Password</h2>
-        <form className="flex flex-col gap-6 max-w-3xl w-full">
+        <form className="flex flex-col gap-6 max-w-3xl w-full" onSubmit={handleChangePassword}>
+          {error && <div className="text-red-500">{error}</div>}
+          {success && <div className="text-green-600">{success}</div>}
           <div>
             <label className="block text-profileText mb-2 text-lg font-normal">Old Password</label>
             <input
               type="password"
               className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
               placeholder="Old Password"
+              value={oldPassword}
+              onChange={e => setOldPassword(e.target.value)}
+              disabled={loading}
             />
           </div>
           <div>
@@ -98,6 +171,9 @@ export function SecurityPage() {
               type="password"
               className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
               placeholder="New Password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              disabled={loading}
             />
           </div>
           <div>
@@ -106,17 +182,25 @@ export function SecurityPage() {
               type="password"
               className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
               placeholder="Re-enter New Password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              disabled={loading}
             />
           </div>
           <div className="flex justify-center mt-4">
             <button
               type="submit"
               className="bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
+              disabled={loading}
             >
-              Update
+              {loading ? "Updating..." : "Update"}
             </button>
           </div>
         </form>
+        <PasswordSuccessModal
+          open={showSuccessModal}
+          onClose={handleModalClose}
+        />
       </div>
     );
   }
