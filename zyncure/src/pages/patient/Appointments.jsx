@@ -36,18 +36,15 @@ const PersonalAppointmentTracker = () => {
         }
       }
 
-      // Load doctors
-      const { data: doctorsData } = await appointmentService.getDoctors();
-      if (doctorsData) {
-        setDoctors(doctorsData);
+      // Load CONNECTED doctors only (changed from getDoctors to getConnectedDoctors)
+      const { data: connectedDoctors } = await appointmentService.getConnectedDoctors();
+      if (connectedDoctors) {
+        setDoctors(connectedDoctors);
       }
     };
 
     initializeData();
   }, []);
-
-  // Get first name for greeting
-
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
