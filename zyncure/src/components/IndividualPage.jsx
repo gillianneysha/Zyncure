@@ -19,6 +19,7 @@ export function PersonalInfoForm() {
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false); // <-- Add this
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [originalData, setOriginalData] = useState(null); // <-- Add this
 
   // Fetch user info on mount
   useEffect(() => {
@@ -49,6 +50,14 @@ export function PersonalInfoForm() {
         birthdate: profile.birthdate || "",
         mobileNumber: profile.contact_number || "",
       });
+      setOriginalData({
+        firstName: profile.first_name || "",
+        middleName: profile.middle_name || "",
+        lastName: profile.last_name || "",
+        email: user.email || "",
+        birthdate: profile.birthdate || "",
+        mobileNumber: profile.contact_number || "",
+      }); // <-- Add this
       setLoading(false);
     }
     fetchUserInfo();
@@ -95,6 +104,12 @@ export function PersonalInfoForm() {
     }
     setSaving(false);
   };
+
+  const isChanged = originalData
+    ? Object.keys(formData).some(
+        (key) => formData[key] !== originalData[key]
+      )
+    : false;
 
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
@@ -166,7 +181,7 @@ export function PersonalInfoForm() {
               value={formData.birthdate}
               onChange={handleChange}
               className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
-              disabled={loading || saving}
+              disabled={!isEditing || loading || saving}
             />
           </div>
           <div className="flex-1">
@@ -177,15 +192,17 @@ export function PersonalInfoForm() {
               value={formData.mobileNumber}
               onChange={handleChange}
               className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
-              disabled={loading || saving}
+              disabled={!isEditing || loading || saving}
             />
           </div>
         </div>
         <div className="flex justify-center pt-4">
           <button
             type="submit"
-            className="bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
-            disabled={loading || saving || !isEditing}
+            className={`bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition ${
+              (!isEditing || loading || saving || !isChanged) ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            disabled={!isEditing || loading || saving || !isChanged}
           >
             {saving ? "Saving..." : "Save"}
           </button>
