@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, EyeClosed, EyeIcon, EyeOff, EyeOffIcon, LucideEye, LucideEyeClosed } from "lucide-react";
+import { Eye, EyeClosed } from "lucide-react";
 
 export default function PasswordInput({
   label = "Password",
@@ -42,7 +42,7 @@ export default function PasswordInput({
         style={{ padding: 0, background: "none", border: "none" }}
         aria-label={showPassword ? "Hide password" : "Show password"}
       >
-        {showPassword ? <Eye size={20} /> : <EyeClosed size={20} />}
+        {showPassword ? <Eye size={22} /> : <EyeClosed size={22} />}
       </button>
       {error && (
         <p className="mb-2 text-sm text-red-300">{error}</p>
