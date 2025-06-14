@@ -1,7 +1,7 @@
-
 import { PencilIcon, ChevronRight, ArrowLeft, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "../client";
+import PasswordInput from "./PasswordInput";
 import PasswordSuccessModal from "./PasswordSuccessModal";
 import PersonalInfoSuccessModal from "./PersonalInfoSuccessModal";
 
@@ -302,18 +302,21 @@ export function SecurityPage() {
         >
           <ArrowLeft className="mr-2" size={20} /> Back to Security
         </button>
-        <h2 className="text-4xl text-profileHeader font-bold mb-8">Change Password</h2>
-        <form className="flex flex-col gap-6 max-w-3xl w-full" onSubmit={handleChangePassword}>
+        <h2 className="text-4xl text-profileHeader font-bold mb-2">Change Password</h2>
+        <form className="flex flex-col gap-2 max-w-3xl w-full" onSubmit={handleChangePassword}>
           {error && <div className="text-red-500">{error}</div>}
           {success && <div className="text-green-600">{success}</div>}
-          <PasswordInput
-            label="Old Password"
-            value={oldPassword}
-            onChange={e => setOldPassword(e.target.value)}
-            placeholder="Old Password"
-            disabled={loading}
-            name="oldPassword"
-          />
+          <div className="mt-4">
+            <PasswordInput
+              label="Old Password"
+              value={oldPassword}
+              onChange={e => setOldPassword(e.target.value)}
+              placeholder="Old Password"
+              disabled={loading}
+              name="oldPassword"
+              inputClassName="mb-0.5"
+            />
+          </div>
           <PasswordInput
             label="New Password"
             value={newPassword}
@@ -321,6 +324,7 @@ export function SecurityPage() {
             placeholder="New Password"
             disabled={loading}
             name="newPassword"
+            inputClassName="mb-0.5"
           />
           <PasswordInput
             label="Re-enter New Password"
@@ -329,6 +333,7 @@ export function SecurityPage() {
             placeholder="Re-enter New Password"
             disabled={loading}
             name="confirmPassword"
+            inputClassName="mb-0.5"
           />
           <div className="flex justify-center mt-4">
             <button

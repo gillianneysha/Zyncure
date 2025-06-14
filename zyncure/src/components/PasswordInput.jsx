@@ -18,8 +18,8 @@ export default function PasswordInput({
   return (
     <div className="relative w-full mb-3">
       {label && (
-        <label className="block mb-1 text-[#F5E0D9] text-left" htmlFor={name}>
-          {label}:
+        <label className="block mb-1 text-[#F46B5D] text-left" htmlFor={name}>
+          {label}
         </label>
       )}
       <input
@@ -29,7 +29,7 @@ export default function PasswordInput({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className={`block w-full mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] pr-10 ${error ? "ring-2 ring-red-400" : ""} ${inputClassName}`}
+        className={`block w-full mb-0.5 p-2 bg-[#FEDED2] border border-[#F46B5D] rounded-[15.5px] pr-10 ${error ? "ring-2 ring-red-400" : ""} ${inputClassName}`}
         required={required}
         disabled={disabled}
         {...props}
