@@ -1,71 +1,202 @@
-import { PencilIcon, ChevronRight, ArrowLeft, Eye, EyeClosed } from "lucide-react";
-import { useState } from "react";
+
+import { PencilIcon, ChevronRight, ArrowLeft, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
 import { supabase } from "../client";
 import PasswordSuccessModal from "./PasswordSuccessModal";
-import PasswordInput from "./PasswordInput";
+import PersonalInfoSuccessModal from "./PersonalInfoSuccessModal";
+
 
 export function PersonalInfoForm() {
+  const [formData, setFormData] = useState({
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    email: "",
+    birthdate: "",
+    mobileNumber: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false); // <-- Add this
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Fetch user info on mount
+  useEffect(() => {
+    async function fetchUserInfo() {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      // Try to get profile from a "profiles" table, fallback to user_metadata
+      let profile = {};
+      let { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      if (profileData) {
+        profile = profileData;
+      } else {
+        profile = user.user_metadata || {};
+      }
+      setFormData({
+        firstName: profile.first_name || "",
+        middleName: profile.middle_name || "",
+        lastName: profile.last_name || "",
+        email: user.email || "",
+        birthdate: profile.birthdate || "",
+        mobileNumber: profile.contact_number || "",
+      });
+      setLoading(false);
+    }
+    fetchUserInfo();
+  }, []);
+
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Save handler
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setError("Not authenticated.");
+      setSaving(false);
+      return;
+    }
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .upsert({
+        id: user.id,
+        first_name: formData.firstName,
+        middle_name: formData.middleName,
+        last_name: formData.lastName,
+        birthdate: formData.birthdate,
+        contact_number: formData.mobileNumber,
+        updated_at: new Date().toISOString(),
+      });
+    if (updateError) {
+      setError("Failed to save changes.");
+    } else {
+      setSuccess("");
+      setShowSuccessModal(true); // Show modal
+      setIsEditing(false); // Exit editing mode
+    }
+    setSaving(false);
+  };
+
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-4xl text-profileHeader font-bold">
           Personal Information
         </h2>
-        <button className="text-mySidebar">
+        <button
+          className="text-mySidebar"
+          type="button"
+          onClick={() => setIsEditing(true)}
+          aria-label="Edit Personal Information"
+        >
           <PencilIcon size={20} />
         </button>
       </div>
-
-      <div className="space-y-4">
+      {error && <div className="text-red-500 mb-2">{error}</div>}
+      {success && <div className="text-green-600 mb-2">{success}</div>}
+      <form className="space-y-4" onSubmit={handleSave}>
         <div>
           <label className="block text-mySidebar mb-1">First Name</label>
           <input
             type="text"
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleChange}
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+            disabled={!isEditing || loading || saving}
           />
         </div>
-
         <div>
           <label className="block text-mySidebar mb-1">Middle Name</label>
           <input
             type="text"
+            name="middleName"
+            value={formData.middleName}
+            onChange={handleChange}
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+            disabled={!isEditing || loading || saving}
           />
         </div>
-
         <div>
           <label className="block text-mySidebar mb-1">Last Name</label>
           <input
             type="text"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+            disabled={!isEditing || loading || saving}
           />
         </div>
-
         <div>
           <label className="block text-mySidebar mb-1">Email</label>
           <input
             type="email"
+            name="email"
+            value={formData.email}
+            disabled
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
           />
         </div>
-
         <div className="flex space-x-4">
           <div className="flex-1">
             <label className="block text-mySidebar mb-1">Birthdate</label>
             <input
               type="date"
+              name="birthdate"
+              value={formData.birthdate}
+              onChange={handleChange}
               className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+              disabled={loading || saving}
             />
           </div>
           <div className="flex-1">
             <label className="block text-mySidebar mb-1">Mobile Number</label>
             <input
               type="tel"
+              name="mobileNumber"
+              value={formData.mobileNumber}
+              onChange={handleChange}
               className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+              disabled={loading || saving}
             />
           </div>
         </div>
-      </div>
+        <div className="flex justify-center pt-4">
+          <button
+            type="submit"
+            className="bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
+            disabled={loading || saving || !isEditing}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+      <PersonalInfoSuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+      />
     </div>
   );
 }
