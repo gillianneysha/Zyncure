@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X, Clock, Send } from 'lucide-react';
 import { supabase } from '../../client'; 
 
 const DoctorConnectionsPage = () => {
@@ -11,7 +11,6 @@ const DoctorConnectionsPage = () => {
   const [connections, setConnections] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [addedConnections, setAddedConnections] = useState(new Set());
   const [showDropdown, setShowDropdown] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -22,7 +21,6 @@ const DoctorConnectionsPage = () => {
   useEffect(() => {
     getCurrentUser();
     loadConnections();
-    loadPendingRequests();
   }, []);
 
   const getCurrentUser = async () => {
@@ -41,7 +39,7 @@ const DoctorConnectionsPage = () => {
     try {
       setIsLoading(true);
       
-      // Get connections from doctor's perspective using the view
+      // Load all connections using the new view
       const { data, error } = await supabase
         .from('doctor_connection_details')
         .select('*')
@@ -49,31 +47,24 @@ const DoctorConnectionsPage = () => {
 
       if (error) throw error;
 
-      setConnections(data || []);
+      const allConnections = data || [];
       
-      // Track which patients are already connected
-      const connectedPatientIds = new Set(data?.map(conn => conn.patient_id) || []);
-      setAddedConnections(connectedPatientIds);
+      // Separate pending incoming requests from other connections
+      const pendingIncoming = allConnections.filter(
+        conn => conn.status === 'pending' && conn.request_direction === 'incoming'
+      );
+      
+      const otherConnections = allConnections.filter(
+        conn => !(conn.status === 'pending' && conn.request_direction === 'incoming')
+      );
+      
+      setConnections(otherConnections);
+      setPendingRequests(pendingIncoming);
       
     } catch (error) {
       console.error('Error loading connections:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadPendingRequests = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('doctor_connection_details')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPendingRequests(data || []);
-    } catch (error) {
-      console.error('Error loading pending requests:', error);
     }
   };
 
@@ -86,29 +77,27 @@ const DoctorConnectionsPage = () => {
       return;
     }
 
+    if (!currentUser) return;
+
     setIsSearching(true);
     try {
-      // Use the search function for patients
+      // Use the new search function for available patients
       const { data, error } = await supabase
-        .rpc('search_patient_by_short_id', { 
-          search_id: term.toUpperCase() 
+        .rpc('search_available_patients_for_doctor', { 
+          doctor_uuid: currentUser.id,
+          search_term: term.toUpperCase() 
         });
 
       if (error) throw error;
       
-      // Filter out already connected patients
-      const filteredResults = (data || []).filter(
-        patient => !addedConnections.has(patient.patient_id)
-      );
-      
-      setSearchResults(filteredResults);
+      setSearchResults(data || []);
     } catch (error) {
       console.error('Error searching patients:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, [addedConnections]);
+  }, [currentUser]);
 
   // Handle search input with debouncing
   useEffect(() => {
@@ -124,52 +113,28 @@ const DoctorConnectionsPage = () => {
   }, [searchTerm, searchPatients]);
 
   // ========================================
-  // CONNECTION MANAGEMENT - ADDING
+  // CONNECTION MANAGEMENT - CREATING REQUESTS
   // ========================================
-  const addConnection = async (patient) => {
+  const sendConnectionRequest = async (patient) => {
     if (!currentUser) {
-      alert('Please log in to add connections');
+      alert('Please log in to send connection requests');
       return;
     }
 
     try {
-      // Get current user's med_id
-      const { data: doctorData, error: doctorError } = await supabase
-        .from('medicalprofessionals')
-        .select('med_id')
-        .eq('med_id', currentUser.id)
-        .single();
-
-      if (doctorError) throw doctorError;
-
-      // Insert new connection (doctor initiating connection)
-      const { data, error } = await supabase
-        .from('connections')
-        .insert({
-          patient_id: patient.patient_id,
-          med_id: doctorData.med_id,
-          status: 'pending'
-        })
-        .select()
-        .single();
+      // Use the new helper function to create connection request
+      const { error } = await supabase
+        .rpc('create_connection_request', {
+          requesting_user_id: currentUser.id,
+          requesting_user_type: 'doctor',
+          target_user_id: patient.patient_id,
+          target_user_type: 'patient'
+        });
 
       if (error) throw error;
 
-      // Update local state
-      const newConnection = {
-        id: data.id,
-        patient_id: data.patient_id,
-        med_id: data.med_id,
-        status: data.status,
-        created_at: data.created_at,
-        patient_first_name: patient.first_name,
-        patient_last_name: patient.last_name,
-        patient_email: patient.email,
-        patient_short_id: patient.short_id
-      };
-
-      setConnections(prev => [newConnection, ...prev]);
-      setAddedConnections(prev => new Set([...prev, patient.patient_id]));
+      // Reload connections to show the new pending request
+      await loadConnections();
       
       // Remove from search results
       setSearchResults(prev => prev.filter(p => p.patient_id !== patient.patient_id));
@@ -177,95 +142,130 @@ const DoctorConnectionsPage = () => {
       alert('Connection request sent successfully!');
       
     } catch (error) {
-      console.error('Error adding connection:', error);
-      alert('Failed to add connection. Please try again.');
+      console.error('Error sending connection request:', error);
+      alert('Failed to send connection request. Please try again.');
     }
   };
 
-  // ========================================
-  // CONNECTION REQUEST MANAGEMENT
-  // ========================================
-  const handleConnectionRequest = async (connectionId, action) => {
-    try {
-      const status = action === 'accept' ? 'accepted' : 'rejected';
-      
-      const { error } = await supabase
-        .from('connections')
-        .update({ status })
-        .eq('id', connectionId);
+ // ========================================
+// FIXED CONNECTION REQUEST MANAGEMENT
+// ========================================
+const handleConnectionRequest = async (connectionId, action) => {
+  try {
+    let error;
+    
+    if (action === 'accept') {
+      // Use the specific database function for accepting
+      const { error: acceptError } = await supabase
+        .rpc('accept_connection_request', {
+          connection_id: connectionId
+        });
+      error = acceptError;
+    } else if (action === 'reject') {
+      // Use the specific database function for rejecting
+      const { error: rejectError } = await supabase
+        .rpc('reject_connection_request', {
+          connection_id: connectionId
+        });
+      error = rejectError;
+    }
 
-      if (error) throw error;
-
-      // Update local state
-      setConnections(prev => 
-        prev.map(conn => 
-          conn.id === connectionId 
-            ? { ...conn, status }
-            : conn
-        )
-      );
-
-      setPendingRequests(prev => prev.filter(req => req.id !== connectionId));
-      
-      alert(`Connection request ${action}ed successfully!`);
-      
-    } catch (error) {
+    if (error) {
       console.error(`Error ${action}ing connection:`, error);
+      throw error;
+    }
+
+    // Reload connections to reflect the change
+    await loadConnections();
+    
+    alert(`Connection request ${action}ed successfully!`);
+    
+  } catch (error) {
+    console.error(`Error ${action}ing connection:`, error);
+    
+    // Provide more specific error messages
+    if (error.message.includes('Only the recipient can')) {
+      alert(`You can only ${action} connection requests sent to you.`);
+    } else if (error.message.includes('not found or not pending')) {
+      alert('This connection request is no longer available.');
+    } else {
       alert(`Failed to ${action} connection. Please try again.`);
     }
-  };
+  }
+};
 
-  // ========================================
-  // CONNECTION MANAGEMENT - REMOVING
-  // ========================================
-  const removeConnection = async (connectionId, patientId) => {
-    if (!confirm('Are you sure you want to remove this connection?')) {
-      return;
-    }
 
-    try {
-      const { error } = await supabase
-        .from('connections')
-        .delete()
-        .eq('id', connectionId);
+// ========================================
+// FIXED CONNECTION REMOVAL MANAGEMENT
+// ========================================
+const removeConnection = async (connectionId) => {
+  if (!confirm('Are you sure you want to remove this connection?')) {
+    return;
+  }
 
-      if (error) throw error;
-
-      // Update local state
-      setConnections(prev => prev.filter(conn => conn.id !== connectionId));
-      setAddedConnections(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(patientId);
-        return newSet;
+  try {
+    const { error } = await supabase
+      .rpc('remove_connection', {
+        connection_id: connectionId
       });
 
-      alert('Connection removed successfully!');
-      
-    } catch (error) {
+    if (error) {
       console.error('Error removing connection:', error);
-      alert('Failed to remove connection. Please try again.');
+      throw error;
     }
-  };
+
+    // Reload connections
+    await loadConnections();
+    
+    alert('Connection removed successfully!');
+    
+  } catch (error) {
+    console.error('Error removing connection:', error);
+    
+    if (error.message.includes('not found or you do not have permission')) {
+      alert('You do not have permission to remove this connection.');
+    } else {
+      alert(`Failed to remove connection: ${error.message}`);
+    }
+  }
+};
 
   // ========================================
   // UI HELPER FUNCTIONS
   // ========================================
-  const getStatusBadge = (status) => {
-    const statusColors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      accepted: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800'
+  const getStatusBadge = (status, requestDirection) => {
+    const statusConfig = {
+      pending: { 
+        color: 'bg-yellow-100 text-yellow-800', 
+        text: requestDirection === 'outgoing' ? 'Request Sent' : 'Pending Approval'
+      },
+      accepted: { color: 'bg-green-100 text-green-800', text: 'Connected' },
+      rejected: { color: 'bg-red-100 text-red-800', text: 'Rejected' }
     };
 
+    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', text: status };
+
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        {config.text}
       </span>
     );
   };
 
   const formatPatientName = (firstName, lastName) => {
     return `${firstName} ${lastName}`;
+  };
+
+  const getConnectionIcon = (status, requestDirection) => {
+    if (status === 'pending') {
+      return requestDirection === 'outgoing' ? <Send className="w-4 h-4" /> : <Clock className="w-4 h-4" />;
+    }
+    return <Check className="w-4 h-4" />;
+  };
+
+  // Check if patient is already connected or has pending request
+  const isPatientUnavailable = (patientId) => {
+    return [...connections, ...pendingRequests].some(conn => conn.patient_id === patientId);
   };
 
   // ========================================
@@ -282,17 +282,17 @@ const DoctorConnectionsPage = () => {
         <MoreHorizontal className="w-6 h-6 text-gray-400" />
       </div>
 
-      {/* Pending Requests Section */}
+      {/* Pending Incoming Requests Section */}
       {pendingRequests.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Pending Connection Requests</h2>
-            <p className="text-sm text-gray-600">{pendingRequests.length} request(s) waiting for your response</p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Incoming Connection Requests</h2>
+            <p className="text-sm text-gray-600">{pendingRequests.length} patient(s) want to connect with you</p>
           </div>
           
           <div className="space-y-3">
             {pendingRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div key={request.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-900">
                     {formatPatientName(request.patient_first_name, request.patient_last_name)}
@@ -314,7 +314,7 @@ const DoctorConnectionsPage = () => {
                     className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                   >
                     <X className="w-4 h-4" />
-                    Reject
+                    Decline
                   </button>
                 </div>
               </div>
@@ -327,17 +327,16 @@ const DoctorConnectionsPage = () => {
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Find Patients</h2>
-          <p className="text-sm text-gray-600">Enter the first 4 characters of a patient's ID to search</p>
+          <p className="text-sm text-gray-600">Enter the first 3+ characters of a patient's ID to search</p>
         </div>
         
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Enter first 4 characters (e.g., A1B2)..."
+            placeholder="Enter first 3+ characters (e.g., A1B)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
-            maxLength={4}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase tracking-wider"
           />
         </div>
@@ -352,7 +351,7 @@ const DoctorConnectionsPage = () => {
               </div>
             ) : searchResults.length > 0 ? (
               <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-3">Found {searchResults.length} patient(s):</p>
+                <p className="text-sm text-gray-600 mb-3">Found {searchResults.length} available patient(s):</p>
                 {searchResults.map((patient) => (
                   <div key={patient.patient_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
                     <div className="flex-1">
@@ -363,32 +362,24 @@ const DoctorConnectionsPage = () => {
                       <p className="text-xs text-gray-500 font-mono mt-1">ID: {patient.short_id}</p>
                     </div>
                     <button
-                      onClick={() => addConnection(patient)}
-                      disabled={addedConnections.has(patient.patient_id)}
+                      onClick={() => sendConnectionRequest(patient)}
+                      disabled={isPatientUnavailable(patient.patient_id)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        addedConnections.has(patient.patient_id)
-                          ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                        isPatientUnavailable(patient.patient_id)
+                          ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
                     >
-                      {addedConnections.has(patient.patient_id) ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="w-4 h-4" />
-                          Connect
-                        </>
-                      )}
+                      <UserPlus className="w-4 h-4" />
+                      Send Request
                     </button>
                   </div>
                 ))}
               </div>
             ) : searchTerm.length >= 3 ? (
               <div className="text-center py-6">
-                <p className="text-gray-500">No patients found with ID starting with "{searchTerm}"</p>
+                <p className="text-gray-500">No available patients found with ID starting with "{searchTerm}"</p>
+                <p className="text-xs text-gray-400 mt-1">They may not exist or you're already connected</p>
               </div>
             ) : (
               <div className="text-center py-4">
@@ -420,17 +411,24 @@ const DoctorConnectionsPage = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-medium text-gray-900">
-                        {formatPatientName(connection.patient_first_name, connection.patient_last_name)}
-                      </h3>
-                      {getStatusBadge(connection.status)}
+                      <div className="flex items-center gap-2">
+                        {getConnectionIcon(connection.status, connection.request_direction)}
+                        <h3 className="font-medium text-gray-900">
+                          {formatPatientName(connection.patient_first_name, connection.patient_last_name)}
+                        </h3>
+                      </div>
+                      {getStatusBadge(connection.status, connection.request_direction)}
                     </div>
                     <p className="text-sm text-gray-600">{connection.patient_email}</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                       <span className="font-mono">Patient ID: {connection.patient_short_id}</span>
-                      <span>Connected: {new Date(connection.created_at).toLocaleDateString()}</span>
+                      <span>
+                        {connection.request_direction === 'outgoing' ? 'Requested' : 'Connected'}: {new Date(connection.created_at).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
+                  
+                  {/* Action Menu */}
                   <div className="relative">
                     <button 
                       onClick={() => setShowDropdown(showDropdown === connection.id ? null : connection.id)}
@@ -449,13 +447,15 @@ const DoctorConnectionsPage = () => {
                         <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
                           <button
                             onClick={() => {
-                              removeConnection(connection.id, connection.patient_id);
+                              removeConnection(connection.id);
                               setShowDropdown(null);
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             <UserMinus className="w-4 h-4" />
-                            Remove Connection
+                            {connection.status === 'pending' && connection.request_direction === 'outgoing' 
+                              ? 'Cancel Request' 
+                              : 'Remove Connection'}
                           </button>
                         </div>
                       </>
