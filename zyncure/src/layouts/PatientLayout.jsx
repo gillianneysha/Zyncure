@@ -11,7 +11,7 @@ export default function PatientLayout() {
   const isHealthActive = location.pathname.includes('/home/health');
 
   return (
-    <div className="flex h-screen">
+    <div className="flex min-h-screen">
       <Sidebar>
         <SidebarItem 
           icon={<House size={20} />} 
@@ -64,10 +64,8 @@ export default function PatientLayout() {
           alert 
         />
       </Sidebar>
-
       <div className="flex flex-col flex-1">
         <Navbar />
-
         <main className="flex-1 w-full p-6 bg-mainBg text-gray-800">
           <Outlet />
         </main>
