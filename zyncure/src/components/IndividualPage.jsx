@@ -1,7 +1,8 @@
-import { PencilIcon, ChevronRight, ArrowLeft, Eye } from "lucide-react";
+import { PencilIcon, ChevronRight, ArrowLeft, Eye, EyeClosed } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "../client";
 import PasswordSuccessModal from "./PasswordSuccessModal";
+import PasswordInput from "./PasswordInput";
 
 export function PersonalInfoForm() {
   return (
@@ -82,6 +83,9 @@ export function SecurityPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   if (showChangePassword) {
     const handleChangePassword = async (e) => {
@@ -154,39 +158,30 @@ export function SecurityPage() {
         <form className="flex flex-col gap-6 max-w-3xl w-full" onSubmit={handleChangePassword}>
           {error && <div className="text-red-500">{error}</div>}
           {success && <div className="text-green-600">{success}</div>}
-          <div>
-            <label className="block text-profileText mb-2 text-lg font-normal">Old Password</label>
-            <input
-              type="password"
-              className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
-              placeholder="Old Password"
-              value={oldPassword}
-              onChange={e => setOldPassword(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          <div>
-            <label className="block text-profileText mb-2 text-lg font-normal">New Password</label>
-            <input
-              type="password"
-              className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          <div>
-            <label className="block text-profileText mb-2 text-lg font-normal">Re-enter New Password</label>
-            <input
-              type="password"
-              className="w-full p-2 border border-[#F46B5D] rounded-xl bg-profileBg text-lg focus:outline-none"
-              placeholder="Re-enter New Password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+          <PasswordInput
+            label="Old Password"
+            value={oldPassword}
+            onChange={e => setOldPassword(e.target.value)}
+            placeholder="Old Password"
+            disabled={loading}
+            name="oldPassword"
+          />
+          <PasswordInput
+            label="New Password"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            placeholder="New Password"
+            disabled={loading}
+            name="newPassword"
+          />
+          <PasswordInput
+            label="Re-enter New Password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            placeholder="Re-enter New Password"
+            disabled={loading}
+            name="confirmPassword"
+          />
           <div className="flex justify-center mt-4">
             <button
               type="submit"
