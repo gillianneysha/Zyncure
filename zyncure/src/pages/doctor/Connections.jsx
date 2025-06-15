@@ -39,7 +39,6 @@ const DoctorConnectionsPage = () => {
     try {
       setIsLoading(true);
       
-      // Load all connections using the new view
       const { data, error } = await supabase
         .from('doctor_connection_details')
         .select('*')
@@ -81,7 +80,6 @@ const DoctorConnectionsPage = () => {
 
     setIsSearching(true);
     try {
-      // Use the new search function for available patients
       const { data, error } = await supabase
         .rpc('search_available_patients_for_doctor', { 
           doctor_uuid: currentUser.id,
@@ -99,7 +97,6 @@ const DoctorConnectionsPage = () => {
     }
   }, [currentUser]);
 
-  // Handle search input with debouncing
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm) {
@@ -122,7 +119,6 @@ const DoctorConnectionsPage = () => {
     }
 
     try {
-      // Use the new helper function to create connection request
       const { error } = await supabase
         .rpc('create_connection_request', {
           requesting_user_id: currentUser.id,
@@ -133,10 +129,8 @@ const DoctorConnectionsPage = () => {
 
       if (error) throw error;
 
-      // Reload connections to show the new pending request
       await loadConnections();
       
-      // Remove from search results
       setSearchResults(prev => prev.filter(p => p.patient_id !== patient.patient_id));
       
       alert('Connection request sent successfully!');
@@ -155,14 +149,12 @@ const handleConnectionRequest = async (connectionId, action) => {
     let error;
     
     if (action === 'accept') {
-      // Use the specific database function for accepting
       const { error: acceptError } = await supabase
         .rpc('accept_connection_request', {
           connection_id: connectionId
         });
       error = acceptError;
     } else if (action === 'reject') {
-      // Use the specific database function for rejecting
       const { error: rejectError } = await supabase
         .rpc('reject_connection_request', {
           connection_id: connectionId
@@ -175,7 +167,6 @@ const handleConnectionRequest = async (connectionId, action) => {
       throw error;
     }
 
-    // Reload connections to reflect the change
     await loadConnections();
     
     alert(`Connection request ${action}ed successfully!`);
@@ -183,7 +174,6 @@ const handleConnectionRequest = async (connectionId, action) => {
   } catch (error) {
     console.error(`Error ${action}ing connection:`, error);
     
-    // Provide more specific error messages
     if (error.message.includes('Only the recipient can')) {
       alert(`You can only ${action} connection requests sent to you.`);
     } else if (error.message.includes('not found or not pending')) {
@@ -213,8 +203,6 @@ const removeConnection = async (connectionId) => {
       console.error('Error removing connection:', error);
       throw error;
     }
-
-    // Reload connections
     await loadConnections();
     
     alert('Connection removed successfully!');
@@ -263,7 +251,6 @@ const removeConnection = async (connectionId) => {
     return <Check className="w-4 h-4" />;
   };
 
-  // Check if patient is already connected or has pending request
   const isPatientUnavailable = (patientId) => {
     return [...connections, ...pendingRequests].some(conn => conn.patient_id === patientId);
   };

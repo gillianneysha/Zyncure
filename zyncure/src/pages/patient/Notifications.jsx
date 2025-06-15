@@ -8,10 +8,8 @@ export default function Notifications() {
   useEffect(() => {
     async function fetchNotifications() {
       setLoading(true);
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      // Fetch notifications for this user
       const { data, error } = await supabase
         .from("notifications")
         .select("*")

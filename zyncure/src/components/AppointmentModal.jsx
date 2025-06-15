@@ -55,10 +55,10 @@ const AppointmentModal = ({
       } else {
         console.log('Available slots:', slots);
         setAvailableTimeSlots(slots || []);
-        setLocalError(''); // Clear any previous errors
+        setLocalError(''); // Clear 
         setLastRefreshTime(new Date());
         
-        // If currently selected time is no longer available, clear it
+        // If currently selected time is no longer available, clear !
         if (newAppointment.time && slots && !slots.includes(newAppointment.time)) {
           setNewAppointment(prev => ({ ...prev, time: '' }));
           setLocalError('Your selected time is no longer available. Please choose a different time.');
@@ -80,7 +80,7 @@ const AppointmentModal = ({
     if (!isOpen || !newAppointment.doctor_id) return;
 
     const interval = setInterval(() => {
-      refreshAvailableSlots(false); // Silent refresh
+      refreshAvailableSlots(false); //refresh
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
@@ -115,13 +115,13 @@ const AppointmentModal = ({
       setParentError('');
     }
     
-    // Validate required fields
+    // Validate 
     if (!newAppointment.doctor_id || !newAppointment.time || !newAppointment.reason) {
       setLocalError('Please fill in all required fields');
       return;
     }
 
-    // Validate reason length
+    // Validate 
     if (newAppointment.reason.trim().length < 10) {
       setLocalError('Please provide a more detailed reason (at least 10 characters)');
       return;
@@ -137,7 +137,7 @@ const AppointmentModal = ({
     setLocalLoading(true);
     
     try {
-      // Final real-time check before submission
+      // Final check before submission
       const dateStr = formatDate(selectedDate);
       const { data: currentSlots } = await appointmentService.getAvailableTimeSlots(
         newAppointment.doctor_id, 
@@ -152,9 +152,7 @@ const AppointmentModal = ({
 
       const result = await onSubmit();
       
-      // If submission was successful
       if (result !== false) {
-        // Success! Modal will be closed by parent component
         console.log('Appointment booked successfully');
       }
     } catch (err) {
@@ -179,14 +177,14 @@ const AppointmentModal = ({
     setNewAppointment({
       ...newAppointment, 
       doctor_id: doctorId,
-      time: '' // Reset time when doctor changes
+      time: '' 
     });
-    setLocalError(''); // Clear any previous errors
+    setLocalError(''); 
   };
 
   const handleTimeChange = (time) => {
     setNewAppointment({...newAppointment, time});
-    setLocalError(''); // Clear any previous errors
+    setLocalError(''); 
   };
 
   if (!isOpen) return null;

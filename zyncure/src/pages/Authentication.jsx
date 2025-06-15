@@ -2,7 +2,7 @@ import React, { useState, memo, useCallback } from 'react';
 import LoginForm from './LoginForm';
 import RegistrationForm from './RegistrationForm';
 
-// Memoize the form components
+
 const MemoizedLoginForm = memo(LoginForm);
 const MemoizedRegistrationForm = memo(RegistrationForm);
 

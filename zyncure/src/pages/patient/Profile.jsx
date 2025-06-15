@@ -14,12 +14,10 @@ export default function ProfilePage({ setIsAuthenticated }) {
   const [activeTab, setActiveTab] = useState("My Profile");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Show modal instead of logging out immediately
   const handleLogoutClick = () => {
     setShowLogoutModal(true);
   };
 
-  // Called when user confirms logout
   const handleLogoutConfirm = async () => {
     setIsAuthenticated(false); 
     sessionStorage.removeItem('token');
@@ -27,7 +25,6 @@ export default function ProfilePage({ setIsAuthenticated }) {
     navigate('/', { replace: true });
 };
 
-  // Called when user cancels logout
   const handleLogoutCancel = () => {
     setShowLogoutModal(false);
   };

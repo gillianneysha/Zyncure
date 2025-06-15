@@ -5,9 +5,9 @@ import { supabase } from '../client';
 // =============================================================================
 
 /**
- * Converts 12-hour format time to 24-hour format for database storage
- * @param {string} time12h - Time in 12-hour format (e.g., "2:30 PM")
- * @returns {string} Time in 24-hour format (e.g., "14:30:00")
+
+ * @param {string} time12h 
+ * @returns {string}
  */
 const convertTo24Hour = (time12h) => {
   const [time, modifier] = time12h.split(' ');
@@ -23,9 +23,9 @@ const convertTo24Hour = (time12h) => {
 };
 
 /**
- * Converts 24-hour format time to 12-hour format for display
- * @param {string} time24h - Time in 24-hour format (e.g., "14:30:00")
- * @returns {string} Time in 12-hour format (e.g., "2:30 PM")
+ 
+ * @param {string} time24h 
+ * @returns {string} 
  */
 const convertTo12Hour = (time24h) => {
   const [hours, minutes] = time24h.split(':');
@@ -36,9 +36,9 @@ const convertTo12Hour = (time24h) => {
 };
 
 /**
- * Formats appointment date for display
- * @param {string} appointmentDate - ISO date string from database
- * @returns {object} Object containing formatted date and time
+
+ * @param {string} appointmentDate 
+ * @returns {object} 
  */
 const formatAppointmentDateTime = (appointmentDate) => ({
   date: appointmentDate.split('T')[0],
@@ -50,8 +50,8 @@ const formatAppointmentDateTime = (appointmentDate) => ({
 });
 
 /**
- * Gets current authenticated user
- * @returns {object} User object or throws error if not authenticated
+
+ * @returns {object} 
  */
 const getCurrentUser = async () => {
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -66,18 +66,18 @@ const getCurrentUser = async () => {
 // =============================================================================
 export const appointmentService = {
   /**
-   * Creates a new appointment with enhanced race condition protection
-   * @param {object} appointmentData - Appointment details
-   * @returns {object} Created appointment data or error
+ 
+   * @param {object} appointmentData 
+   * @returns {object}
    */
-// APPROACH 2: Using the simpler function that returns only appointment ID
+
 async createAppointment(appointmentData) {
   try {
     const user = await getCurrentUser();
     const time24h = convertTo24Hour(appointmentData.time);
     const fullDateTime = `${appointmentData.date}T${time24h}`;
 
-    // Pre-flight check: Verify time slot is still available
+
     const { data: availableSlots } = await this.getAvailableTimeSlots(
       appointmentData.doctor_id, 
       appointmentData.date
@@ -87,7 +87,7 @@ async createAppointment(appointmentData) {
       throw new Error('This time slot is no longer available. Please select a different time.');
     }
 
-    // Use the simpler database function
+
     const { data: appointmentId, error } = await supabase.rpc('create_appointment_simple', {
       p_patient_id: user.id,
       p_med_id: appointmentData.doctor_id,
@@ -118,7 +118,7 @@ async createAppointment(appointmentData) {
       throw new Error('Appointment creation failed. Please try again.');
     }
 
-    // Fetch the created appointment details
+
     const { data: appointmentDetails, error: fetchError } = await supabase
       .from('appointments')
       .select(`
@@ -135,7 +135,7 @@ async createAppointment(appointmentData) {
 
     if (fetchError || !appointmentDetails) {
       console.warn('Could not fetch created appointment details:', fetchError);
-      // Return basic info if we can't fetch full details
+
       return {
         data: [{
           id: appointmentId,
@@ -151,7 +151,7 @@ async createAppointment(appointmentData) {
       };
     }
 
-    // Transform data for frontend
+
     const { date, time } = formatAppointmentDateTime(appointmentDetails.appointment_date);
     const transformedData = [{
       id: appointmentDetails.appointment_id,
@@ -176,10 +176,10 @@ async createAppointment(appointmentData) {
 
 
   /**
-   * Gets appointments for a specific date - IMPROVED VERSION
-   * @param {string} date - Date in YYYY-MM-DD format
-   * @param {string} doctorId - Optional doctor ID filter
-   * @returns {object} Appointments array or error
+
+   * @param {string} date 
+   * @param {string} doctorId 
+   * @returns {object} 
    */
   async getAppointments(date, doctorId = null) {
     try {
@@ -209,7 +209,7 @@ async createAppointment(appointmentData) {
         throw error;
       }
 
-      // Transform data for frontend
+  
       const transformedData = (data || []).map(apt => {
         const { date, time } = formatAppointmentDateTime(apt.appointment_date);
         return {
@@ -234,9 +234,9 @@ async createAppointment(appointmentData) {
   },
 
   /**
-   * Gets all appointments for the current user
-   * @param {string} userId - Optional user ID (defaults to current user)
-   * @returns {object} User's appointments array or error
+
+   * @param {string} userId
+   * @returns {object} 
    */
   async getUserAppointments(userId = null) {
     try {
@@ -287,8 +287,8 @@ async createAppointment(appointmentData) {
   },
 
   /**
-   * Gets connected doctors for the current patient
-   * @returns {object} Connected doctors array or error
+ 
+   * @returns {object} 
    */
   async getConnectedDoctors() {
     try {
@@ -333,14 +333,14 @@ async createAppointment(appointmentData) {
   },
 
   /**
-   * Gets available time slots with real-time conflict checking
-   * @param {string} doctorId - Doctor's ID
-   * @param {string} date - Date in YYYY-MM-DD format
-   * @returns {object} Available time slots array or error
+
+   * @param {string} doctorId 
+   * @param {string} date 
+   * @returns {object} 
    */
   async getAvailableTimeSlots(doctorId, date) {
     try {
-      // Get existing appointments for the doctor on that date
+
       const { data: existingAppointments, error } = await supabase
         .from('appointments')
         .select('appointment_date')
@@ -355,19 +355,18 @@ async createAppointment(appointmentData) {
         throw error;
       }
 
-      // Define available time slots in 24-hour format
+
       const allTimeSlots24h = [
         '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
         '11:00', '11:30', '13:00', '13:30', '14:00', '14:30',
         '15:00', '15:30', '16:00', '16:30', '17:00'
       ];
 
-      // Get booked times in 24-hour format
       const bookedTimes = (existingAppointments || []).map(apt => 
         new Date(apt.appointment_date).toTimeString().substring(0, 5)
       );
 
-      // Filter out booked slots and convert to 12-hour format
+
       const availableSlots24h = allTimeSlots24h.filter(time => !bookedTimes.includes(time));
       const availableSlots12h = availableSlots24h.map(time => convertTo12Hour(time + ':00'));
 
@@ -379,22 +378,21 @@ async createAppointment(appointmentData) {
   },
 
   /**
-   * Updates an existing appointment
-   * @param {string} appointmentId - Appointment ID to update
-   * @param {object} updateData - Data to update
-   * @returns {object} Updated appointment data or error
+
+   * @param {string} appointmentId 
+   * @param {object} updateData 
+   * @returns {object} 
    */
   async updateAppointment(appointmentId, updateData) {
     try {
       const dataToUpdate = {};
       
-      // Handle date and time updates
+
       if (updateData.date && updateData.time) {
         const time24h = convertTo24Hour(updateData.time);
         dataToUpdate.appointment_date = `${updateData.date}T${time24h}`;
       }
-      
-      // Handle other field updates
+
       if (updateData.status) dataToUpdate.status = updateData.status;
       if (updateData.reason) dataToUpdate.reason = updateData.reason;
       if (updateData.doctor_id) dataToUpdate.med_id = updateData.doctor_id;
@@ -418,7 +416,7 @@ async createAppointment(appointmentData) {
         throw error;
       }
 
-      // Transform data for frontend
+
       const transformedData = (data || []).map(apt => {
         const { date, time } = formatAppointmentDateTime(apt.appointment_date);
         return {
@@ -440,9 +438,9 @@ async createAppointment(appointmentData) {
   },
 
   /**
-   * Deletes an appointment
-   * @param {string} appointmentId - Appointment ID to delete
-   * @returns {object} Success status or error
+
+   * @param {string} appointmentId
+   * @returns {object} 
    */
   async deleteAppointment(appointmentId) {
     try {
@@ -469,9 +467,9 @@ async createAppointment(appointmentData) {
 
 export const connectionService = {
   /**
-   * Searches for medical professionals by short ID
-   * @param {string} shortId - Short ID to search for
-   * @returns {object} Search results or error
+
+   * @param {string} shortId 
+   * @returns {object}
    */
   async searchDoctorByShortId(shortId) {
     try {
@@ -490,9 +488,9 @@ export const connectionService = {
   },
 
   /**
-   * Creates a new connection request
-   * @param {string} medId - Medical professional ID
-   * @returns {object} Created connection or error
+
+   * @param {string} medId 
+   * @returns {object} 
    */
   async createConnection(medId) {
     try {
@@ -520,8 +518,8 @@ export const connectionService = {
   },
 
   /**
-   * Gets patient's connections
-   * @returns {object} Connections array or error
+
+   * @returns {object} 
    */
   async getPatientConnections() {
     try {
@@ -542,10 +540,10 @@ export const connectionService = {
   },
 
   /**
-   * Updates connection status
-   * @param {string} connectionId - Connection ID
-   * @param {string} status - New status ('pending', 'accepted', 'rejected')
-   * @returns {object} Updated connection or error
+
+   * @param {string} connectionId 
+   * @param {string} status 
+   * @returns {object}
    */
   async updateConnectionStatus(connectionId, status) {
     try {
@@ -573,8 +571,8 @@ export const connectionService = {
 
 export const userService = {
   /**
-   * Gets current user data with patient information
-   * @returns {object} User data or null if error
+
+   * @returns {object} 
    */
   async getUserData() {
     try {
@@ -587,7 +585,7 @@ export const userService = {
         id: user.id,
       };
 
-      // Try to get additional patient data
+  
       try {
         const { data: patientData, error: patientError } = await supabase
           .from("patients")
@@ -608,7 +606,7 @@ export const userService = {
         }
       } catch (patientErr) {
         console.warn('Could not fetch patient data:', patientErr);
-        // Continue with basic user data
+    
       }
 
       return userData;
