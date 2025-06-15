@@ -532,11 +532,15 @@ export function NotificationPage() {
 
 export function BillingPage() {
   const [showPlans, setShowPlans] = useState(false);
-  const [selectedTier, setSelectedTier] = useState(""); // Add this at the top of BillingPage
+  const [selectedTier, setSelectedTier] = useState("");
+  const [billingStep, setBillingStep] = useState("home");
 
   const handleOptionClick = (option) => {
     if (option === "Subscriptions") setShowPlans(true);
-    // Add other options as needed
+    else if (option === "Payment methods") setBillingStep("methods");
+    else if (option === "Contact Information") {
+      // Add logic for Contact Information if needed
+    }
   };
 
   const SecurityOption = ({ title, onClick }) => (
@@ -639,31 +643,117 @@ export function BillingPage() {
     );
   }
 
-  return (
-    <div className="bg-profileBg rounded-xl p-8 h-[700px]">
-      <div className="mb-6">
-        <h2 className="text-4xl text-profileHeader font-bold">Billing</h2>
-        <p className="text-zyncureOrange text-left">
-          Payment methods and subscriptions are monitored here
-        </p>
+  if (billingStep === "methods") {
+    return (
+      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+        <button
+          onClick={() => setBillingStep("home")}
+          className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
+        >
+          <ArrowLeft className="mr-2" size={20} /> Back to Billing
+        </button>
+        <h2 className="text-4xl text-profileHeader font-bold mb-2">Payment Methods</h2>
+        <p className="text-zyncureOrange mb-8">Select your mode of payment and input your information</p>
+        <div
+          className="bg-[#FFEDE7] rounded-xl flex items-center px-6 py-5 cursor-pointer hover:bg-[#f9d3c2] transition mb-4"
+          onClick={() => setBillingStep("details")}
+        >
+          <div className="w-10 h-10 mr-4 rounded-lg flex items-center justify-center bg-black">
+            <img
+              src="https://cdn.brandfetch.io/id_IE4goUp/theme/dark/logo.svg?c=1dxbfHSJFAPEGdCLU4o5B"
+              alt="Maya Bank"
+              className="w-8 h-8"
+              style={{ objectFit: "contain" }}
+            />
+          </div>
+          <span className="text-[#F46B5D] font-semibold text-lg flex-1">Maya Bank</span>
+          <ChevronRight className="text-[#F46B5D]" size={28} />
+        </div>
       </div>
+    );
+  }
 
-      <div className="mt-8">
-        <SecurityOption
-          title="Subscriptions"
-          onClick={handleOptionClick}
-        />
-        <SecurityOption
-          title="Payment methods"
-          onClick={handleOptionClick}
-        />
-        <SecurityOption
-          title="Contact Information"
-          onClick={handleOptionClick}
-        />
+  if (billingStep === "details") {
+    return (
+      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+        <button
+          onClick={() => setBillingStep("methods")}
+          className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
+        >
+          <ArrowLeft className="mr-2" size={20} /> Back to Payment Methods
+        </button>
+        <h2 className="text-4xl text-profileHeader font-bold mb-2">Enter payment details</h2>
+        <p className="text-zyncureOrange mb-8">Select your mode of payment and input your information</p>
+        <div className="bg-[#FFEDE7] rounded-xl px-8 py-8 max-w-xl mx-auto">
+          <div className="flex items-center mb-6">
+            <div className="w-10 h-10 mr-4 rounded-lg flex items-center justify-center bg-black">
+              <img
+                src="https://cdn.brandfetch.io/id_IE4goUp/theme/dark/logo.svg?c=1dxbfHSJFAPEGdCLU4o5B"
+                alt="Maya Bank"
+                className="w-8 h-8"
+                style={{ objectFit: "contain" }}
+              />
+            </div>
+            <span className="text-[#F46B5D] font-semibold text-lg">Maya Bank</span>
+          </div>
+          <label className="block text-[#3BA4A0] font-semibold mb-2">
+            Enter your Maya mobile number
+          </label>
+          <div className="flex items-center mb-4">
+            <span className="px-4 py-2 bg-[#FEDED2] border border-[#F46B5D] rounded-l-[15.5px] text-[#F46B5D] font-semibold">+63</span>
+            <input
+              type="tel"
+              className="w-full p-2 bg-[#FEDED2] border-t border-b border-r border-[#F46B5D] rounded-r-[15.5px] outline-none"
+              placeholder="Mobile Number"
+            />
+          </div>
+          <p className="text-[#F46B5D] text-xs mb-4">
+            By checking the checkbox below, you agree that ZynCure will automatically continue your membership and charge the membership fee to your payment method until you cancel. You may cancel at any time to avoid future charges.
+          </p>
+          <div className="flex items-center mb-6">
+            <input type="checkbox" id="agree" className="mr-2 accent-[#F46B5D] w-5 h-5" />
+            <label htmlFor="agree" className="text-[#F46B5D] font-semibold">I Agree.</label>
+          </div>
+          <div className="flex justify-center mb-4">
+            <button className="bg-[#55A1A4] text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition">
+              Save
+            </button>
+          </div>
+          <p className="text-[#F46B5D] text-xs text-center">
+            You'll be taken to Maya to complete the payment setup, but you won't be charged right away.
+          </p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // --- Default Billing Home ---
+  if (billingStep === "home") {
+    return (
+      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+        <div className="mb-6">
+          <h2 className="text-4xl text-profileHeader font-bold">Billing</h2>
+          <p className="text-zyncureOrange text-left">
+            Payment methods and subscriptions are monitored here
+          </p>
+        </div>
+        <div className="mt-8">
+          <SecurityOption
+            title="Subscriptions"
+            onClick={handleOptionClick}
+          />
+          <SecurityOption
+            title="Payment methods"
+            onClick={handleOptionClick}
+          />
+          <SecurityOption
+            title="Contact Information"
+            onClick={handleOptionClick}
+          />
+        </div>
+      </div>
+    );
+  }
 }
 
 export function TermsOfServicePage({ onBack }) {
