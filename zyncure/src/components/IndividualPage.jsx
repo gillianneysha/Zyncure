@@ -120,7 +120,14 @@ export function PersonalInfoForm() {
           Personal Information
         </h2>
         <button
-          className="text-mySidebar"
+          className={`
+            transition-all duration-300
+            p-2 rounded-xl
+            ${isEditing
+              ? "bg-[#55A1A4]/10 border border-[#55A1A4] text-[#55A1A4] scale-110 shadow"
+              : "hover:bg-[#55A1A4]/10 hover:border hover:border-[#55A1A4] hover:text-[#55A1A4] text-mySidebar"
+            }
+          `}
           type="button"
           onClick={() => setIsEditing(true)}
           aria-label="Edit Personal Information"
@@ -303,7 +310,7 @@ export function SecurityPage() {
           <ArrowLeft className="mr-2" size={20} /> Back to Security
         </button>
         <h2 className="text-4xl text-profileHeader font-bold mb-2">Change Password</h2>
-        <form className="flex flex-col gap-2 max-w-3xl w-full" onSubmit={handleChangePassword}>
+        <form className="flex flex-col gap-2 w-full" onSubmit={handleChangePassword}>
           {error && <div className="text-red-500">{error}</div>}
           {success && <div className="text-green-600">{success}</div>}
           <div className="mt-4">
@@ -314,7 +321,7 @@ export function SecurityPage() {
               placeholder="Old Password"
               disabled={loading}
               name="oldPassword"
-              inputClassName="mb-0.5"
+              inputClassName="mb-0.5 w-full"
             />
           </div>
           <PasswordInput
@@ -324,7 +331,7 @@ export function SecurityPage() {
             placeholder="New Password"
             disabled={loading}
             name="newPassword"
-            inputClassName="mb-0.5"
+            inputClassName="mb-0.5 w-full"
           />
           <PasswordInput
             label="Re-enter New Password"
@@ -333,7 +340,7 @@ export function SecurityPage() {
             placeholder="Re-enter New Password"
             disabled={loading}
             name="confirmPassword"
-            inputClassName="mb-0.5"
+            inputClassName="mb-0.5 w-full"
           />
           <div className="flex justify-center mt-4">
             <button
@@ -376,7 +383,7 @@ export function SecurityPage() {
           <ArrowLeft className="mr-2" size={20} /> Back to Security
         </button>
         <h2 className="text-4xl text-profileHeader font-bold mb-8">Two-factor Authentication</h2>
-        <div className="border border-[#F46B5D] rounded-xl bg-profileBg w-full max-w-4xl">
+        <div className="border border-[#F46B5D] rounded-xl bg-profileBg w-full transition-all duration-300">
           <div className="flex items-center justify-between px-6 pt-5 pb-2">
             <div>
               <span className="block text-[#F46B5D] font-semibold text-base mb-1">
@@ -406,7 +413,7 @@ export function SecurityPage() {
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
         <h2 className="text-4xl text-profileHeader font-bold">Security</h2>
-        <p className="text-zyncureOrange text-left">
+        <p className="text-zyncureOrange text-left mt-3">
           Manage account password and login preferences.
         </p>
       </div>
@@ -733,7 +740,7 @@ export function BillingPage() {
       <div className="bg-profileBg rounded-xl p-8 h-[700px]">
         <div className="mb-6">
           <h2 className="text-4xl text-profileHeader font-bold">Billing</h2>
-          <p className="text-zyncureOrange text-left">
+          <p className="text-zyncureOrange text-left mt-3">
             Payment methods and subscriptions are monitored here
           </p>
         </div>
