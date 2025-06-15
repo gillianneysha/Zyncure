@@ -7,8 +7,8 @@ export default function Sidebar({ children }) {
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <aside className="h-screen">
-      <nav className="h-full flex flex-col bg-mySidebar shadow-md">
+    <aside className="min-h-screen flex flex-col bg-mySidebar rounded-br-[120px] shadow-2xl drop-shadow-2xl">
+      <nav className="h-full flex flex-col">
         <div className="p-4 pb-2 flex justify-between items-center">
           <img
             src="/zyncure_logo.png"
