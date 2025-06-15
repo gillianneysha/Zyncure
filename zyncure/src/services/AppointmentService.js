@@ -219,109 +219,95 @@ export const appointmentService = {
     }
   },
 
-  /**
-   * Gets connected doctors for the current patient
-   * @param {string} patientId - Optional patient ID
-   * @returns {object} Connected doctors array or error
-   */
-  async getConnectedDoctors(patientId = null) {
-    try {
-      const currentPatientId = patientId || (await getCurrentUser()).id;
+/**
+ * Gets connected doctors for the current patient using the new database views
+ * @returns {object} Connected doctors array or error
+ */
+async getConnectedDoctors() {
+  try {
+    // Use the new patient_connection_details view you created
+    // The view automatically filters by auth.uid() due to RLS
+    const { data, error } = await supabase
+      .from('patient_connection_details')
+      .select(`
+        med_id,
+        doctor_first_name,
+        doctor_last_name,
+        doctor_type,
+        doctor_email,
+        doctor_short_id,
+        status
+      `)
+      .eq('status', 'accepted')  // Only get accepted connections
+      .order('doctor_first_name');
 
-      // Get accepted connections
-      const { data: connections, error: connectionsError } = await supabase
-        .from('connections')
-        .select('*')
-        .eq('patient_id', currentPatientId)
-        .eq('status', 'accepted');
+    if (error) throw error;
 
-      if (connectionsError) throw connectionsError;
-
-      if (!connections || connections.length === 0) {
-        return { data: [], error: null };
-      }
-
-      // Get doctor details for each connection
-      const doctorPromises = connections.map(async (connection) => {
-        const { data: doctorData, error: doctorError } = await supabase
-          .from('medicalprofessionals')
-          .select('med_id, first_name, last_name, user_type, email')
-          .eq('med_id', connection.med_id)
-          .single();
-
-        if (doctorError) return null;
-
-        return {
-          ...doctorData,
-          connection_id: connection.id,
-          connection_status: connection.status
-        };
-      });
-
-      const doctorResults = await Promise.all(doctorPromises);
-      const validDoctors = doctorResults.filter(doctor => doctor !== null);
-
-      // Transform data for frontend
-      const transformedData = validDoctors.map(doctor => ({
-        id: doctor.med_id,
-        name: `Dr. ${doctor.first_name} ${doctor.last_name}`,
-        specialty: doctor.user_type,
-        email: doctor.email,
-        available: true,
-        shortId: doctor.med_id.toString().substring(0, 4).toUpperCase()
-      }));
-
-      return { data: transformedData, error: null };
-    } catch (error) {
-      return { data: [], error: error.message };
+    if (!data || data.length === 0) {
+      return { data: [], error: null };
     }
-  },
 
-  /**
-   * Alternative method to get connected doctors using database view
-   * @param {string} patientId - Optional patient ID
-   * @returns {object} Connected doctors array or error
-   */
-  async getConnectedDoctorsFromView(patientId = null) {
-    try {
-      const currentPatientId = patientId || (await getCurrentUser()).id;
+    // Transform data for frontend (matching the expected format)
+    const transformedData = data.map(connection => ({
+      id: connection.med_id,
+      name: `Dr. ${connection.doctor_first_name} ${connection.doctor_last_name}`,
+      specialty: connection.doctor_type,
+      email: connection.doctor_email,
+      available: true,
+      shortId: connection.doctor_short_id
+    }));
 
-      const { data, error } = await supabase
-        .from('connection_details')
-        .select(`
-          med_id,
-          doctor_first_name,
-          doctor_last_name,
-          doctor_type,
-          doctor_email,
-          status,
-          doctor_short_id
-        `)
-        .eq('patient_id', currentPatientId)
-        .eq('status', 'accepted')
-        .order('doctor_first_name');
+    return { data: transformedData, error: null };
+  } catch (error) {
+    return { data: [], error: error.message };
+  }
+},
 
-      if (error) throw error;
+  // /**
+  //  * Alternative method to get connected doctors using database view
+  //  * @param {string} patientId - Optional patient ID
+  //  * @returns {object} Connected doctors array or error
+  //  */
+  // async getConnectedDoctorsFromView(patientId = null) {
+  //   try {
+  //     const currentPatientId = patientId || (await getCurrentUser()).id;
 
-      if (!data || data.length === 0) {
-        return { data: [], error: null };
-      }
+  //     const { data, error } = await supabase
+  //       .from('connection_details')
+  //       .select(`
+  //         med_id,
+  //         doctor_first_name,
+  //         doctor_last_name,
+  //         doctor_type,
+  //         doctor_email,
+  //         status,
+  //         doctor_short_id
+  //       `)
+  //       .eq('patient_id', currentPatientId)
+  //       .eq('status', 'accepted')
+  //       .order('doctor_first_name');
 
-      // Transform data for frontend
-      const transformedData = data.map(connection => ({
-        id: connection.med_id,
-        name: `Dr. ${connection.doctor_first_name} ${connection.doctor_last_name}`,
-        specialty: connection.doctor_type,
-        email: connection.doctor_email,
-        available: true,
-        shortId: connection.doctor_short_id
-      }));
+  //     if (error) throw error;
 
-      return { data: transformedData, error: null };
-    } catch (error) {
-      return { data: [], error: error.message };
-    }
-  },
+  //     if (!data || data.length === 0) {
+  //       return { data: [], error: null };
+  //     }
+
+  //     // Transform data for frontend
+  //     const transformedData = data.map(connection => ({
+  //       id: connection.med_id,
+  //       name: `Dr. ${connection.doctor_first_name} ${connection.doctor_last_name}`,
+  //       specialty: connection.doctor_type,
+  //       email: connection.doctor_email,
+  //       available: true,
+  //       shortId: connection.doctor_short_id
+  //     }));
+
+  //     return { data: transformedData, error: null };
+  //   } catch (error) {
+  //     return { data: [], error: error.message };
+  //   }
+  // },
 
   /**
    * Updates an existing appointment
