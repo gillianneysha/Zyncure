@@ -2,7 +2,7 @@ import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
 
-// Move FormField OUTSIDE the component to prevent recreation
+
 const FormField = memo(({ 
   label, 
   name, 
@@ -66,7 +66,7 @@ export default function RegistrationForm() {
     }));
   }, []);
 
-  // Memoize validation to prevent unnecessary recalculations
+
   const validateForm = useCallback(() => {
     const newErrors = {};
 
@@ -132,7 +132,7 @@ export default function RegistrationForm() {
     });
   }, []);
 
-// Updated handleSubmit for database trigger method
+
 const handleSubmit = useCallback(async (event) => {
   event.preventDefault();
 
@@ -143,7 +143,7 @@ const handleSubmit = useCallback(async (event) => {
   setSuccessMessage("");
 
   try {
-    // Only do Supabase Auth signup - database insertion handled by trigger
+    
     const { error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
@@ -155,14 +155,14 @@ const handleSubmit = useCallback(async (event) => {
           birthdate: formData.birthdate,
           user_type: formData.userType,
         },
-        // Optional: Set redirect URL for after email confirmation
+       
         emailRedirectTo: `${window.location.origin}/dashboard`
       },
     });
 
     if (authError) throw authError;
 
-    // Success! The database trigger will handle inserting user data when they confirm email
+ 
     setSuccessMessage(
       "Registration successful! Please check your email and click the confirmation link to activate your account."
     );

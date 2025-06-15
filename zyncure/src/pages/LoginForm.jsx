@@ -4,7 +4,7 @@ import { supabase } from "../client";
 import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
 
-// Moved FormField outside the component and memoized it
+
 const FormField = React.memo(({ 
   label, 
   name, 
@@ -50,7 +50,7 @@ export default function LoginForm({ setToken }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Memoized handleChange function
+
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
     setFormData(prev => ({
@@ -58,7 +58,7 @@ export default function LoginForm({ setToken }) {
       [name]: value
     }));
 
-    // Clear error when user starts typing
+    
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -67,7 +67,7 @@ export default function LoginForm({ setToken }) {
     }
   }, [errors]);
 
-  // Memoized validateForm function - only depends on formData
+
   const validateForm = useCallback(() => {
     const newErrors = {};
 
@@ -88,7 +88,7 @@ export default function LoginForm({ setToken }) {
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
-  // Memoized handleSubmit function
+ 
   const handleSubmit = useCallback(async (event) => {
     event.preventDefault();
 
@@ -121,7 +121,7 @@ export default function LoginForm({ setToken }) {
     }
   }, [formData, validateForm, setToken, navigate]);
 
-  // Memoized handleGoogleSignIn function
+  
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -145,14 +145,7 @@ export default function LoginForm({ setToken }) {
     }
   }, []);
 
-  // Memoized resetForm function
-  // const resetForm = useCallback(() => {
-  //   setFormData({
-  //     email: "",
-  //     password: "",
-  //   });
-  //   setErrors({});
-  // }, []);
+
 
   const handleForgotPassword = async () => {
     if (!formData.email) {
@@ -217,7 +210,6 @@ export default function LoginForm({ setToken }) {
             id="rememberMe"
             type="checkbox"
             className="mr-2 accent-[#55A1A4] w-4 h-4 rounded"
-            // You can add checked/onChange logic if you want to handle the value
           />
           <label htmlFor="rememberMe" className="text-[#F5E0D9] text-sm select-none">
             Remember me
@@ -271,7 +263,6 @@ export default function LoginForm({ setToken }) {
           aria-label="Sign in with Google"
           disabled={isLoading}
         >
-          {/* Add Google icon here or use an icon library */}
           <span className="text-2xl">G</span>
         </button>
         <p className="mt-2">Log in using your Google account</p>

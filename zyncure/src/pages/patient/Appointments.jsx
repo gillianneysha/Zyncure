@@ -1,4 +1,4 @@
-// Enhanced PersonalAppointmentTracker with better conflict handling
+
 import { useState, useEffect } from 'react';
 import Calendar from '../../components/Calendar';
 import AppointmentModal from '../../components/AppointmentModal';
@@ -25,17 +25,14 @@ const PersonalAppointmentTracker = () => {
     type: 'Consultation'
   });
 
-  // Enhanced initialization with better error handling
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
       try {
-        // Get user data first
         const user = await userService.getUserData();
         if (user) {
           setUserData(user);
           
-          // Load user's appointments
           const { data: userAppointments, error: appointmentsError } = 
             await appointmentService.getUserAppointments(user.id);
           
@@ -47,7 +44,6 @@ const PersonalAppointmentTracker = () => {
           }
         }
 
-        // Load connected doctors only
         const { data: connectedDoctors, error: doctorsError } = 
           await appointmentService.getConnectedDoctors();
         
@@ -70,7 +66,7 @@ const PersonalAppointmentTracker = () => {
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
-    setError(''); // Clear any previous errors when changing dates
+    setError(''); 
   };
 
   const handleMonthNavigate = (direction) => {
@@ -84,25 +80,20 @@ const PersonalAppointmentTracker = () => {
     setShowModal(true);
   };
 
-  // Enhanced appointment submission with better error handling and real-time validation
   const handleSubmitAppointment = async () => {
     setError('');
     setLoading(true);
 
     try {
-      // Validate required fields
       if (!newAppointment.doctor_id || !newAppointment.time || !newAppointment.reason) {
         setError('Please fill in all required fields');
         return false;
       }
 
-      // Validate reason length
       if (newAppointment.reason.trim().length < 10) {
         setError('Please provide a more detailed reason (at least 10 characters)');
         return false;
       }
-
-      // Final availability check before submission
       const dateStr = selectedDate.toISOString().split('T')[0];
       const { data: availableSlots, error: slotsError } = 
         await appointmentService.getAvailableTimeSlots(newAppointment.doctor_id, dateStr);
@@ -117,7 +108,6 @@ const PersonalAppointmentTracker = () => {
         return false;
       }
 
-      // Create appointment data
       const appointmentData = {
         ...newAppointment,
         date: dateStr,
@@ -127,13 +117,11 @@ const PersonalAppointmentTracker = () => {
 
       console.log('Submitting appointment:', appointmentData);
 
-      // Submit the appointment
       const { data, error: submitError } = await appointmentService.createAppointment(appointmentData);
       
       if (submitError) {
         console.error('Appointment creation error:', submitError);
         
-        // Handle specific error types
         if (submitError.includes('no longer available') || 
             submitError.includes('time slot') || 
             submitError.includes('conflict')) {
@@ -145,13 +133,10 @@ const PersonalAppointmentTracker = () => {
       }
 
       if (data && data.length > 0) {
-        // Successfully created appointment
         console.log('Appointment created successfully:', data[0]);
         
-        // Update local appointments state immediately
         setAppointments(prevAppointments => [...prevAppointments, data[0]]);
         
-        // Close modal and reset form
         setShowModal(false);
         setNewAppointment({
           doctor_id: '',
@@ -160,7 +145,6 @@ const PersonalAppointmentTracker = () => {
           type: 'Consultation'
         });
 
-        // Optionally refresh all appointments to ensure consistency
         setTimeout(async () => {
           const { data: refreshedAppointments } = 
             await appointmentService.getUserAppointments(userData.id);
@@ -169,7 +153,7 @@ const PersonalAppointmentTracker = () => {
           }
         }, 1000);
 
-        return true; // Success
+        return true;
       } else {
         setError('Failed to create appointment. Please try again.');
         return false;

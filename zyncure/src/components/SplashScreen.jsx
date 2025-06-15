@@ -4,7 +4,6 @@ export default function SplashScreen() {
   const [logoVisible, setLogoVisible] = useState(false);
 
   useEffect(() => {
-    // Start fade-in after a short delay
     const timer = setTimeout(() => setLogoVisible(true), 300);
     return () => clearTimeout(timer);
   }, []);

@@ -19,11 +19,11 @@ export function PersonalInfoForm() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
-  const [isEditing, setIsEditing] = useState(false); // <-- Add this
+  const [isEditing, setIsEditing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [originalData, setOriginalData] = useState(null); // <-- Add this
+  const [originalData, setOriginalData] = useState(null); 
 
-  // Fetch user info on mount
+  
   useEffect(() => {
     async function fetchUserInfo() {
       setLoading(true);
@@ -32,7 +32,7 @@ export function PersonalInfoForm() {
         setLoading(false);
         return;
       }
-      // Try to get profile from a "profiles" table, fallback to user_metadata
+  
       let profile = {};
       let { data: profileData } = await supabase
         .from("profiles")
@@ -65,7 +65,7 @@ export function PersonalInfoForm() {
     fetchUserInfo();
   }, []);
 
-  // Handle input changes
+ 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -74,7 +74,7 @@ export function PersonalInfoForm() {
     }));
   };
 
-  // Save handler
+ 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -101,8 +101,8 @@ export function PersonalInfoForm() {
       setError("Failed to save changes.");
     } else {
       setSuccess("");
-      setShowSuccessModal(true); // Show modal
-      setIsEditing(false); // Exit editing mode
+      setShowSuccessModal(true); 
+      setIsEditing(false);
     }
     setSaving(false);
   };
@@ -228,7 +228,7 @@ export function PersonalInfoForm() {
 export function SecurityPage() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showTwoFactor, setShowTwoFactor] = useState(false);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false); // <-- Add this
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   // For change password form
   const [oldPassword, setOldPassword] = useState("");
@@ -263,11 +263,11 @@ export function SecurityPage() {
 
       setLoading(true);
       try {
-        // Re-authenticate user
+        
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
 
-        // Try signing in with old password to verify
+        
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: user.email,
           password: oldPassword,
@@ -278,7 +278,7 @@ export function SecurityPage() {
           return;
         }
 
-        // Update password
+       
         const { error: updateError } = await supabase.auth.updateUser({
           password: newPassword,
         });
@@ -297,8 +297,8 @@ export function SecurityPage() {
 
     const handleModalClose = () => {
       setShowSuccessModal(false);
-      // Optionally reset form fields or redirect
-      setShowChangePassword(false); // Go back to security page
+     
+      setShowChangePassword(false); 
     };
 
     return (
@@ -361,7 +361,7 @@ export function SecurityPage() {
   }
 
   if (showTwoFactor) {
-    // Toggle component (same as NotificationPage)
+   
     const Toggle = ({ enabled, onChange }) => (
       <button
         type="button"
@@ -438,7 +438,7 @@ export function SecurityPage() {
 }
 
 export function NotificationPage() {
-  // State for toggle switches
+
   const [reminderNotifications, setReminderNotifications] = useState(true);
   const [reminderPush, setReminderPush] = useState(true);
   const [reminderEmail, setReminderEmail] = useState(true);
@@ -447,7 +447,7 @@ export function NotificationPage() {
   const [eventPush, setEventPush] = useState(true);
   const [eventEmail, setEventEmail] = useState(true);
 
-  // Toggle component
+  
   const Toggle = ({ enabled, onChange }) => {
     return (
       <button
@@ -464,7 +464,7 @@ export function NotificationPage() {
     );
   };
 
-  // Notification category component
+  
   const NotificationCategory = ({
     title,
     description,
@@ -546,7 +546,7 @@ export function BillingPage() {
     if (option === "Subscriptions") setShowPlans(true);
     else if (option === "Payment methods") setBillingStep("methods");
     else if (option === "Contact Information") {
-      // Add logic for Contact Information if needed
+      // Add logic for Contact Information if ever
     }
   };
 
@@ -1013,7 +1013,6 @@ export function PoliciesPage() {
   const handleOptionClick = (option) => {
     if (option === "Terms of Service") setShowTerms(true);
     else if (option === "Privacy Policy") setShowPrivacy(true);
-    // Optionally add similar for Community Standards, etc.
   };
 
   const SecurityOption = ({ title, onClick }) => (

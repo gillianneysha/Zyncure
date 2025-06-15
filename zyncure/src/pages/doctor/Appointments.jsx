@@ -24,12 +24,11 @@ const PersonalAppointmentTracker = () => {
 
   useEffect(() => {
     const initializeData = async () => {
-      // Get user data
       const user = await userService.getUserData();
       if (user) {
         setUserData(user);
         
-        // Load user's appointments
+
         const { data: userAppointments } = await appointmentService.getUserAppointments(user.id);
         if (userAppointments) {
           setAppointments(userAppointments);
@@ -46,7 +45,6 @@ const PersonalAppointmentTracker = () => {
     initializeData();
   }, []);
 
-  // Get first name for greeting
 
 
   const handleDateSelect = (date) => {

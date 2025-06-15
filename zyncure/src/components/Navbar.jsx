@@ -1,6 +1,5 @@
 import { Search } from "lucide-react";
 import { useState, useEffect } from "react";
-// import { supabase } from "../client"; 
 
 export default function Navbar() {
   const [userData, setUserData] = useState({
@@ -11,13 +10,13 @@ export default function Navbar() {
   useEffect(() => {
     const getUserData = async () => {
       try {
-        // get token
+       
         const tokenStr = sessionStorage.getItem("token");
         if (!tokenStr) return;
 
         const token = JSON.parse(tokenStr);
 
-        // Check session
+        
         if (token?.session?.user) {
           const { user } = token.session;
 
@@ -31,18 +30,6 @@ export default function Navbar() {
             id: user.id.substring(0, 4),
           });
 
-          // const { data, error } = await supabase
-          //   .from("profiles")
-          //   .select("full_name, display_name")
-          //   .eq("id", user.id)
-          //   .single();
-
-          // if (data && !error) {
-          //   setUserData((prevState) => ({
-          //     ...prevState,
-          //     name: data.full_name || data.display_name || prevState.name,
-          //   }));
-          // }
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -52,7 +39,7 @@ export default function Navbar() {
     getUserData();
   }, []);
 
-  // get first name
+
   const firstName = userData.name.includes(" ")
     ? userData.name.split(" ")[0]
     : userData.name;
