@@ -8,26 +8,23 @@ import { NotificationPage } from "../../components/IndividualPage.jsx";
 import { BillingPage } from "../../components/IndividualPage.jsx";
 import { PoliciesPage } from "../../components/IndividualPage.jsx";
 import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
+import { supabase } from "../../client"; // <-- Add this
 
-export default function ProfilePage({ setIsAuthenticated }) {
+export default function ProfilePage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("My Profile");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogoutClick = () => {
-    setShowLogoutModal(true);
-  };
+  const handleLogoutClick = () => setShowLogoutModal(true);
 
   const handleLogoutConfirm = async () => {
-    setIsAuthenticated(false); 
-    sessionStorage.removeItem('token');
+    await supabase.auth.signOut();
     setShowLogoutModal(false);
     navigate('/', { replace: true });
-};
 
-  const handleLogoutCancel = () => {
-    setShowLogoutModal(false);
   };
+
+  const handleLogoutCancel = () => setShowLogoutModal(false);
 
   const tabs = [
     { id: "My Profile", component: <PersonalInfoForm /> },
@@ -59,7 +56,7 @@ export default function ProfilePage({ setIsAuthenticated }) {
         {/* Logout*/}
         <div 
           className="flex items-center p-4 rounded-lg cursor-pointer hover:bg-profileBg text-profileText mt-4"
-          onClick={handleLogoutClick} // <-- use modal trigger
+          onClick={handleLogoutClick}
         >
           <LogOut size={20} className="mr-2" />
           <span>Log out</span>

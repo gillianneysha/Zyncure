@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { useState, useEffect } from "react";
+import { supabase } from "../client"; // adjust path as needed
 
 export default function Navbar() {
   const [userData, setUserData] = useState({
@@ -10,27 +11,33 @@ export default function Navbar() {
   useEffect(() => {
     const getUserData = async () => {
       try {
-       
-        const tokenStr = sessionStorage.getItem("token");
-        if (!tokenStr) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-        const token = JSON.parse(tokenStr);
+        // Try to get profile info from Supabase profiles table
+        let profile = {};
+        let { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-        
-        if (token?.session?.user) {
-          const { user } = token.session;
-
-          const initialName =
-            user.user_metadata?.first_name ||
-            user.email?.split("@")[0] ||
-            "User";
-
-          setUserData({
-            name: initialName,
-            id: user.id.substring(0, 4),
-          });
-
+        if (profileData) {
+          profile = profileData;
+        } else {
+          profile = user.user_metadata || {};
         }
+
+        const initialName =
+          profile.first_name ||
+          user.user_metadata?.first_name ||
+          user.email?.split("@")[0] ||
+          "User";
+
+        setUserData({
+          name: initialName,
+          id: user.id ? user.id.substring(0, 4) : "----",
+        });
       } catch (error) {
         console.error("Error fetching user data:", error);
       }

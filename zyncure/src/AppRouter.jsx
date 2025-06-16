@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
 import { useUser } from "./hooks/useUser";
 import PatientLayout from "./layouts/PatientLayout";
 import DoctorLayout from "./layouts/DoctorLayout";
@@ -12,7 +12,7 @@ import PatientNotifications from "./pages/patient/Notifications";
 import PatientHealthRecords from "./pages/patient/Records";
 import PatientTracking from "./pages/patient/Tracking";
 import PatientHealth from "./pages/patient/YourHealth";
-
+import CompleteProfile from "./pages/CompleteProfile";
 
 import DoctorHome from "./pages/doctor/Home";
 import DoctorPatients from "./pages/doctor/Patients";
@@ -21,6 +21,7 @@ import DoctorAppointments from "./pages/doctor/Appointments";
 import DoctorReports from "./pages/doctor/Reports";
 import DoctorConnections from "./pages/doctor/Connections";
 import DoctorNotifications from "./pages/doctor/Notifications";
+import AuthCallbackHandler from "./pages/AuthCallbackHandler";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { user, isLoading } = useUser();
@@ -37,9 +38,8 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     );
   }
 
-  // Check if user is authenticated (has token and user data)
-  const token = sessionStorage.getItem("token");
-  if (!user || !token) {
+  // Only check for user, not token
+  if (!user) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
@@ -55,28 +55,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
 export default function AppRouter() {
   const { user, isLoading } = useUser();
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    // Initialize with session storage check
-    return !!sessionStorage.getItem("token");
-  });
-
-  const setToken = useCallback((data) => {
-    if (data) {
-      sessionStorage.setItem("token", JSON.stringify(data));
-      setIsAuthenticated(true);
-    } else {
-      sessionStorage.removeItem("token");
-      setIsAuthenticated(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading) {
-      const token = sessionStorage.getItem("token");
-      const newAuthState = !!(user && token);
-      setIsAuthenticated(newAuthState);
-    }
-  }, [user, isLoading]);
+  const isAuthenticated = !!user;
 
   if (isLoading) {
     return (
@@ -101,7 +80,7 @@ export default function AppRouter() {
               replace
             />
           ) : (
-            <Registration setToken={setToken} />
+            <Registration />
           )
         }
       />
@@ -116,10 +95,7 @@ export default function AppRouter() {
         }
       >
         <Route index element={<PatientHome />} />
-        <Route
-          path="profile"
-          element={<PatientProfile setIsAuthenticated={setIsAuthenticated} />}
-        />
+        <Route path="profile" element={<PatientProfile />} />
         <Route path="health">
           <Route index element={<PatientHealth />} />
           <Route path="tracking" element={<PatientTracking />} />
@@ -144,12 +120,14 @@ export default function AppRouter() {
         <Route path="profile" element={<DoctorProfile />} />
         <Route path="patients">
           <Route index element={<DoctorPatients />} />
-          <Route path="appointments" element={<DoctorAppointments/>} />
+          <Route path="appointments" element={<DoctorAppointments />} />
           <Route path="reports" element={<DoctorReports />} />
         </Route>
         <Route path="connections" element={<DoctorConnections />} />
         <Route path="notifications" element={<DoctorNotifications />} />
       </Route>
+      <Route path="/auth/callback" element={<AuthCallbackHandler />} />
+      <Route path="/complete-profile" element={<CompleteProfile />} />
 
       {/* Catch-all route */}
       <Route

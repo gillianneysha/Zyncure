@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../client";
 import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
+import GoogleIcon from "../components/GoogleIcon"; // Add this import at the top
 
 
 const FormField = React.memo(({ 
@@ -194,13 +195,15 @@ export default function LoginForm({ setToken }) {
 
       <div className="w-4/5 mx-auto">
         <PasswordInput
-          label="Password"
+          label="Password:"
           name="password"
           value={formData.password}
           onChange={handleChange}
           placeholder="Password"
           error={errors.password}
           disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FEDED2]"
         />
       </div>
 
@@ -259,11 +262,12 @@ export default function LoginForm({ setToken }) {
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg hover:shadow-xl transition mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Sign in with Google"
           disabled={isLoading}
         >
-          <span className="text-2xl">G</span>
+          <GoogleIcon className="w-10 h-10" />
+
         </button>
         <p className="mt-2">Log in using your Google account</p>
       </div>
