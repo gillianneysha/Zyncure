@@ -8,6 +8,7 @@ import { NotificationPage } from "../../components/IndividualPage.jsx";
 import { BillingPage } from "../../components/IndividualPage.jsx";
 import { PoliciesPage } from "../../components/IndividualPage.jsx";
 import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
+import { supabase } from "../../client"; // adjust path if needed
 
 export default function ProfilePage({ setIsAuthenticated }) {
   const navigate = useNavigate();
@@ -21,8 +22,7 @@ export default function ProfilePage({ setIsAuthenticated }) {
 
   // Called when user confirms logout
   const handleLogoutConfirm = async () => {
-    setIsAuthenticated(false); 
-    sessionStorage.removeItem('token');
+    await supabase.auth.signOut();
     setShowLogoutModal(false);
     navigate('/', { replace: true });
 };

@@ -11,6 +11,7 @@ export default function PasswordInput({
   disabled = false,
   required = true,
   inputClassName = "",
+  labelClassName = "text-[#F46B5D]", 
   ...props
 }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -18,7 +19,10 @@ export default function PasswordInput({
   return (
     <div className="relative w-full mb-3">
       {label && (
-        <label className="block mb-1 text-[#F46B5D] text-left" htmlFor={name}>
+        <label
+          className={`block mb-1 text-left ${labelClassName}`}
+          htmlFor={name}
+        >
           {label}
         </label>
       )}

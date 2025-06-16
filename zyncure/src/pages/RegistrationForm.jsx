@@ -1,6 +1,7 @@
 import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
+import GoogleIcon from "../components/GoogleIcon"; // Add this import at the top
 
 // Move FormField OUTSIDE the component to prevent recreation
 const FormField = memo(({ 
@@ -306,25 +307,29 @@ const handleSubmit = useCallback(async (event) => {
 
       <div className="w-4/5 mx-auto">
         <PasswordInput
-          label="Password"
+          label="Password:"
           name="password"
           value={formData.password}
           onChange={handleChange}
-          placeholder="Password (min 6 characters)"
+          placeholder="Password"
           error={errors.password}
           disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FEDED2]"
         />
       </div>
 
       <div className="w-4/5 mx-auto">
         <PasswordInput
-          label="Confirm Password"
+          label="Confirm Password:"
           name="confirmPassword"
           value={formData.confirmPassword}
           onChange={handleChange}
           placeholder="Confirm Password"
           error={errors.confirmPassword}
           disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FEDED2]"
         />
       </div>
 
@@ -356,11 +361,11 @@ const handleSubmit = useCallback(async (event) => {
         <button
           type="button"
           onClick={handleGoogleSignUp}
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Sign up with Google"
           disabled={isLoading}
         >
-          <span className="text-2xl">G</span>
+          <GoogleIcon className="w-10 h-10" />
         </button>
         <span className="mt-3 text-[#F5E0D9] text-sm">
           Sign up using your Google account
