@@ -39,7 +39,6 @@ const PatientConnectionsPage = () => {
     try {
       setIsLoading(true);
       
-      // Load all connections using the new view
       const { data, error } = await supabase
         .from('patient_connection_details')
         .select('*')
@@ -49,7 +48,6 @@ const PatientConnectionsPage = () => {
 
       const allConnections = data || [];
       
-      // Separate pending incoming requests from other connections
       const pendingIncoming = allConnections.filter(
         conn => conn.status === 'pending' && conn.request_direction === 'incoming'
       );
@@ -81,7 +79,6 @@ const PatientConnectionsPage = () => {
 
     setIsSearching(true);
     try {
-      // Use the new search function for available doctors
       const { data, error } = await supabase
         .rpc('search_available_doctors_for_patient', { 
           patient_uuid: currentUser.id,
@@ -99,7 +96,6 @@ const PatientConnectionsPage = () => {
     }
   }, [currentUser]);
 
-  // Handle search input with debouncing
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm) {
@@ -122,7 +118,6 @@ const PatientConnectionsPage = () => {
     }
 
     try {
-      // Use the new helper function to create connection request
       const { error } = await supabase
         .rpc('create_connection_request', {
           requesting_user_id: currentUser.id,
@@ -133,10 +128,8 @@ const PatientConnectionsPage = () => {
 
       if (error) throw error;
 
-      // Reload connections to show the new pending request
       await loadConnections();
       
-      // Remove from search results
       setSearchResults(prev => prev.filter(d => d.med_id !== doctor.med_id));
       
       alert('Connection request sent successfully!');
@@ -155,14 +148,12 @@ const handleConnectionRequest = async (connectionId, action) => {
     let error;
     
     if (action === 'accept') {
-      // Use the specific database function for accepting
       const { error: acceptError } = await supabase
         .rpc('accept_connection_request', {
           connection_id: connectionId
         });
       error = acceptError;
     } else if (action === 'reject') {
-      // Use the specific database function for rejecting
       const { error: rejectError } = await supabase
         .rpc('reject_connection_request', {
           connection_id: connectionId
@@ -175,7 +166,6 @@ const handleConnectionRequest = async (connectionId, action) => {
       throw error;
     }
 
-    // Reload connections to reflect the change
     await loadConnections();
     
     alert(`Connection request ${action}ed successfully!`);
@@ -183,7 +173,7 @@ const handleConnectionRequest = async (connectionId, action) => {
   } catch (error) {
     console.error(`Error ${action}ing connection:`, error);
     
-    // Provide more specific error messages
+
     if (error.message.includes('Only the recipient can')) {
       alert(`You can only ${action} connection requests sent to you.`);
     } else if (error.message.includes('not found or not pending')) {
@@ -214,7 +204,6 @@ const removeConnection = async (connectionId) => {
       throw error;
     }
 
-    // Reload connections
     await loadConnections();
     
     alert('Connection removed successfully!');

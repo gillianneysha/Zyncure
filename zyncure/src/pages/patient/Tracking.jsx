@@ -48,24 +48,21 @@ const PeriodTracker = () => {
           return;
         }
 
-        // Normalize date and store
         const normalizedData = data.map((entry) => ({
           ...entry,
-          date_logged: new Date(entry.date_logged),  // convert to Date object
+          date_logged: new Date(entry.date_logged),  
         }));
 
         console.log("Fetched and normalized data:", normalizedData);
         setLoggedDates(normalizedData);
-        localStorage.setItem('loggedDates', JSON.stringify(normalizedData)); // Store in local storage
+        localStorage.setItem('loggedDates', JSON.stringify(normalizedData)); 
       } catch (err) {
         console.error("Unexpected error:", err);
       }
     };
 
-    // Fetch logged dates from Supabase
     fetchLoggedDates();
 
-    // Load logged dates from local storage
     const storedLoggedDates = localStorage.getItem('loggedDates');
     if (storedLoggedDates) {
       setLoggedDates(JSON.parse(storedLoggedDates));
@@ -121,7 +118,6 @@ const PeriodTracker = () => {
       setModalMessage(`${selectedTab} saved as ${selectedValue} on ${formattedDate}`);
       setShowSuccessModal(true);
 
-      // Update state so dot shows immediately
       setLoggedDates((prev) => {
         const alreadyExists = prev.some(
           (entry) =>
@@ -129,11 +125,11 @@ const PeriodTracker = () => {
             entry.symptoms === selectedTab
         );
         const updatedDates = alreadyExists ? prev : [...prev, { ...dataToSave }];
-        localStorage.setItem('loggedDates', JSON.stringify(updatedDates)); // Update local storage
+        localStorage.setItem('loggedDates', JSON.stringify(updatedDates)); 
         return updatedDates;
       });
 
-      // Reset selected input
+      
       if (selectedTab === 'Period') setSelectedFlow('');
       else if (selectedTab === 'Feelings') setSelectedFeeling('');
       else if (selectedTab === 'Skin') setSelectedSkin('');
@@ -310,7 +306,7 @@ const PeriodTracker = () => {
                     ? 'bg-[#F98679] text-white shadow-lg scale-105'
                     : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
                 }`}
-                style={{ minWidth: 90 }} /* Adjusted for smaller screens */
+                style={{ minWidth: 90 }} 
               >
                 {tab}
               </button>

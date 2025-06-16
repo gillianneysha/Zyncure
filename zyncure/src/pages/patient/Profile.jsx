@@ -21,6 +21,7 @@ export default function ProfilePage() {
     await supabase.auth.signOut();
     setShowLogoutModal(false);
     navigate('/', { replace: true });
+
   };
 
   const handleLogoutCancel = () => setShowLogoutModal(false);

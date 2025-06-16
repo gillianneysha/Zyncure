@@ -32,8 +32,6 @@ export function useUser() {
       async (event, session) => {
         if (!mounted) return;
 
-        // Only update user state, don't toggle loading for auth state changes
-        // Loading should only be true during initial load
         if (session?.user) {
           const { user } = session;
           const newUser = {
@@ -41,7 +39,7 @@ export function useUser() {
             role: user.user_metadata?.user_type || 'patient'
           };
           
-          // Only update if user data actually changed
+          
           setUser(prevUser => {
             if (!prevUser || prevUser.id !== newUser.id || prevUser.role !== newUser.role) {
               return newUser;
@@ -49,11 +47,11 @@ export function useUser() {
             return prevUser;
           });
         } else {
-          // Only set to null if we previously had a user
+        
           setUser(prevUser => prevUser ? null : prevUser);
         }
 
-        // Only set loading to false if it's still true (initial load)
+        
         setIsLoading(prevLoading => prevLoading ? false : prevLoading);
       }
     );

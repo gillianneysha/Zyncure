@@ -5,28 +5,40 @@ import { supabase } from '../client';
 // =============================================================================
 
 /**
- * Converts 12-hour format time to 24-hour format for database storage
- * @param {string} time12h - Time in 12-hour format (e.g., "2:30 PM")
- * @returns {string} Time in 24-hour format (e.g., "14:30:00")
+
+ * @param {string} time12h 
+ * @returns {string}
  */
 const convertTo24Hour = (time12h) => {
   const [time, modifier] = time12h.split(' ');
   let [hours, minutes] = time.split(':');
   
   if (hours === '12') {
-    hours = '00';
-  }
-  if (modifier === 'PM') {
-    hours = parseInt(hours, 10) + 12;
+    hours = modifier === 'AM' ? '00' : '12';
+  } else if (modifier === 'PM') {
+    hours = (parseInt(hours, 10) + 12).toString();
   }
   
   return `${hours.padStart(2, '0')}:${minutes}:00`;
 };
 
 /**
- * Formats appointment date for display
- * @param {string} appointmentDate - ISO date string from database
- * @returns {object} Object containing formatted date and time
+ 
+ * @param {string} time24h 
+ * @returns {string} 
+ */
+const convertTo12Hour = (time24h) => {
+  const [hours, minutes] = time24h.split(':');
+  const hour = parseInt(hours, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes.padStart(2, '0')} ${ampm}`;
+};
+
+/**
+
+ * @param {string} appointmentDate 
+ * @returns {object} 
  */
 const formatAppointmentDateTime = (appointmentDate) => ({
   date: appointmentDate.split('T')[0],
@@ -38,8 +50,8 @@ const formatAppointmentDateTime = (appointmentDate) => ({
 });
 
 /**
- * Gets current authenticated user
- * @returns {object} User object or throws error if not authenticated
+
+ * @returns {object} 
  */
 const getCurrentUser = async () => {
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -52,103 +64,153 @@ const getCurrentUser = async () => {
 // =============================================================================
 // APPOINTMENT SERVICE
 // =============================================================================
-
 export const appointmentService = {
   /**
-   * Creates a new appointment
-   * @param {object} appointmentData - Appointment details
-   * @returns {object} Created appointment data or error
+ 
+   * @param {object} appointmentData 
+   * @returns {object}
    */
-  async createAppointment(appointmentData) {
-    try {
-      const user = await getCurrentUser();
-      const time24h = convertTo24Hour(appointmentData.time);
-      
-      const appointmentToInsert = {
-        patient_id: user.id,
-        med_id: appointmentData.doctor_id,
-        appointment_date: `${appointmentData.date}T${time24h}`,
-        status: appointmentData.status || 'pending',
-        reason: appointmentData.reason
-      };
 
-      const { data, error } = await supabase
+async createAppointment(appointmentData) {
+  try {
+    const user = await getCurrentUser();
+    const time24h = convertTo24Hour(appointmentData.time);
+    const fullDateTime = `${appointmentData.date}T${time24h}`;
+
+
+    const { data: availableSlots } = await this.getAvailableTimeSlots(
+      appointmentData.doctor_id, 
+      appointmentData.date
+    );
+    
+    if (!availableSlots || !availableSlots.includes(appointmentData.time)) {
+      throw new Error('This time slot is no longer available. Please select a different time.');
+    }
+
+
+    const { data: appointmentId, error } = await supabase.rpc('create_appointment_simple', {
+      p_patient_id: user.id,
+      p_med_id: appointmentData.doctor_id,
+      p_appointment_date: fullDateTime,
+      p_reason: appointmentData.reason,
+      p_status: appointmentData.status || 'confirmed'
+    });
+
+    if (error) {
+      console.error('Error creating appointment:', error);
+      
+      if (error.message.includes('time_slot_conflict') || 
+          error.message.includes('duplicate key') ||
+          error.message.includes('already exists') ||
+          error.message.includes('already booked') ||
+          error.message.includes('unique_violation')) {
+        throw new Error('This time slot was just booked by someone else. Please select a different time.');
+      }
+      
+      if (error.message.includes('Unauthorized')) {
+        throw new Error('You are not authorized to create this appointment.');
+      }
+      
+      throw new Error(error.message || 'Failed to create appointment. Please try again.');
+    }
+
+    if (!appointmentId) {
+      throw new Error('Appointment creation failed. Please try again.');
+    }
+
+
+    const { data: appointmentDetails, error: fetchError } = await supabase
+      .from('appointments')
+      .select(`
+        appointment_id,
+        appointment_date,
+        status,
+        reason,
+        patient_id,
+        med_id,
+        medicalprofessionals!inner(first_name, last_name, user_type)
+      `)
+      .eq('appointment_id', appointmentId)
+      .single();
+
+    if (fetchError || !appointmentDetails) {
+      console.warn('Could not fetch created appointment details:', fetchError);
+
+      return {
+        data: [{
+          id: appointmentId,
+          patient_id: user.id,
+          doctor_id: appointmentData.doctor_id,
+          date: appointmentData.date,
+          time: appointmentData.time,
+          status: appointmentData.status || 'confirmed',
+          reason: appointmentData.reason,
+          type: appointmentData.type || 'Consultation'
+        }],
+        error: null
+      };
+    }
+
+
+    const { date, time } = formatAppointmentDateTime(appointmentDetails.appointment_date);
+    const transformedData = [{
+      id: appointmentDetails.appointment_id,
+      patient_id: appointmentDetails.patient_id,
+      doctor_id: appointmentDetails.med_id,
+      date,
+      time,
+      status: appointmentDetails.status,
+      reason: appointmentDetails.reason,
+      type: appointmentData.type || 'Consultation',
+      doctor_name: `Dr. ${appointmentDetails.medicalprofessionals.first_name} ${appointmentDetails.medicalprofessionals.last_name}`,
+      specialty: appointmentDetails.medicalprofessionals.user_type
+    }];
+
+    return { data: transformedData, error: null };
+  } catch (error) {
+    console.error('Appointment creation error:', error);
+    return { data: null, error: error.message };
+  }
+},
+
+
+
+  /**
+
+   * @param {string} date 
+   * @param {string} doctorId 
+   * @returns {object} 
+   */
+  async getAppointments(date, doctorId = null) {
+    try {
+      let query = supabase
         .from('appointments')
-        .insert([appointmentToInsert])
         .select(`
           appointment_id,
           appointment_date,
           status,
           reason,
-          created_at,
-          updated_at,
           patient_id,
-          med_id
-        `);
-
-      if (error) throw error;
-
-      // Get doctor information
-      const { data: doctorData } = await supabase
-        .from('medicalprofessionals')
-        .select('first_name, last_name, user_type')
-        .eq('med_id', appointmentData.doctor_id)
-        .single();
-
-      // Transform data for frontend
-      const transformedData = data.map(apt => {
-        const { date, time } = formatAppointmentDateTime(apt.appointment_date);
-        return {
-          id: apt.appointment_id,
-          patient_id: apt.patient_id,
-          doctor_id: apt.med_id,
-          date,
-          time,
-          status: apt.status,
-          reason: apt.reason,
-          type: appointmentData.type || 'Consultation',
-          doctor_name: doctorData ? `Dr. ${doctorData.first_name} ${doctorData.last_name}` : 'Unknown Doctor',
-          specialty: doctorData?.user_type || 'General'
-        };
-      });
-
-      return { data: transformedData, error: null };
-    } catch (error) {
-      return { data: null, error: error.message };
-    }
-  },
-
-  /**
-   * Gets appointments for a specific date
-   * @param {string} date - Date in YYYY-MM-DD format
-   * @param {string} patientId - Optional patient ID filter
-   * @returns {object} Appointments array or error
-   */
-  async getAppointments(date, patientId = null) {
-    try {
-      let query = supabase
-        .from('appointment_details')
-        .select('*')
+          med_id,
+          medicalprofessionals!inner(first_name, last_name, user_type)
+        `)
         .gte('appointment_date', `${date}T00:00:00`)
-        .lt('appointment_date', `${date}T23:59:59`);
+        .lt('appointment_date', `${date}T23:59:59`)
+        .in('status', ['confirmed', 'pending'])
+        .order('appointment_date');
 
-      if (patientId) {
-        const { data: patientData } = await supabase
-          .from('patients')
-          .select('patient_id')
-          .eq('user_id', patientId)
-          .single();
-
-        if (patientData) {
-          query = query.eq('patient_id', patientData.patient_id);
-        }
+      if (doctorId) {
+        query = query.eq('med_id', doctorId);
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching appointments:', error);
+        throw error;
+      }
 
-      // Transform data for frontend
-      const transformedData = data.map(apt => {
+  
+      const transformedData = (data || []).map(apt => {
         const { date, time } = formatAppointmentDateTime(apt.appointment_date);
         return {
           id: apt.appointment_id,
@@ -158,21 +220,23 @@ export const appointmentService = {
           time,
           status: apt.status,
           reason: apt.reason,
-          doctor_name: apt.doctor_name,
-          patient_name: apt.patient_name
+          type: 'Consultation',
+          doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
+          specialty: apt.medicalprofessionals.user_type
         };
       });
 
       return { data: transformedData, error: null };
     } catch (error) {
+      console.error('Error in getAppointments:', error);
       return { data: [], error: error.message };
     }
   },
 
   /**
-   * Gets all appointments for the current user
-   * @param {string} userId - Optional user ID (defaults to current user)
-   * @returns {object} User's appointments array or error
+
+   * @param {string} userId
+   * @returns {object} 
    */
   async getUserAppointments(userId = null) {
     try {
@@ -194,10 +258,12 @@ export const appointmentService = {
         .eq('patient_id', currentUserId)
         .order('appointment_date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user appointments:', error);
+        throw error;
+      }
 
-      // Transform data for frontend
-      const transformedData = data.map(apt => {
+      const transformedData = (data || []).map(apt => {
         const { date, time } = formatAppointmentDateTime(apt.appointment_date);
         return {
           id: apt.appointment_id,
@@ -215,99 +281,41 @@ export const appointmentService = {
 
       return { data: transformedData, error: null };
     } catch (error) {
+      console.error('Error in getUserAppointments:', error);
       return { data: [], error: error.message };
     }
   },
 
   /**
-   * Gets connected doctors for the current patient
-   * @param {string} patientId - Optional patient ID
-   * @returns {object} Connected doctors array or error
+ 
+   * @returns {object} 
    */
-  async getConnectedDoctors(patientId = null) {
+  async getConnectedDoctors() {
     try {
-      const currentPatientId = patientId || (await getCurrentUser()).id;
-
-      // Get accepted connections
-      const { data: connections, error: connectionsError } = await supabase
-        .from('connections')
-        .select('*')
-        .eq('patient_id', currentPatientId)
-        .eq('status', 'accepted');
-
-      if (connectionsError) throw connectionsError;
-
-      if (!connections || connections.length === 0) {
-        return { data: [], error: null };
-      }
-
-      // Get doctor details for each connection
-      const doctorPromises = connections.map(async (connection) => {
-        const { data: doctorData, error: doctorError } = await supabase
-          .from('medicalprofessionals')
-          .select('med_id, first_name, last_name, user_type, email')
-          .eq('med_id', connection.med_id)
-          .single();
-
-        if (doctorError) return null;
-
-        return {
-          ...doctorData,
-          connection_id: connection.id,
-          connection_status: connection.status
-        };
-      });
-
-      const doctorResults = await Promise.all(doctorPromises);
-      const validDoctors = doctorResults.filter(doctor => doctor !== null);
-
-      // Transform data for frontend
-      const transformedData = validDoctors.map(doctor => ({
-        id: doctor.med_id,
-        name: `Dr. ${doctor.first_name} ${doctor.last_name}`,
-        specialty: doctor.user_type,
-        email: doctor.email,
-        available: true,
-        shortId: doctor.med_id.toString().substring(0, 4).toUpperCase()
-      }));
-
-      return { data: transformedData, error: null };
-    } catch (error) {
-      return { data: [], error: error.message };
-    }
-  },
-
-  /**
-   * Alternative method to get connected doctors using database view
-   * @param {string} patientId - Optional patient ID
-   * @returns {object} Connected doctors array or error
-   */
-  async getConnectedDoctorsFromView(patientId = null) {
-    try {
-      const currentPatientId = patientId || (await getCurrentUser()).id;
-
+      // Use the simplified view
       const { data, error } = await supabase
-        .from('connection_details')
+        .from('patient_connection_details')
         .select(`
           med_id,
           doctor_first_name,
           doctor_last_name,
           doctor_type,
           doctor_email,
-          status,
-          doctor_short_id
+          doctor_short_id,
+          status
         `)
-        .eq('patient_id', currentPatientId)
         .eq('status', 'accepted')
         .order('doctor_first_name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching connected doctors:', error);
+        throw error;
+      }
 
       if (!data || data.length === 0) {
         return { data: [], error: null };
       }
 
-      // Transform data for frontend
       const transformedData = data.map(connection => ({
         id: connection.med_id,
         name: `Dr. ${connection.doctor_first_name} ${connection.doctor_last_name}`,
@@ -319,27 +327,72 @@ export const appointmentService = {
 
       return { data: transformedData, error: null };
     } catch (error) {
+      console.error('Error in getConnectedDoctors:', error);
       return { data: [], error: error.message };
     }
   },
 
   /**
-   * Updates an existing appointment
-   * @param {string} appointmentId - Appointment ID to update
-   * @param {object} updateData - Data to update
-   * @returns {object} Updated appointment data or error
+
+   * @param {string} doctorId 
+   * @param {string} date 
+   * @returns {object} 
+   */
+  async getAvailableTimeSlots(doctorId, date) {
+    try {
+
+      const { data: existingAppointments, error } = await supabase
+        .from('appointments')
+        .select('appointment_date')
+        .eq('med_id', doctorId)
+        .gte('appointment_date', `${date}T00:00:00`)
+        .lt('appointment_date', `${date}T23:59:59`)
+        .in('status', ['confirmed', 'pending'])
+        .order('appointment_date');
+
+      if (error) {
+        console.error('Error fetching existing appointments:', error);
+        throw error;
+      }
+
+
+      const allTimeSlots24h = [
+        '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+        '11:00', '11:30', '13:00', '13:30', '14:00', '14:30',
+        '15:00', '15:30', '16:00', '16:30', '17:00'
+      ];
+
+      const bookedTimes = (existingAppointments || []).map(apt => 
+        new Date(apt.appointment_date).toTimeString().substring(0, 5)
+      );
+
+
+      const availableSlots24h = allTimeSlots24h.filter(time => !bookedTimes.includes(time));
+      const availableSlots12h = availableSlots24h.map(time => convertTo12Hour(time + ':00'));
+
+      return { data: availableSlots12h, error: null };
+    } catch (error) {
+      console.error('Error in getAvailableTimeSlots:', error);
+      return { data: [], error: error.message };
+    }
+  },
+
+  /**
+
+   * @param {string} appointmentId 
+   * @param {object} updateData 
+   * @returns {object} 
    */
   async updateAppointment(appointmentId, updateData) {
     try {
       const dataToUpdate = {};
       
-      // Handle date and time updates
+
       if (updateData.date && updateData.time) {
         const time24h = convertTo24Hour(updateData.time);
         dataToUpdate.appointment_date = `${updateData.date}T${time24h}`;
       }
-      
-      // Handle other field updates
+
       if (updateData.status) dataToUpdate.status = updateData.status;
       if (updateData.reason) dataToUpdate.reason = updateData.reason;
       if (updateData.doctor_id) dataToUpdate.med_id = updateData.doctor_id;
@@ -358,10 +411,13 @@ export const appointmentService = {
           medicalprofessionals!inner(first_name, last_name, user_type)
         `);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating appointment:', error);
+        throw error;
+      }
 
-      // Transform data for frontend
-      const transformedData = data.map(apt => {
+
+      const transformedData = (data || []).map(apt => {
         const { date, time } = formatAppointmentDateTime(apt.appointment_date);
         return {
           id: apt.appointment_id,
@@ -376,14 +432,15 @@ export const appointmentService = {
 
       return { data: transformedData, error: null };
     } catch (error) {
+      console.error('Error in updateAppointment:', error);
       return { data: null, error: error.message };
     }
   },
 
   /**
-   * Deletes an appointment
-   * @param {string} appointmentId - Appointment ID to delete
-   * @returns {object} Success status or error
+
+   * @param {string} appointmentId
+   * @returns {object} 
    */
   async deleteAppointment(appointmentId) {
     try {
@@ -392,49 +449,14 @@ export const appointmentService = {
         .delete()
         .eq('appointment_id', appointmentId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting appointment:', error);
+        throw error;
+      }
       return { data: null, error: null };
     } catch (error) {
+      console.error('Error in deleteAppointment:', error);
       return { data: null, error: error.message };
-    }
-  },
-
-  /**
-   * Gets available time slots for a specific doctor and date
-   * @param {string} doctorId - Doctor's ID
-   * @param {string} date - Date in YYYY-MM-DD format
-   * @returns {object} Available time slots array or error
-   */
-  async getAvailableTimeSlots(doctorId, date) {
-    try {
-      // Get existing appointments for the doctor on that date
-      const { data: existingAppointments, error } = await supabase
-        .from('appointments')
-        .select('appointment_date')
-        .eq('med_id', doctorId)
-        .gte('appointment_date', `${date}T00:00:00`)
-        .lt('appointment_date', `${date}T23:59:59`)
-        .neq('status', 'cancelled');
-
-      if (error) throw error;
-
-      // Define available time slots
-      const allTimeSlots = [
-        '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-        '11:00', '11:30', '13:00', '13:30', '14:00', '14:30',
-        '15:00', '15:30', '16:00', '16:30', '17:00'
-      ];
-
-      // Filter out booked slots
-      const bookedTimes = existingAppointments.map(apt => 
-        new Date(apt.appointment_date).toTimeString().substring(0, 5)
-      );
-
-      const availableSlots = allTimeSlots.filter(time => !bookedTimes.includes(time));
-
-      return { data: availableSlots, error: null };
-    } catch (error) {
-      return { data: [], error: error.message };
     }
   }
 };
@@ -445,26 +467,30 @@ export const appointmentService = {
 
 export const connectionService = {
   /**
-   * Searches for medical professionals by short ID
-   * @param {string} shortId - Short ID to search for
-   * @returns {object} Search results or error
+
+   * @param {string} shortId 
+   * @returns {object}
    */
   async searchDoctorByShortId(shortId) {
     try {
       const { data, error } = await supabase
         .rpc('search_medical_professional_by_short_id', { search_id: shortId });
 
-      if (error) throw error;
-      return { data, error: null };
+      if (error) {
+        console.error('Error searching doctors:', error);
+        throw error;
+      }
+      return { data: data || [], error: null };
     } catch (error) {
+      console.error('Error in searchDoctorByShortId:', error);
       return { data: [], error: error.message };
     }
   },
 
   /**
-   * Creates a new connection request
-   * @param {string} medId - Medical professional ID
-   * @returns {object} Created connection or error
+
+   * @param {string} medId 
+   * @returns {object} 
    */
   async createConnection(medId) {
     try {
@@ -475,44 +501,49 @@ export const connectionService = {
         .insert([{
           patient_id: user.id,
           med_id: medId,
-          status: 'pending'
+          status: 'pending',
+          requester_type: 'patient'
         }])
         .select('*');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating connection:', error);
+        throw error;
+      }
       return { data, error: null };
     } catch (error) {
+      console.error('Error in createConnection:', error);
       return { data: null, error: error.message };
     }
   },
 
   /**
-   * Gets patient's connections
-   * @param {string} patientId - Optional patient ID
-   * @returns {object} Connections array or error
-   */
-  async getPatientConnections(patientId = null) {
-    try {
-      const currentPatientId = patientId || (await getCurrentUser()).id;
 
+   * @returns {object} 
+   */
+  async getPatientConnections() {
+    try {
       const { data, error } = await supabase
-        .from('connection_details')
+        .from('patient_connection_details')
         .select('*')
-        .eq('patient_id', currentPatientId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return { data, error: null };
+      if (error) {
+        console.error('Error fetching patient connections:', error);
+        throw error;
+      }
+      return { data: data || [], error: null };
     } catch (error) {
+      console.error('Error in getPatientConnections:', error);
       return { data: [], error: error.message };
     }
   },
 
   /**
-   * Updates connection status (for medical professionals)
-   * @param {string} connectionId - Connection ID
-   * @param {string} status - New status ('pending', 'accepted', 'rejected')
-   * @returns {object} Updated connection or error
+
+   * @param {string} connectionId 
+   * @param {string} status 
+   * @returns {object}
    */
   async updateConnectionStatus(connectionId, status) {
     try {
@@ -522,9 +553,13 @@ export const connectionService = {
         .eq('id', connectionId)
         .select('*');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating connection status:', error);
+        throw error;
+      }
       return { data, error: null };
     } catch (error) {
+      console.error('Error in updateConnectionStatus:', error);
       return { data: null, error: error.message };
     }
   }
@@ -536,8 +571,8 @@ export const connectionService = {
 
 export const userService = {
   /**
-   * Gets current user data with patient information
-   * @returns {object} User data or null if error
+
+   * @returns {object} 
    */
   async getUserData() {
     try {
@@ -550,23 +585,28 @@ export const userService = {
         id: user.id,
       };
 
-      // Try to get additional patient data
-      const { data: patientData, error: patientError } = await supabase
-        .from("patients")
-        .select("patient_id, first_name, last_name, email, phone")
-        .eq("patient_id", user.id)
-        .single();
+  
+      try {
+        const { data: patientData, error: patientError } = await supabase
+          .from("patients")
+          .select("patient_id, first_name, last_name, email, phone")
+          .eq("patient_id", user.id)
+          .single();
 
-      if (patientData && !patientError) {
-        userData = {
-          ...userData,
-          name: patientData.first_name && patientData.last_name 
-            ? `${patientData.first_name} ${patientData.last_name}` 
-            : userData.name,
-          patient_id: patientData.patient_id,
-          email: patientData.email,
-          phone: patientData.phone
-        };
+        if (patientData && !patientError) {
+          userData = {
+            ...userData,
+            name: patientData.first_name && patientData.last_name 
+              ? `${patientData.first_name} ${patientData.last_name}` 
+              : userData.name,
+            patient_id: patientData.patient_id,
+            email: patientData.email,
+            phone: patientData.phone
+          };
+        }
+      } catch (patientErr) {
+        console.warn('Could not fetch patient data:', patientErr);
+    
       }
 
       return userData;

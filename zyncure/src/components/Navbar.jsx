@@ -46,7 +46,7 @@ export default function Navbar() {
     getUserData();
   }, []);
 
-  // get first name
+
   const firstName = userData.name.includes(" ")
     ? userData.name.split(" ")[0]
     : userData.name;
