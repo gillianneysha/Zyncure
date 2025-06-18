@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, User, FileText, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { doctorAppointmentService } from '../../services/DoctorAppointmentService';
 
 const DoctorAppointments = () => {
-  const [doctorData] = useState({
-    name: "Dr. Smith",
-    id: "DOC001",
+  const [doctorData, setDoctorData] = useState({
+    name: "Loading...",
+    id: null,
   });
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -13,79 +14,121 @@ const DoctorAppointments = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const appointmentsPerPage = 2;
   
-  const [appointments, setAppointments] = useState([
-    {
-      id: 1,
-      time: '8:00 AM',
-      patient_name: 'Maria Santos',
-      patient_id: 'PAT001',
-      type: 'Checkup',
-      status: 'confirmed',
-      reason: 'Regular health checkup',
-      contact: '+63 912 345 6789'
-    },
-    {
-      id: 2,
-      time: '8:30 AM',
-      patient_name: 'Bethany Ramos',
-      patient_id: 'PAT002',
-      type: 'Checkup',
-      status: 'confirmed',
-      reason: 'Follow-up consultation',
-      contact: '+63 912 345 6790'
-    },
-    {
-      id: 3,
-      time: '9:30 AM',
-      patient_name: 'Julie Salazar',
-      patient_id: 'PAT003',
-      type: 'Checkup',
-      status: 'confirmed',
-      reason: 'Annual physical examination',
-      contact: '+63 912 345 6791'
-    },
-    {
-      id: 4,
-      time: '10:00 AM',
-      patient_name: 'Kimberly Tan',
-      patient_id: 'PAT004',
-      type: 'Checkup',
-      status: 'confirmed',
-      reason: 'Blood pressure monitoring',
-      contact: '+63 912 345 6792'
-    },
-    {
-      id: 5,
-      time: '10:30 AM',
-      patient_name: 'Roberto Cruz',
-      patient_id: 'PAT005',
-      type: 'Consultation',
-      status: 'pending',
-      reason: 'Diabetes management',
-      contact: '+63 912 345 6793'
-    },
-    {
-      id: 6,
-      time: '11:00 AM',
-      patient_name: 'Angela Lopez',
-      patient_id: 'PAT006',
-      type: 'Follow-up',
-      status: 'confirmed',
-      reason: 'Post-surgery checkup',
-      contact: '+63 912 345 6794'
-    }
-  ]);
-
+  const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [patientDetails, setPatientDetails] = useState(null);
+  const [appointmentsByDate, setAppointmentsByDate] = useState({});
+
+  // Define loadAppointments first, before useEffect that uses it
+  // Inside loadAppointments function, add debug logging:
+
+const loadAppointments = useCallback(async () => {
+  setLoading(true);
+  setError('');
+  
+  console.log('Debug - Loading appointments for:', {
+    date: selectedDate.toISOString().split('T')[0],
+    status: statusFilter
+  });
+  
+  try {
+    const dateString = selectedDate.toISOString().split('T')[0];
+    const { data, error } = await doctorAppointmentService.getDoctorAppointments(dateString, statusFilter);
+    
+    console.log('Debug - Appointments loaded:', {
+      success: !!data,
+      count: data?.length || 0,
+      error: error
+    });
+    
+    if (error) {
+      setError(`Error loading appointments: ${error}`);
+      setAppointments([]);
+    } else {
+      setAppointments(data || []);
+    }
+  } catch (err) {
+    console.error('Error loading appointments:', err);
+    setError('Failed to load appointments');
+    setAppointments([]);
+  } finally {
+    setLoading(false);
+  }
+}, [selectedDate, statusFilter]);
+
+  // Load doctor profile on component mount
+  useEffect(() => {
+    loadDoctorProfile();
+  }, []);
+
+  // Load appointments when date or filter changes
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  const loadDoctorProfile = async () => {
+    try {
+      const { data, error } = await doctorAppointmentService.getDoctorProfile();
+      if (error) {
+        setError(`Error loading doctor profile: ${error}`);
+      } else if (data) {
+        setDoctorData({
+          name: data.name || 'Doctor',
+          id: data.id,
+          email: data.email,
+          contact_no: data.contact_no
+        });
+      }
+    } catch (err) {
+      setError('Failed to load doctor profile');
+      console.error('Error loading doctor profile:', err);
+    }
+  };
+
+  // Load appointments for calendar display (optional - for showing appointment indicators)
+  const loadAppointmentsForCalendar = useCallback(async () => {
+    try {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      
+      const { data, error } = await doctorAppointmentService.getDoctorAppointmentsRange(
+        firstDay.toISOString().split('T')[0],
+        lastDay.toISOString().split('T')[0]
+      );
+      
+      if (!error && data) {
+        // Group appointments by date
+        const appointmentsByDate = {};
+        data.forEach(apt => {
+          const date = apt.date;
+          if (!appointmentsByDate[date]) {
+            appointmentsByDate[date] = [];
+          }
+          appointmentsByDate[date].push(apt);
+        });
+        setAppointmentsByDate(appointmentsByDate);
+      }
+    } catch (err) {
+      console.error('Error loading calendar appointments:', err);
+    }
+  }, [currentDate]);
+
+  // Load calendar appointments when month changes
+  useEffect(() => {
+    if (doctorAppointmentService.getDoctorAppointmentsRange) {
+      loadAppointmentsForCalendar();
+    }
+  }, [currentDate, loadAppointmentsForCalendar]);
 
   // Calendar functionality
   const handleDateSelect = (date) => {
     setSelectedDate(date);
     setCurrentPage(1); // Reset to first page when changing date
-    setStatusFilter('all'); // Reset filter when changing date
     setError('');
   };
 
@@ -124,16 +167,16 @@ const DoctorAppointments = () => {
   const handleConfirmAppointment = async (appointmentId) => {
     setLoading(true);
     try {
-      // API call would go here
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt.id === appointmentId 
-            ? { ...apt, status: 'confirmed' }
-            : apt
-        )
-      );
-    } catch {
+      const { error } = await doctorAppointmentService.updateAppointmentStatus(appointmentId, 'confirmed');
+      if (error) {
+        setError(`Failed to confirm appointment: ${error}`);
+      } else {
+        // Refresh appointments list
+        await loadAppointments();
+      }
+    } catch (err) {
       setError('Failed to confirm appointment');
+      console.error('Error confirming appointment:', err);
     } finally {
       setLoading(false);
     }
@@ -142,16 +185,18 @@ const DoctorAppointments = () => {
   const handleRescheduleAppointment = async (appointmentId) => {
     setLoading(true);
     try {
-      // API call would go here
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt.id === appointmentId 
-            ? { ...apt, status: 'pending_reschedule' }
-            : apt
-        )
-      );
-    } catch {
+      // For now, just change status to pending_reschedule
+      // In a full implementation, you'd show a modal to select new date/time
+      const { error } = await doctorAppointmentService.updateAppointmentStatus(appointmentId, 'pending');
+      if (error) {
+        setError(`Failed to reschedule appointment: ${error}`);
+      } else {
+        // Refresh appointments list
+        await loadAppointments();
+      }
+    } catch (err) {
       setError('Failed to reschedule appointment');
+      console.error('Error rescheduling appointment:', err);
     } finally {
       setLoading(false);
     }
@@ -160,39 +205,49 @@ const DoctorAppointments = () => {
   const handleCancelAppointment = async (appointmentId) => {
     setLoading(true);
     try {
-      // API call would go here
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt.id === appointmentId 
-            ? { ...apt, status: 'cancelled' }
-            : apt
-        )
-      );
-    } catch {
+      const { error } = await doctorAppointmentService.cancelAppointment(appointmentId, 'Cancelled by doctor');
+      if (error) {
+        setError(`Failed to cancel appointment: ${error}`);
+      } else {
+        // Refresh appointments list
+        await loadAppointments();
+      }
+    } catch (err) {
       setError('Failed to cancel appointment');
+      console.error('Error cancelling appointment:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleViewDetails = (appointment) => {
+  const handleViewDetails = async (appointment) => {
     setSelectedAppointment(appointment);
     setShowDetailsModal(true);
+    
+    // Load patient details
+    try {
+      const { data, error } = await doctorAppointmentService.getPatientDetails(appointment.patient_id);
+      if (error) {
+        console.error('Error loading patient details:', error);
+        setPatientDetails(null);
+      } else {
+        setPatientDetails(data);
+      }
+    } catch (err) {
+      console.error('Error loading patient details:', err);
+      setPatientDetails(null);
+    }
   };
 
   // Get appointments for selected date
   const getAppointmentsForDate = () => {
-    // In real implementation, filter by selectedDate
+    // Appointments are already filtered by date from the service
     return appointments;
   };
 
-  // Get filtered appointments
+  // Get filtered appointments (already filtered by service, but we keep this for UI logic)
   const getFilteredAppointments = () => {
-    const selectedDateAppointments = getAppointmentsForDate();
-    if (statusFilter === 'all') {
-      return selectedDateAppointments;
-    }
-    return selectedDateAppointments.filter(apt => apt.status === statusFilter);
+    return appointments;
   };
 
   // Get paginated appointments
@@ -240,10 +295,10 @@ const DoctorAppointments = () => {
       const date = new Date(year, month, day);
       const isToday = date.toDateString() === today.toDateString();
       const isSelected = date.toDateString() === selectedDate.toDateString();
-      const hasAppointments = appointments.some(() => {
-        // In real implementation, check if appointment date matches this day
-        return day === 19; // Mock data for March 19
-      });
+      
+      // Check if this day has appointments from the loaded data
+      const dateString = date.toISOString().split('T')[0];
+      const hasAppointments = appointmentsByDate[dateString] && appointmentsByDate[dateString].length > 0;
 
       days.push(
         <button
@@ -319,16 +374,44 @@ const DoctorAppointments = () => {
 
   const statusCounts = getStatusCounts();
 
+  // Determine header text based on selected date
+  const getHeaderText = () => {
+    const today = new Date();
+    const isToday = selectedDate.toDateString() === today.toDateString();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = selectedDate.toDateString() === tomorrow.toDateString();
+    
+    if (isToday) {
+      return "Today's Schedule";
+    } else if (isTomorrow) {
+      return "Tomorrow's Schedule";
+    } else {
+      return `Schedule for ${selectedDate.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      })}`;
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold text-myHeader mb-4">
-        {doctorData.name} - Today's Schedule
+        {doctorData.name} - {getHeaderText()}
       </h1>
       
       {/* Global Error Display */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Loading indicator */}
+      {loading && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <p className="text-blue-600">Loading...</p>
         </div>
       )}
       
@@ -341,7 +424,7 @@ const DoctorAppointments = () => {
             <h3 className="font-semibold mb-2">Quick Stats</h3>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Today's:</span>
+                <span className="text-gray-600">Selected Date:</span>
                 <span className="font-semibold">{selectedDateAppointments.length}</span>
               </div>
               <div className="flex justify-between">
@@ -426,7 +509,8 @@ const DoctorAppointments = () => {
                 <div className="text-center py-8 text-gray-500">
                   <Calendar className="mx-auto mb-3 w-10 h-10 text-gray-300" />
                   <p className="text-sm">
-                    {statusFilter === 'all' 
+                    {loading ? 'Loading appointments...' :
+                     statusFilter === 'all' 
                       ? 'No appointments scheduled for this date'
                       : `No ${statusFilter} appointments found`
                     }
@@ -600,9 +684,52 @@ const DoctorAppointments = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Contact
                   </label>
-                  <span className="text-gray-600">{selectedAppointment.contact}</span>
+                  <span className="text-gray-600">{selectedAppointment.contact || 'N/A'}</span>
                 </div>
               </div>
+
+              {/* Additional patient details if loaded */}
+              {patientDetails && (
+                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-200">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email
+                    </label>
+                    <span className="text-gray-600">{patientDetails.email || 'N/A'}</span>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Date of Birth
+                    </label>
+                    <span className="text-gray-600">
+                      {patientDetails.date_of_birth ? new Date(patientDetails.date_of_birth).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+
+                  {patientDetails.medical_conditions && (
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Medical Conditions
+                      </label>
+                      <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
+                        {patientDetails.medical_conditions}
+                      </p>
+                    </div>
+                  )}
+
+                  {patientDetails.allergies && (
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Allergies
+                      </label>
+                      <p className="text-gray-600 bg-red-50 p-3 rounded-lg">
+                        {patientDetails.allergies}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -632,6 +759,8 @@ const DoctorAppointments = () => {
               </div>
             </div>
             
+            
+            
             <div className="p-6 border-t border-gray-200 flex gap-3 justify-end">
               <button
                 onClick={() => setShowDetailsModal(false)}
@@ -639,15 +768,17 @@ const DoctorAppointments = () => {
               >
                 Close
               </button>
-              <button
-                onClick={() => {
-                  handleConfirmAppointment(selectedAppointment.id);
-                  setShowDetailsModal(false);
-                }}
-                className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
-              >
-                Confirm Appointment
-              </button>
+              {selectedAppointment.status === 'pending' && (
+                <button
+                  onClick={() => {
+                    handleConfirmAppointment(selectedAppointment.id);
+                    setShowDetailsModal(false);
+                  }}
+                  className="px-6 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
+                >
+                  Confirm Appointment
+                </button>
+              )}
             </div>
           </div>
         </div>
