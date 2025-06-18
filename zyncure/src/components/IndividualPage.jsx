@@ -4,7 +4,8 @@ import { supabase } from "../client";
 import PasswordInput from "./PasswordInput";
 import PasswordSuccessModal from "./PasswordSuccessModal";
 import PersonalInfoSuccessModal from "./PersonalInfoSuccessModal";
-
+import LogoutModal from "./LogoutModal"; 
+import DeleteAccountModal from "./DeleteAccountModal";
 
 export function PersonalInfoForm() {
   const [formData, setFormData] = useState({
@@ -1056,6 +1057,64 @@ export function PoliciesPage() {
 }
 
 export function DeleteAccountPage() {
+  const [showModal, setShowModal] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleDelete = () => setShowModal(true);
+  const handleCancel = () => setShowModal(false);
+
+  const handleConfirmDelete = async () => {
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    // 1. Re-authenticate user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      setError("You must be logged in.");
+      setLoading(false);
+      return;
+    }
+    if (!email || !password) {
+      setError("Please enter your email and password.");
+      setLoading(false);
+      return;
+    }
+    if (email !== user.email) {
+      setError("Entered email does not match your account.");
+      setLoading(false);
+      return;
+    }
+    // 2. Sign in again to verify password
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInError) {
+      setError("Incorrect password.");
+      setLoading(false);
+      return;
+    }
+    // 3. Call the Edge Function to delete the user
+    const { error: fnError } = await supabase.functions.invoke('delete-user', {
+      body: { user_id: user.id }
+    });
+    if (fnError) {
+      setError("Failed to delete account: " + fnError.message);
+      setLoading(false);
+      return;
+    }
+    setSuccess("Account deleted successfully.");
+    setLoading(false);
+    // Optionally: redirect or log out
+    setTimeout(() => {
+      window.location.href = "/register";
+    }, 2000);
+  };
+
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="flex justify-between items-center mb-6">
@@ -1070,6 +1129,8 @@ export function DeleteAccountPage() {
           <input
             type="text"
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </div>
 
@@ -1078,13 +1139,31 @@ export function DeleteAccountPage() {
           <input
             type="text"
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
         </div>
         <div className="flex justify-center mt-6">
-          <button className="bg-profileHeader text-white px-6 py-2 rounded-xl font-bold hover:bg-red-600 transition-colors">
+          <button
+            className="bg-profileHeader text-white px-6 py-2 rounded-xl font-bold hover:bg-red-600 transition-colors"
+            onClick={handleDelete}
+            type="button"
+          >
             Delete Account
           </button>
         </div>
+        {showModal && (
+          <DeleteAccountModal
+            open={showModal}
+            onCancel={handleCancel}
+            onConfirm={handleConfirmDelete}
+            title="This will delete your account"
+            description="Proceed with your deletion request?"
+            loading={loading} // optional: pass loading state if you want to disable buttons while deleting
+          />
+        )}
+        {error && <div className="text-red-500 mt-4">{error}</div>}
+        {success && <div className="text-green-600 mt-4">{success}</div>}
       </div>
     </div>
   );
