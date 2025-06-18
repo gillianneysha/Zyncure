@@ -430,7 +430,19 @@ function FileListItem({ file, onRename, onDelete, maxFileNameLength, onPreview, 
   );
 }
 
-export default function Records({ currentUserId }) {
+export default function Records({ currentUserId: propUserId }) {
+  const [currentUserId, setCurrentUserId] = useState(propUserId || null);
+
+  useEffect(() => {
+    if (!propUserId) {
+      // Fetch user from Supabase Auth
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user?.id) setCurrentUserId(data.user.id);
+        else setCurrentUserId(null);
+      });
+    }
+  }, [propUserId]);
+
   const fileInputRef = useRef(null);
   const folderFileInputRef = useRef(null);
   const [fileName, setFileName] = useState("");
@@ -463,7 +475,7 @@ export default function Records({ currentUserId }) {
   useEffect(() => {
     fetchFolders();
     fetchFiles();
-  }, []);
+  }, [currentUserId]); // Add currentUserId as dependency
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -512,34 +524,60 @@ export default function Records({ currentUserId }) {
     }
   }, [allDropdownOpen]);
 
+  // UPDATED: Fetch only folders owned by current user
   async function fetchFolders() {
+    if (!currentUserId) return;
+    
     setLoading(true);
     const { data, error } = await supabase
       .from("folders")
       .select("*")
+      .eq("owner_id", currentUserId) // Only fetch folders owned by current user
       .order("created_at", { ascending: true });
-    setFolders(error ? [] : data);
+    
+    if (error) {
+      console.error("Error fetching folders:", error);
+      setFolders([]);
+    } else {
+      setFolders(data || []);
+    }
     setLoading(false);
   }
 
+  // UPDATED: Fetch only files owned by current user OR shared with them
   async function fetchFiles() {
+    if (!currentUserId) return;
+    
     setLoading(true);
     const { data, error } = await supabase
       .from("medical_files")
       .select("*")
+      .or(`owner_id.eq.${currentUserId},shared_with_ids.cs.{${currentUserId}}`) // Files owned by user OR shared with user
       .order("created_at", { ascending: true });
-    setFiles(error ? [] : data);
+    
+    if (error) {
+      console.error("Error fetching files:", error);
+      setFiles([]);
+    } else {
+      setFiles(data || []);
+    }
     setLoading(false);
   }
 
   const handleFileChange = async (e, folder_id = null) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    if (!currentUserId) {
+      alert("User not authenticated");
+      return;
+    }
+    
     setFileName(file.name);
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("medical-files")
-      .upload(`files/${Date.now()}_${file.name}`, file);
+      .upload(`files/${currentUserId}/${Date.now()}_${file.name}`, file); // Include userId in path
 
     if (uploadError) {
       alert("Upload error: " + uploadError.message);
@@ -559,7 +597,7 @@ export default function Records({ currentUserId }) {
         file_size: file.size,
         preview_url: publicUrlData.publicUrl,
         folder_id: folder_id,
-        owner_id: currentUserId,
+        owner_id: currentUserId, // Set owner_id
         shared_with_ids: [],
       },
     ]);
@@ -580,10 +618,21 @@ export default function Records({ currentUserId }) {
     e.target.value = "";
   };
 
+  // UPDATED: Set owner_id when creating folder
   const handleAddFolder = async () => {
+    if (!currentUserId) {
+      alert("User not authenticated");
+      return;
+    }
+    
     const folderName = prompt("Folder name?");
     if (!folderName) return;
-    const { error } = await supabase.from("folders").insert([{ name: folderName }]);
+    
+    const { error } = await supabase.from("folders").insert([{ 
+      name: folderName,
+      owner_id: currentUserId // Set owner_id
+    }]);
+    
     if (error) {
       alert("DB error: " + error.message);
     }
@@ -592,14 +641,22 @@ export default function Records({ currentUserId }) {
 
   const handleDropdownToggle = () => setDropdownOpen((v) => !v);
 
+  // UPDATED: Check ownership before allowing rename
   const handleRenameFile = async (fileId, currentName) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file || file.owner_id !== currentUserId) {
+      alert("You can only rename files you own");
+      return;
+    }
+    
     const newName = prompt("Enter new file name:", currentName);
     if (!newName || newName === currentName) return;
 
     const { error } = await supabase
       .from("medical_files")
       .update({ name: newName })
-      .eq("id", fileId);
+      .eq("id", fileId)
+      .eq("owner_id", currentUserId); // Ensure user owns the file
 
     if (error) {
       alert("Error renaming file: " + error.message);
@@ -608,7 +665,14 @@ export default function Records({ currentUserId }) {
     }
   };
 
+  // UPDATED: Check ownership before allowing delete
   const handleDeleteFile = async (fileId, fileName, filePath) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file || file.owner_id !== currentUserId) {
+      alert("You can only delete files you own");
+      return;
+    }
+    
     if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return;
 
     const { error: storageError } = await supabase.storage
@@ -621,7 +685,8 @@ export default function Records({ currentUserId }) {
     const { error: dbError } = await supabase
       .from("medical_files")
       .delete()
-      .eq("id", fileId);
+      .eq("id", fileId)
+      .eq("owner_id", currentUserId); // Ensure user owns the file
 
     if (dbError) {
       alert("Error deleting file: " + dbError.message);
@@ -631,14 +696,22 @@ export default function Records({ currentUserId }) {
     }
   };
 
+  // UPDATED: Check ownership before allowing rename
   const handleRenameFolder = async (folderId, currentName) => {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder || folder.owner_id !== currentUserId) {
+      alert("You can only rename folders you own");
+      return;
+    }
+    
     const newName = prompt("Enter new folder name:", currentName);
     if (!newName || newName === currentName) return;
 
     const { error } = await supabase
       .from("folders")
       .update({ name: newName })
-      .eq("id", folderId);
+      .eq("id", folderId)
+      .eq("owner_id", currentUserId); // Ensure user owns the folder
 
     if (error) {
       alert("Error renaming folder: " + error.message);
@@ -647,8 +720,15 @@ export default function Records({ currentUserId }) {
     }
   };
 
+  // UPDATED: Check ownership before allowing delete
   const handleDeleteFolder = async (folderId, folderName) => {
-    const filesInFolder = files.filter(file => file.folder_id === folderId);
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder || folder.owner_id !== currentUserId) {
+      alert("You can only delete folders you own");
+      return;
+    }
+    
+    const filesInFolder = files.filter(file => file.folder_id === folderId && file.owner_id === currentUserId);
     if (filesInFolder.length > 0) {
       if (!confirm(`Folder "${folderName}" contains ${filesInFolder.length} file(s). Deleting the folder will also delete all files inside. Are you sure?`)) {
         return;
@@ -660,15 +740,18 @@ export default function Records({ currentUserId }) {
         await supabase
           .from("medical_files")
           .delete()
-          .eq("id", file.id);
+          .eq("id", file.id)
+          .eq("owner_id", currentUserId);
       }
     } else {
       if (!confirm(`Are you sure you want to delete folder "${folderName}"?`)) return;
     }
+    
     const { error } = await supabase
       .from("folders")
       .delete()
-      .eq("id", folderId);
+      .eq("id", folderId)
+      .eq("owner_id", currentUserId); // Ensure user owns the folder
 
     if (error) {
       alert("Error deleting folder: " + error.message);
@@ -681,10 +764,16 @@ export default function Records({ currentUserId }) {
     }
   };
 
+  // UPDATED: Filter displayed files to only show user's files or files shared with them
   const displayedFiles = (activeFolderId
     ? files.filter((file) => file.folder_id === activeFolderId)
     : files.filter((file) => !file.folder_id)
   ).filter(file => {
+    // Ensure user can see this file (owns it or it's shared with them)
+    const canSeeFile = file.owner_id === currentUserId || 
+                      (file.shared_with_ids && file.shared_with_ids.includes(currentUserId));
+    if (!canSeeFile) return false;
+    
     if (fileTypeFilter) {
       const ext = getFileExtension(file.name);
       if (fileTypeFilter === "jpg") {
@@ -701,6 +790,15 @@ export default function Records({ currentUserId }) {
   const activeFolder = folders.find((f) => f.id === activeFolderId);
 
   const maxFileNameLength = useMaxFileNameLength();
+
+  // Add early return if currentUserId is not available
+  if (!currentUserId) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-500">Please log in to view your medical records.</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
