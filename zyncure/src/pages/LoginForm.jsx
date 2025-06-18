@@ -48,7 +48,7 @@ export default function LoginForm({ setToken }) {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  // Removed unused showPassword state
 
   // Memoized handleChange function
   const handleChange = useCallback((event) => {

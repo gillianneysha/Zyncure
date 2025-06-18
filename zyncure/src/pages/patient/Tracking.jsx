@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { ShareButton } from "../../components/ShareButton.jsx";
 import { supabase } from '../../client';
 
 const PeriodTracker = () => {
