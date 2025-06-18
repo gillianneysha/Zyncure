@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../client";
 import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
-import GoogleIcon from "../components/GoogleIcon"; // Add this import at the top
+import GoogleIcon from "../components/GoogleIcon";
 
 
 const FormField = React.memo(({ 
@@ -27,7 +27,7 @@ const FormField = React.memo(({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
+      className={`w-4/5 block mx-auto mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] ${
         error ? "ring-2 ring-red-400" : ""
       }`}
       required={required}
@@ -191,6 +191,8 @@ export default function LoginForm({ setToken }) {
         onChange={handleChange}
         error={errors.email}
         disabled={isLoading}
+        labelClassName="text-[#F5E0D9]"
+        inputClassName="bg-[#FFEDE7]"
       />
 
       <div className="w-4/5 mx-auto">
@@ -203,7 +205,7 @@ export default function LoginForm({ setToken }) {
           error={errors.password}
           disabled={isLoading}
           labelClassName="text-[#F5E0D9]"
-          inputClassName="bg-[#FEDED2]"
+          inputClassName="bg-[#FFEDE7]"
         />
       </div>
 

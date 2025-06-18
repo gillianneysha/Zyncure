@@ -1,7 +1,7 @@
 import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
-import GoogleIcon from "../components/GoogleIcon"; // Add this import at the top
+import GoogleIcon from "../components/GoogleIcon";
 
 
 const FormField = memo(({ 
@@ -27,7 +27,7 @@ const FormField = memo(({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] ${
+        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] ${
           error ? "ring-2 ring-red-400" : ""
         }`}
         required={required}
@@ -224,6 +224,8 @@ const handleSubmit = useCallback(async (event) => {
         onChange={handleChange}
         error={errors.firstName}
         disabled={isLoading}
+        labelClassName="text-[#F5E0D9]"
+        inputClassName="bg-[#FFEDE7]"
       />
 
       <FormField 
@@ -234,6 +236,8 @@ const handleSubmit = useCallback(async (event) => {
         onChange={handleChange}
         error={errors.lastName}
         disabled={isLoading}
+        labelClassName="text-[#F5E0D9]"
+        inputClassName="bg-[#FFEDE7]"
       />
 
       <FormField 
@@ -244,6 +248,8 @@ const handleSubmit = useCallback(async (event) => {
         onChange={handleChange}
         error={errors.contactNumber}
         disabled={isLoading}
+        labelClassName="text-[#F5E0D9]"
+        inputClassName="bg-[#FFEDE7]"
       />
 
       <FormField 
@@ -254,6 +260,8 @@ const handleSubmit = useCallback(async (event) => {
         onChange={handleChange}
         error={errors.birthdate}
         disabled={isLoading}
+        labelClassName="text-[#F5E0D9]"
+        inputClassName="bg-[#FFEDE7]"
       />
 
       <FormField 
@@ -263,13 +271,15 @@ const handleSubmit = useCallback(async (event) => {
         onChange={handleChange}
         error={errors.userType}
         disabled={isLoading}
+        labelClassName="text-[#F5E0D9]"
+        inputClassName="bg-[#FFEDE7]"
       >
         <div className="relative w-4/5 mx-auto">
           <select
             name="userType"
             value={formData.userType}
             onChange={handleChange}
-            className={`appearance-none w-full mb-1 p-2 bg-[#E5E7DD] border-none rounded-[15.5px] text-[#b0b0b0] ${
+            className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${
               errors.userType ? "ring-2 ring-red-400" : ""
             }`}
             required
@@ -303,6 +313,8 @@ const handleSubmit = useCallback(async (event) => {
         onChange={handleChange}
         error={errors.email}
         disabled={isLoading}
+        labelClassName="text-[#F5E0D9]"
+        inputClassName="bg-[#FFEDE7]"
       />
 
       <div className="w-4/5 mx-auto">
@@ -315,7 +327,7 @@ const handleSubmit = useCallback(async (event) => {
           error={errors.password}
           disabled={isLoading}
           labelClassName="text-[#F5E0D9]"
-          inputClassName="bg-[#FEDED2]"
+          inputClassName="bg-[#FFEDE7]"
         />
       </div>
 
@@ -329,7 +341,7 @@ const handleSubmit = useCallback(async (event) => {
           error={errors.confirmPassword}
           disabled={isLoading}
           labelClassName="text-[#F5E0D9]"
-          inputClassName="bg-[#FEDED2]"
+          inputClassName="bg-[#FFEDE7]"
         />
       </div>
 
