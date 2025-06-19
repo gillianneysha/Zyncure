@@ -6,6 +6,7 @@ export default function Navbar() {
   const [userData, setUserData] = useState({
     name: "User",
     id: "----",
+    userType: "----",
   });
 
   useEffect(() => {
@@ -34,9 +35,20 @@ export default function Navbar() {
           user.email?.split("@")[0] ||
           "User";
 
+        const userType = 
+          profile.user_type ||
+          profile.role ||
+          user.user_metadata?.user_type ||
+          user.user_metadata?.role ||
+          "User";
+
+        // Capitalize first letter of user type
+        const capitalizedUserType = userType.charAt(0).toUpperCase() + userType.slice(1).toLowerCase();
+
         setUserData({
           name: initialName,
           id: user.id ? user.id.substring(0, 4) : "----",
+          userType: capitalizedUserType,
         });
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -45,7 +57,6 @@ export default function Navbar() {
 
     getUserData();
   }, []);
-
 
   const firstName = userData.name.includes(" ")
     ? userData.name.split(" ")[0]
@@ -63,20 +74,23 @@ export default function Navbar() {
         <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-mySidebar w-5 h-5" />
       </div>
 
-      {/* User greeting and avatar */}
-      <div className="flex items-center space-x-3 ml-6">
+      
+        <div className="flex items-center space-x-3 ml-6">
         <div className="flex flex-col leading-tight text-right">
-          <span className="text-white font-medium">Hi, {firstName}!</span>
-          <span className="text-sm text-white">ID: {userData.id}</span>
+          <span className="text-white font-medium">Hi, {firstName}!</span>          
+          <span className="text-sm text-white">ID: {userData.id} • <span className="bg-indigo-500 px-1.5  rounded-full">{userData.userType}</span></span>
         </div>
-        <img
-          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-            userData.name
-          )}&background=c7d2fe&color=3730a3`}
-          alt="User Avatar"
-          className="w-10 h-10 rounded-full border-2 border-indigo-300"
-        />
+        <div className="relative">
+          <img
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+              userData.name
+            )}&background=c7d2fe&color=3730a3`}
+            alt="User Avatar"
+            className="w-10 h-10 rounded-full border-2 border-indigo-300"
+          />
+        </div>
       </div>
+     
     </nav>
   );
 }
