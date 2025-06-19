@@ -50,11 +50,11 @@ const DoctorConnectionsPage = () => {
       
       // Separate pending incoming requests from other connections
       const pendingIncoming = allConnections.filter(
-        conn => conn.status === 'pending' && conn.request_direction === 'incoming'
+        conn => conn.status === 'pending' 
       );
       
       const otherConnections = allConnections.filter(
-        conn => !(conn.status === 'pending' && conn.request_direction === 'incoming')
+        conn => !(conn.status === 'pending' )
       );
       
       setConnections(otherConnections);
@@ -145,6 +145,7 @@ const DoctorConnectionsPage = () => {
 // FIXED CONNECTION REQUEST MANAGEMENT
 // ========================================
 const handleConnectionRequest = async (connectionId, action) => {
+  
   try {
     let error;
     

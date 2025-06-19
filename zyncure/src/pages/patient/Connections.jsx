@@ -42,6 +42,7 @@ const PatientConnectionsPage = () => {
       const { data, error } = await supabase
         .from('patient_connection_details')
         .select('*')
+        .eq('patient_id', currentUser.id) 
         .order('created_at', { ascending: false });
 
       if (error) throw error;
