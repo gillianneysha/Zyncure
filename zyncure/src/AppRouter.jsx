@@ -3,6 +3,7 @@ import React from "react";
 import { useUser } from "./hooks/useUser";
 import PatientLayout from "./layouts/PatientLayout";
 import DoctorLayout from "./layouts/DoctorLayout";
+import AdminLayout from "./layouts/AdminLayout";
 import Registration from "./pages/Authentication";
 import PatientProfile from "./pages/patient/Profile";
 import PatientHome from "./pages/patient/Home";
@@ -23,6 +24,15 @@ import DoctorConnections from "./pages/doctor/Connections";
 import DoctorNotifications from "./pages/doctor/Notifications";
 import AuthCallbackHandler from "./pages/AuthCallbackHandler";
 
+// --- ADMIN PAGES ---
+import AdminProfile from "./pages/admin/AdminProfile";
+import AdminHome from "./pages/admin/Home";
+import AdminPatients from "./pages/admin/Patients";
+import AdminProfessionals from "./pages/admin/Professionals";
+import AdminReports from "./pages/admin/Reports";
+import AdminSupport from "./pages/admin/Support";
+import AdminBugs from "./pages/admin/Bugs";
+
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { user, isLoading } = useUser();
   const location = useLocation();
@@ -38,7 +48,6 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     );
   }
 
-  // Only check for user, not token
   if (!user) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
@@ -46,6 +55,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   // Check if user has the required role
   if (requiredRole && user.role !== requiredRole) {
     // Redirect to appropriate home based on user's actual role
+    if (user.role === "admin") return <Navigate to="/admin/profile" replace />;
     const redirectPath = user.role === "patient" ? "/home" : "/doctor";
     return <Navigate to={redirectPath} replace />;
   }
@@ -76,7 +86,13 @@ export default function AppRouter() {
         element={
           isAuthenticated ? (
             <Navigate
-              to={user?.role === "patient" ? "/home" : "/doctor"}
+              to={
+                user?.role === "admin"
+                  ? "/admin/profile"
+                  : user?.role === "patient"
+                  ? "/home"
+                  : "/doctor"
+              }
               replace
             />
           ) : (
@@ -126,6 +142,25 @@ export default function AppRouter() {
         <Route path="connections" element={<DoctorConnections />} />
         <Route path="notifications" element={<DoctorNotifications />} />
       </Route>
+
+      {/* --- ADMIN ROUTES --- */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="profile" element={<AdminProfile />} />
+        <Route path="home" element={<AdminHome />} />
+        <Route path="patients" element={<AdminPatients />} />
+        <Route path="professionals" element={<AdminProfessionals />} />
+        <Route path="reports" element={<AdminReports />} />
+        <Route path="support" element={<AdminSupport />} />
+        <Route path="bugs" element={<AdminBugs />} />
+      </Route>
+
       <Route path="/auth/callback" element={<AuthCallbackHandler />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />
 
@@ -136,7 +171,9 @@ export default function AppRouter() {
           <Navigate
             to={
               isAuthenticated
-                ? user?.role === "patient"
+                ? user?.role === "admin"
+                  ? "/admin/profile"
+                  : user?.role === "patient"
                   ? "/home"
                   : "/doctor"
                 : "/"
