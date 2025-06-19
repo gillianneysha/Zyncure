@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "../../client";
+import ShareModal from '../../components/ShareModal';
 
 const FILE_TYPE_FILTERS = [
   { label: "PDF", value: "pdf" },
@@ -472,6 +473,11 @@ export default function Records({ currentUserId: propUserId }) {
   const [allDropdownOpen, setAllDropdownOpen] = useState(false);
   const allDropdownRef = useRef(null);
 
+  // Share modal state
+  const [shareModal, setShareModal] = useState({ open: false, file: null });
+  const [selectedDoctorIds, setSelectedDoctorIds] = useState([]);
+
+
   useEffect(() => {
     fetchFolders();
     fetchFiles();
@@ -787,6 +793,11 @@ export default function Records({ currentUserId: propUserId }) {
     return true;
   });
 
+  // Add missing handleShareFile function
+  function handleShareFile({ id, name, file, type }) {
+    setShareModal({ open: true, file: file || { id, name, type } });
+  }
+
   const activeFolder = folders.find((f) => f.id === activeFolderId);
 
   const maxFileNameLength = useMaxFileNameLength();
@@ -798,6 +809,38 @@ export default function Records({ currentUserId: propUserId }) {
         <div className="text-gray-500">Please log in to view your medical records.</div>
       </div>
     );
+  }
+
+  // Add missing handleShareSubmit function
+  async function handleShareSubmit() {
+    if (!shareModal.file || selectedDoctorIds.length === 0) return;
+    const fileId = shareModal.file.id;
+    // Fetch the file from state
+    const file = files.find(f => f.id === fileId);
+    if (!file) {
+      alert("File not found.");
+      return;
+    }
+    // Only allow sharing if user owns the file
+    if (file.owner_id !== currentUserId) {
+      alert("You can only share files you own.");
+      return;
+    }
+    // Merge existing shared_with_ids with selectedDoctorIds (avoid duplicates)
+    const newSharedWithIds = Array.from(new Set([...(file.shared_with_ids || []), ...selectedDoctorIds]));
+    const { error } = await supabase
+      .from("medical_files")
+      .update({ shared_with_ids: newSharedWithIds })
+      .eq("id", fileId)
+      .eq("owner_id", currentUserId);
+    if (error) {
+      alert("Error sharing file: " + error.message);
+    } else {
+      setShareModal({ open: false, file: null });
+      setSelectedDoctorIds([]);
+      await fetchFiles();
+      alert("File shared successfully!");
+    }
   }
 
   return (
@@ -1053,6 +1096,7 @@ export default function Records({ currentUserId: propUserId }) {
                   onDelete={handleDeleteFile}
                   maxFileNameLength={maxFileNameLength}
                   onPreview={setPreviewFile}
+                  onShare={handleShareFile}
                 />
               ))}
             </div>
@@ -1069,6 +1113,7 @@ export default function Records({ currentUserId: propUserId }) {
                   onDelete={handleDeleteFile}
                   maxFileNameLength={maxFileNameLength}
                   onPreview={setPreviewFile}
+                  onShare={handleShareFile}
                 />
               ))}
             </div>
@@ -1121,6 +1166,15 @@ export default function Records({ currentUserId: propUserId }) {
           <span className="text-xs">Share Report</span>
         </button>
       </div>
+      {/* Share Modal */}
+ <ShareModal
+  isOpen={shareModal.open}
+  onClose={() => setShareModal({ open: false, file: null })}
+  item={shareModal.file}
+  currentUserId={currentUserId}
+  supabase={supabase}
+  onSubmit={handleShareSubmit}
+/>
     </div>
   );
 }
