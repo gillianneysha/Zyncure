@@ -55,7 +55,7 @@ export default function ProfilePage() {
         
         {/* Logout*/}
         <div 
-          className="flex items-center p-4 rounded-lg cursor-pointer hover:bg-profileBg text-profileText mt-4"
+          className="flex items-center p-4 rounded-3xl cursor-pointer hover:bg-rose-200 text-profileText mt-4"
           onClick={handleLogoutClick}
         >
           <LogOut size={20} className="mr-2" />

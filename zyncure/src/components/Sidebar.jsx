@@ -105,7 +105,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children }) {
         {/* Floating submenu when collapsed */}
         {hasChildren && !expanded && hovered && (
           <ul
-            className="absolute left-full top-1/2 -translate-y-1/2 ml-2 bg-indigo-100 shadow-lg rounded-xl py-2 z-50 min-w-[160px] border border-gray-200"
+            className="absolute left-full top-1/2 -translate-y-1/2 ml-6 bg-indigo-100 shadow-lg rounded-xl py-2 z-50 min-w-[160px] border border-gray-200"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
