@@ -1,4 +1,4 @@
-import { PencilIcon, ChevronRight, ArrowLeft, Eye } from "lucide-react";
+import { PencilIcon, ChevronRight, ArrowLeft, Eye, EyeClosed } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "../client";
 import PasswordInput from "./PasswordInput";
@@ -209,7 +209,7 @@ export function PersonalInfoForm() {
         <div className="flex justify-center pt-4">
           <button
             type="submit"
-            className={`bg-[#55A1A4] text-white px-8 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition ${
+            className={`bg-[#55A1A4] text-white px-6 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition ${
               (!isEditing || loading || saving || !isChanged) ? "opacity-50 cursor-not-allowed" : ""
             }`}
             disabled={!isEditing || loading || saving || !isChanged}
@@ -1060,6 +1060,7 @@ export function DeleteAccountPage() {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // <-- Add this
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1134,18 +1135,28 @@ export function DeleteAccountPage() {
           />
         </div>
 
-        <div>
+        <div className="relative">
           <label className="block text-mySidebar mb-1">Password</label>
           <input
-            type="text"
-            className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
+            type={showPassword ? "text" : "password"}
+            className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg pr-10"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-        </div>
-        <div className="flex justify-center mt-6">
           <button
-            className="bg-profileHeader text-white px-6 py-2 rounded-xl font-bold hover:bg-red-600 transition-colors"
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-12 -translate-y-1/2 flex items-center text-[#F46B5D] focus:outline-none"
+            tabIndex={-1}
+            style={{ background: "none", border: "none", padding: 0 }}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <Eye size={22} /> : <EyeClosed size={22} />}
+          </button>
+        </div>
+        <div className="flex justify-center py-5">
+          <button
+            className="bg-profileHeader text-white px-6 py-2 rounded-xl font-semibold hover:bg-red-600 transition-colors"
             onClick={handleDelete}
             type="button"
           >
@@ -1159,7 +1170,7 @@ export function DeleteAccountPage() {
             onConfirm={handleConfirmDelete}
             title="This will delete your account"
             description="Proceed with your deletion request?"
-            loading={loading} // optional: pass loading state if you want to disable buttons while deleting
+            loading={loading}
           />
         )}
         {error && <div className="text-red-500 mt-4">{error}</div>}

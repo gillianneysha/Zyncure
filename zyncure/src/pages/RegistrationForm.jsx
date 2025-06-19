@@ -364,9 +364,9 @@ const handleSubmit = useCallback(async (event) => {
       </div>
 
       <div className="w-full flex items-center justify-center mt-8 mb-8">
-        <span className="flex-1 h-px bg-[#FEDED2] mx-2"></span>
-        <span className="text-[#F5E0D9] text-base font-semibold px-4">OR</span>
-        <span className="flex-1 h-px bg-[#FEDED2] mx-2"></span>
+        <span className="flex-1 h-px bg-[#FEDED2] mx-11"></span>
+        <span className="text-[#F5E0D9] text-base font-semibold">OR</span>
+        <span className="flex-1 h-px bg-[#FEDED2] mx-11"></span>
       </div>
 
       <div className="flex flex-col items-center mb-8">
