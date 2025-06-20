@@ -53,20 +53,24 @@ const PatientsPage = () => {
     if (error) throw error;
 
     // Transform connection data into patient folder format
-    const patientFolders = (data || []).map(connection => ({
-      id: connection.patient_id,
-      name: `${connection.patient_first_name} ${connection.patient_last_name}`,
-      email: connection.patient_email,
-
-      connectionId: connection.id,
-      connectedAt: connection.created_at,
-      lastAccessed: connection.updated_at || connection.created_at,
-      status: 'active', // Since we're only getting accepted connections, they're all active
-      avatar: null,
-      recordsCount: 0,
-      lastVisit: null,
-    }));
-
+    // In loadConnectedPatients function, replace the patientFolders mapping with:
+const patientFolders = await Promise.all((data || []).map(async connection => {
+  const sharedFiles = await loadSharedFilesForPatient(connection.patient_id);
+  
+  return {
+    id: connection.patient_id,
+    name: `${connection.patient_first_name} ${connection.patient_last_name}`,
+    email: connection.patient_email,
+    connectionId: connection.id,
+    connectedAt: connection.created_at,
+    lastAccessed: connection.updated_at || connection.created_at,
+    status: 'active',
+    avatar: null,
+    recordsCount: sharedFiles.length, // Show count of shared files
+    sharedFiles: sharedFiles, // Store the actual shared files
+    lastVisit: null,
+  };
+}));
     console.log('Loaded patient folders:', patientFolders); // Debug log
     setPatients(patientFolders);
     
@@ -76,7 +80,50 @@ const PatientsPage = () => {
     setIsLoading(false);
   }
 };
+const loadSharedFilesForPatient = async (patientId) => {
+  try {
+    const { data, error } = await supabase
+      .from('file_shares')
+      .select(`
+        *,
+        medical_files!file_shares_file_id_fkey (
+          id,
+          filename,
+          file_size,
+          file_type,
+          upload_date,
+          owner_id
+        ),
+        folders!file_shares_folder_id_fkey (
+          id,
+          name,
+          created_at,
+          owner_id
+        )
+      `)
+      .eq('shared_with_id', currentUser.id)
+      .eq('is_active', true)
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
+    if (error) throw error;
+    
+    // Filter the results to only include files/folders owned by the specific patient
+    const filteredData = (data || []).filter(share => {
+      if (share.medical_files && share.medical_files.owner_id === patientId) {
+        return true;
+      }
+      if (share.folders && share.folders.owner_id === patientId) {
+        return true;
+      }
+      return false;
+    });
+    
+    return filteredData;
+  } catch (error) {
+    console.error('Error loading shared files:', error);
+    return [];
+  }
+};
 // ========================================
 // FIXED FILTERING SECTION - Remove status filter since all are active
 // ========================================
@@ -108,10 +155,8 @@ const getFilteredPatients = () => {
   // PATIENT FOLDER ACTIONS
   // ========================================
   const handlePatientClick = (patient) => {
-    // Navigate to patient details or records
-    console.log('Opening patient folder:', patient);
-    // You can implement navigation here
-    // For example: navigate(`/patients/${patient.id}/records`);
+console.log('Opening patient folder:', patient);
+  console.log('Shared files:', patient.sharedFiles);
   };
 
   const handlePatientMenuAction = (patient, action) => {
@@ -226,15 +271,18 @@ const getFilteredPatients = () => {
     </div>
     
     {/* Patient info below folder */}
-    <div className="mt-3 text-center">
-      <h3 className="font-medium text-gray-900 text-sm truncate group-hover:text-blue-600 transition-colors">
-        {patient.name}
-      </h3>
-      <p className="text-xs text-gray-500 font-mono mt-1">{patient.shortId}</p>
-      <p className="text-xs text-gray-400 mt-1">
-        {formatDate(patient.connectedAt)}
-      </p>
-    </div>
+    // In the patient info section of renderPatientFolder, update this part:
+<div className="mt-3 text-center">
+  <h3 className="font-medium text-gray-900 text-sm truncate group-hover:text-blue-600 transition-colors">
+    {patient.name}
+  </h3>
+  <p className="text-xs text-gray-500 mt-1">
+    {patient.recordsCount} shared file{patient.recordsCount !== 1 ? 's' : ''}
+  </p>
+  <p className="text-xs text-gray-400 mt-1">
+    Connected {formatDate(patient.connectedAt)}
+  </p>
+</div>
 
     {/* Dropdown menu */}
     {showDropdown === patient.id && (
