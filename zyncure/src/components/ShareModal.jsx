@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { X, User, Clock, Calendar, Trash2, Share } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { X, User, Clock, Calendar, Trash2, Share } from "lucide-react";
+import { supabase } from "../client";
 
-const ShareModal = ({ 
-  isOpen, 
-  onClose, 
+const ShareModal = ({
+  isOpen,
+  onClose,
   item, // { id, name, type: 'file' | 'folder', file?: fileObject }
   currentUserId,
-  supabase 
 }) => {
   const [connections, setConnections] = useState([]);
   const [activeShares, setActiveShares] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDoctorId, setSelectedDoctorId] = useState('');
-  const [durationType, setDurationType] = useState('hours');
-  const [durationValue, setDurationValue] = useState('24');
-  const [customDate, setCustomDate] = useState('');
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [durationType, setDurationType] = useState("hours");
+  const [durationValue, setDurationValue] = useState("24");
+  const [customDate, setCustomDate] = useState("");
   const [noExpiration, setNoExpiration] = useState(false);
 
   useEffect(() => {
@@ -24,71 +24,82 @@ const ShareModal = ({
     }
   }, [isOpen, currentUserId, item?.id]);
 
-  const fetchConnections = async () => {
-    setLoading(true);
-    try {
-      // Fetch connected doctors - adjust this query based on your connections table structure
-      const { data, error } = await supabase
-        .from('connections')
-        .select(`
-          *,
-          doctor:connected_user_id(id, email, full_name, role)
-        `)
-        .eq('user_id', currentUserId)
-        .eq('status', 'accepted') // assuming you have a status field
-        .eq('doctor.role', 'doctor'); // assuming doctors have a role field
+ const fetchConnections = async () => {
+  console.log("fetchConnections called");
+  setLoading(true);
+  try {
+    console.log("About to query supabase...");
+    console.log("Current user ID:", currentUserId);
 
-      if (error) throw error;
-      setConnections(data || []);
-    } catch (error) {
-      console.error('Error fetching connections:', error);
-      alert('Failed to fetch connections');
-    } finally {
-      setLoading(false);
+    // Use the patient_connection_details view and only get accepted connections for the current user
+    const { data, error } = await supabase
+      .from("patient_connection_details")
+      .select("*")
+      .eq("status", "accepted")
+      .eq("patient_id", currentUserId); // Add this line to filter by current user
+
+    console.log("Query completed");
+    console.log("Error:", error);
+    console.log("Data:", data);
+
+    if (error) {
+      console.error("Supabase error:", error);
+      throw error;
     }
-  };
+
+    console.log("Connections data:", data);
+    setConnections(data || []);
+  } catch (error) {
+    console.error("Error fetching connections:", error);
+    alert("Failed to fetch connections");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchActiveShares = async () => {
     if (!item?.id) return;
-    
+
     try {
       const { data, error } = await supabase
-        .from('file_shares')
-        .select(`
+        .from("file_shares")
+        .select(
+          `
           *,
           shared_user:shared_with_id(id, email, full_name)
-        `)
-        .eq(item.type === 'file' ? 'file_id' : 'folder_id', item.id)
-        .eq('owner_id', currentUserId)
-        .eq('is_active', true);
+        `
+        )
+        .eq(item.type === "file" ? "file_id" : "folder_id", item.id)
+        .eq("owner_id", currentUserId)
+        .eq("is_active", true);
 
       if (error) throw error;
       setActiveShares(data || []);
     } catch (error) {
-      console.error('Error fetching active shares:', error);
+      console.error("Error fetching active shares:", error);
     }
   };
 
   const calculateExpirationDate = () => {
     if (noExpiration) return null;
-    
+
     const now = new Date();
-    
-    if (durationType === 'custom') {
+
+    if (durationType === "custom") {
       return customDate ? new Date(customDate) : null;
     }
-    
+
     const value = parseInt(durationValue);
     if (isNaN(value)) return null;
-    
+
     switch (durationType) {
-      case 'hours':
+      case "hours":
         return new Date(now.getTime() + value * 60 * 60 * 1000);
-      case 'days':
+      case "days":
         return new Date(now.getTime() + value * 24 * 60 * 60 * 1000);
-      case 'weeks':
+      case "weeks":
         return new Date(now.getTime() + value * 7 * 24 * 60 * 60 * 1000);
-      case 'months': {
+      case "months": {
         const monthDate = new Date(now);
         monthDate.setMonth(monthDate.getMonth() + value);
         return monthDate;
@@ -97,95 +108,132 @@ const ShareModal = ({
         return null;
     }
   };
-
+const validateShareItem = async () => {
+  if (!item?.id) return false;
+  
+  try {
+    if (item.type === 'file') {
+      const { data, error } = await supabase
+        .from('medical_files')
+        .select('id')
+        .eq('id', item.id)
+        .eq('owner_id', currentUserId)
+        .single();
+      
+      if (error || !data) {
+        throw new Error('File not found or you do not own this file');
+      }
+    } else if (item.type === 'folder') {
+      const { data, error } = await supabase
+        .from('folders')
+        .select('id')
+        .eq('id', item.id)
+        .eq('owner_id', currentUserId)
+        .single();
+      
+      if (error || !data) {
+        throw new Error('Folder not found or you do not own this folder');
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('Validation error:', error);
+    alert(error.message);
+    return false;
+  }
+};
   const handleShare = async () => {
-    if (!selectedDoctorId) {
-      alert('Please select a doctor to share with');
-      return;
-    }
+  if (!selectedDoctorId) {
+    alert("Please select a doctor to share with");
+    return;
+  }
 
-    const expirationDate = calculateExpirationDate();
-    
-    try {
-      setLoading(true);
-      
-      const shareData = {
-        [item.type === 'file' ? 'file_id' : 'folder_id']: item.id,
-        owner_id: currentUserId,
-        shared_with_id: selectedDoctorId,
-        share_type: item.type,
-        expires_at: expirationDate?.toISOString() || null,
-        is_active: true
-      };
+  // Add validation here
+  const isValid = await validateShareItem();
+  if (!isValid) return;
 
-      const { error } = await supabase
-        .from('file_shares')
-        .insert([shareData]);
+  const expirationDate = calculateExpirationDate();
 
-      if (error) throw error;
+  try {
+    setLoading(true);
 
-      // Reset form
-      setSelectedDoctorId('');
-      setDurationValue('24');
-      setDurationType('hours');
-      setCustomDate('');
-      setNoExpiration(false);
-      
-      // Refresh active shares
-      await fetchActiveShares();
-      
-      alert(`${item.type === 'file' ? 'File' : 'Folder'} shared successfully!`);
-    } catch (error) {
-      console.error('Error sharing:', error);
-      alert('Failed to share. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const shareData = {
+      [item.type === "file" ? "file_id" : "folder_id"]: item.id,
+      owner_id: currentUserId,
+      shared_with_id: selectedDoctorId,
+      share_type: item.type,
+      expires_at: expirationDate?.toISOString() || null,
+      is_active: true,
+    };
+
+    console.log('Share data being inserted:', shareData); // Debug log
+
+    const { error } = await supabase.from("file_shares").insert([shareData]);
+
+    if (error) throw error;
+
+    // Reset form
+    setSelectedDoctorId("");
+    setDurationValue("24");
+    setDurationType("hours");
+    setCustomDate("");
+    setNoExpiration(false);
+
+    // Refresh active shares
+    await fetchActiveShares();
+
+    alert(`${item.type === "file" ? "File" : "Folder"} shared successfully!`);
+  } catch (error) {
+    console.error("Error sharing:", error);
+    alert("Failed to share. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleRevokeShare = async (shareId) => {
     try {
       const { error } = await supabase
-        .from('file_shares')
+        .from("file_shares")
         .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('id', shareId)
-        .eq('owner_id', currentUserId);
+        .eq("id", shareId)
+        .eq("owner_id", currentUserId);
 
       if (error) throw error;
-      
+
       await fetchActiveShares();
-      alert('Share revoked successfully');
+      alert("Share revoked successfully");
     } catch (error) {
-      console.error('Error revoking share:', error);
-      alert('Failed to revoke share');
+      console.error("Error revoking share:", error);
+      alert("Failed to revoke share");
     }
   };
 
   const formatExpirationDate = (dateString) => {
-    if (!dateString) return 'No expiration';
+    if (!dateString) return "No expiration";
     const date = new Date(dateString);
     const now = new Date();
-    
-    if (date < now) return 'Expired';
-    
+
+    if (date < now) return "Expired";
+
     const diffMs = date - now;
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
-    
+
     if (diffDays > 0) {
-      return `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+      return `Expires in ${diffDays} day${diffDays > 1 ? "s" : ""}`;
     } else if (diffHours > 0) {
-      return `Expires in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+      return `Expires in ${diffHours} hour${diffHours > 1 ? "s" : ""}`;
     } else {
-      return 'Expires soon';
+      return "Expires soon";
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9998 }}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto relative" style={{ zIndex: 9999 }}>
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Share size={20} className="text-teal-500" />
@@ -205,19 +253,22 @@ const ShareModal = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Share with Doctor
             </label>
-            <select
-              value={selectedDoctorId}
-              onChange={(e) => setSelectedDoctorId(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              disabled={loading}
-            >
-              <option value="">Select a doctor...</option>
-              {connections.map((connection) => (
-                <option key={connection.doctor.id} value={connection.doctor.id}>
-                  {connection.doctor.full_name || connection.doctor.email}
-                </option>
-              ))}
-            </select>
+<select
+  value={selectedDoctorId}
+  onChange={(e) => setSelectedDoctorId(e.target.value)}
+  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+  disabled={loading}
+>
+  <option value="">Select a doctor...</option>
+  {connections.map((connection) => (
+    <option key={connection.med_id} value={connection.med_id}>
+      {connection.doctor_first_name && connection.doctor_last_name
+        ? `${connection.doctor_first_name} ${connection.doctor_last_name}`
+        : connection.doctor_email
+      }
+    </option>
+  ))}
+</select>
           </div>
 
           {/* Duration settings */}
@@ -225,7 +276,7 @@ const ShareModal = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Access Duration
             </label>
-            
+
             <div className="flex items-center gap-2 mb-2">
               <input
                 type="checkbox"
@@ -248,7 +299,7 @@ const ShareModal = ({
                     onChange={(e) => setDurationValue(e.target.value)}
                     className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                     min="1"
-                    disabled={durationType === 'custom'}
+                    disabled={durationType === "custom"}
                   />
                   <select
                     value={durationType}
@@ -263,7 +314,7 @@ const ShareModal = ({
                   </select>
                 </div>
 
-                {durationType === 'custom' && (
+                {durationType === "custom" && (
                   <input
                     type="datetime-local"
                     value={customDate}
@@ -282,13 +333,15 @@ const ShareModal = ({
             disabled={loading || !selectedDoctorId}
             className="w-full bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? 'Sharing...' : 'Share Access'}
+            {loading ? "Sharing..." : "Share Access"}
           </button>
 
           {/* Active shares */}
           {activeShares.length > 0 && (
             <div className="mt-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Active Shares</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">
+                Active Shares
+              </h3>
               <div className="space-y-2">
                 {activeShares.map((share) => (
                   <div
@@ -299,7 +352,8 @@ const ShareModal = ({
                       <User size={16} className="text-gray-500" />
                       <div>
                         <div className="text-sm font-medium">
-                          {share.shared_user?.full_name || share.shared_user?.email}
+                          {share.shared_user?.full_name ||
+                            share.shared_user?.email}
                         </div>
                         <div className="text-xs text-gray-500 flex items-center gap-1">
                           <Clock size={12} />
