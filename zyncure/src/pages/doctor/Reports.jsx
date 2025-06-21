@@ -271,7 +271,7 @@ console.log('Opening patient folder:', patient);
     </div>
     
     {/* Patient info below folder */}
-    // In the patient info section of renderPatientFolder, update this part:
+    
 <div className="mt-3 text-center">
   <h3 className="font-medium text-gray-900 text-sm truncate group-hover:text-blue-600 transition-colors">
     {patient.name}

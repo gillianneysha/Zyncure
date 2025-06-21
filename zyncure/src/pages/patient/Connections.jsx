@@ -18,10 +18,14 @@ const PatientConnectionsPage = () => {
   // ========================================
   // USER AUTHENTICATION & INITIALIZATION
   // ========================================
-  useEffect(() => {
-    getCurrentUser();
-    loadConnections();
-  }, []);
+ useEffect(() => {
+  const initializeData = async () => {
+    await getCurrentUser();
+    await loadConnections();
+  };
+  
+  initializeData();
+}, []);
 
   const getCurrentUser = async () => {
     try {
@@ -35,37 +39,49 @@ const PatientConnectionsPage = () => {
   // ========================================
   // DATA LOADING FUNCTIONS
   // ========================================
-  const loadConnections = async () => {
-    try {
-      setIsLoading(true);
-      
-      const { data, error } = await supabase
-        .from('patient_connection_details')
-        .select('*')
-        .eq('patient_id', currentUser.id) 
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const allConnections = data || [];
-      
-      const pendingIncoming = allConnections.filter(
-        conn => conn.status === 'pending' && conn.request_direction === 'incoming'
-      );
-      
-      const otherConnections = allConnections.filter(
-        conn => !(conn.status === 'pending' && conn.request_direction === 'incoming')
-      );
-      
-      setConnections(otherConnections);
-      setPendingRequests(pendingIncoming);
-      
-    } catch (error) {
-      console.error('Error loading connections:', error);
-    } finally {
-      setIsLoading(false);
+ const loadConnections = async () => {
+  try {
+    setIsLoading(true);
+    
+    // Get current user first
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('No authenticated user found');
+      return;
     }
-  };
+    
+    const { data, error } = await supabase
+      .from('patient_connection_details')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const allConnections = data || [];
+    
+    // EXPLICIT CLIENT-SIDE FILTERING - only show connections for current user
+    const userConnections = allConnections.filter(conn => conn.patient_id === user.id);
+    
+    console.log('Total connections returned:', allConnections.length);
+    console.log('User connections after filtering:', userConnections.length);
+    
+    const pendingIncoming = userConnections.filter(
+      conn => conn.status === 'pending' 
+    );
+    
+    const otherConnections = userConnections.filter(
+      conn => !(conn.status === 'pending' )
+    );
+    
+    setConnections(otherConnections);
+    setPendingRequests(pendingIncoming);
+    
+  } catch (error) {
+    console.error('Error loading connections:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // ========================================
   // SEARCH FUNCTIONALITY (FOR DOCTORS)
