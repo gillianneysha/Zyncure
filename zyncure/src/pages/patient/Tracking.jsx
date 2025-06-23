@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Droplet, Droplets, FileDown, FileUp, CloudSun, Leaf, Sun, Moon, Circle,
-  Rainbow, Flame, Check, Lollipop, Scale, CircleAlert, Share2, Download
+  Rainbow, Flame, Check, Lollipop, Scale, CircleAlert
 } from 'lucide-react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { supabase } from '../../client';
-import ShareSymptom from '../../components/ShareSymptom'; // Make sure the path matches your project
+import ShareSymptom from '../../components/ShareSymptom';
 
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Period');
@@ -21,40 +21,46 @@ const PeriodTracker = () => {
   const [showShareSymptom, setShowShareSymptom] = useState(false);
 
   useEffect(() => {
-    const fetchLoggedDates = async () => {
-      try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) return console.error("Auth Error:", authError?.message);
+    const fetchAndStoreUserData = async () => {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('User fetch failed:', authError?.message);
+        return;
+      }
 
+      const userKey = `loggedDates-${user.id}`;
+      const stored = localStorage.getItem(userKey);
+
+      if (stored) {
+        setLoggedDates(JSON.parse(stored));
+      } else {
         const { data, error } = await supabase
           .from('symptomlog')
           .select('date_logged, symptoms')
           .eq('patients_id', user.id);
 
-        if (error) return console.error('Supabase fetch error:', error.message);
-        if (!data || data.length === 0) return console.warn("No data returned from Supabase.");
+        if (error) {
+          console.error('Supabase fetch error:', error.message);
+          return;
+        }
 
-        const normalizedData = data.map(entry => ({
+        const normalized = data.map(entry => ({
           ...entry,
           date_logged: new Date(entry.date_logged),
         }));
 
-        setLoggedDates(normalizedData);
-        localStorage.setItem('loggedDates', JSON.stringify(normalizedData));
-      } catch (err) {
-        console.error("Unexpected error:", err);
+        setLoggedDates(normalized);
+        localStorage.setItem(userKey, JSON.stringify(normalized));
       }
     };
 
-    fetchLoggedDates();
-    const storedLoggedDates = localStorage.getItem('loggedDates');
-    if (storedLoggedDates) setLoggedDates(JSON.parse(storedLoggedDates));
+    fetchAndStoreUserData();
   }, []);
 
   const handleSave = async () => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      setModalContent({ title: 'Error', message: 'You must be logged in to save your data.', isError: true });
+      setModalContent({ title: 'Error', message: 'You must be logged in to save.', isError: true });
       setShowModal(true);
       return;
     }
@@ -70,7 +76,7 @@ const PeriodTracker = () => {
     if (!selectedValue) {
       setModalContent({
         title: 'Error',
-        message: `Please select a ${selectedTab.toLowerCase()} option`,
+        message: `Please select a ${selectedTab.toLowerCase()} option.`,
         isError: true
       });
       setShowModal(true);
@@ -88,9 +94,9 @@ const PeriodTracker = () => {
     };
 
     const { error } = await supabase.from('symptomlog').insert([dataToSave]);
+
     if (error) {
       setModalContent({ title: 'Error', message: `Failed to save: ${error.message}`, isError: true });
-      setShowModal(true);
     } else {
       const formattedDate = normalizedDate.toDateString();
       setModalContent({
@@ -98,29 +104,25 @@ const PeriodTracker = () => {
         message: `${selectedTab} saved as ${selectedValue} on ${formattedDate}`,
         isError: false
       });
-      setShowModal(true);
 
       setLoggedDates(prev => {
         const alreadyExists = prev.some(entry =>
           new Date(entry.date_logged).toDateString() === normalizedDate.toDateString() &&
           entry.symptoms === selectedTab
         );
-        const updatedDates = alreadyExists ? prev : [...prev, { ...dataToSave }];
-        localStorage.setItem('loggedDates', JSON.stringify(updatedDates));
-        return updatedDates;
+        const updated = alreadyExists ? prev : [...prev, { ...dataToSave, date_logged: normalizedDate }];
+        localStorage.setItem(`loggedDates-${user.id}`, JSON.stringify(updated));
+        return updated;
       });
 
       if (selectedTab === 'Period') setSelectedFlow('');
-      else if (selectedTab === 'Feelings') setSelectedFeeling('');
-      else if (selectedTab === 'Skin') setSelectedSkin('');
-      else if (selectedTab === 'Metabolism') setSelectedMetabolism('');
+      if (selectedTab === 'Feelings') setSelectedFeeling('');
+      if (selectedTab === 'Skin') setSelectedSkin('');
+      if (selectedTab === 'Metabolism') setSelectedMetabolism('');
     }
+
+    setShowModal(true);
   };
-
-  const handleShare = () => {
-  setShowShareSymptom(true);
-};
-
 
   const handleDownload = () => {
     const data = {
@@ -143,9 +145,11 @@ const PeriodTracker = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    setModalContent({ title: 'Download Complete', message: 'Your data has been downloaded successfully', isError: false });
+    setModalContent({ title: 'Download Complete', message: 'Your data has been downloaded successfully.', isError: false });
     setShowModal(true);
   };
+
+  const handleShare = () => setShowShareSymptom(true);
 
   const tabConfigs = {
     Period: {
@@ -262,26 +266,29 @@ const PeriodTracker = () => {
 
         <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 rounded-2xl w-full">
           <div className={selectedTab === 'Period' ? 'flex justify-between gap-2' : 'grid grid-cols-2 gap-2 md:flex md:justify-around md:gap-4'}>
-            {currentConfig.options.map(({ name, icon: Icon, size }) => (
-              <div
-                key={name}
-                onClick={() => currentConfig.onSelect(name)}
-                className="flex flex-col items-center cursor-pointer w-full max-w-[90px] py-2"
-              >
+            {currentConfig.options.map(({ name, icon, size }) => {
+              const IconComponent = icon;
+              return (
                 <div
-                  className={`w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-4 transition-all ${
-                    currentConfig.selected === name ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md' : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6] hover:border-[#3BA4A0] hover:bg-[#F0F9F9]'
-                  }`}
+                  key={name}
+                  onClick={() => currentConfig.onSelect(name)}
+                  className="flex flex-col items-center cursor-pointer w-full max-w-[90px] py-2"
                 >
-                  {Icon && <Icon size={size || 40} />}
+                  <div
+                    className={`w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-4 transition-all ${
+                      currentConfig.selected === name ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md' : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6] hover:border-[#3BA4A0] hover:bg-[#F0F9F9]'
+                    }`}
+                  >
+                    <IconComponent size={size || 40} />
+                  </div>
+                  <span className={`mt-2 text-base md:text-lg font-semibold text-center transition-all ${
+                    currentConfig.selected === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'
+                  }`}>
+                    {name}
+                  </span>
                 </div>
-                <span className={`mt-2 text-base md:text-lg font-semibold text-center transition-all ${
-                  currentConfig.selected === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'
-                }`}>
-                  {name}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -310,35 +317,19 @@ const PeriodTracker = () => {
         </div>
       )}
 
- <div
-  className="fixed bottom-6 right-6 flex flex-row gap-5"
-  role="region"
-  aria-label="Download and Share Controls"
->
-  <button
-    onClick={handleDownload}
-    className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg"
-    aria-label="Download"
-  >
-    <FileDown size={30} />
-    <span className="mt-1 font-bold">Download</span>
-  </button>
-  <button
-    onClick={handleShare}
-    className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg"
-    aria-label="Share"
-  >
-    <FileUp size={30} />
-    <span className="mt-1 font-bold">Share</span>
-  </button>
-
-  <ShareSymptom isOpen={showShareSymptom} onClose={() => setShowShareSymptom(false)} />
-</div>
-
-
-    {/* Closing tag for calendar-container */}
-  </div>
+      <div className="fixed bottom-6 right-6 flex flex-row gap-5">
+        <button onClick={handleDownload} className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg">
+          <FileDown size={30} />
+          <span className="mt-1 font-bold">Download</span>
+        </button>
+        <button onClick={handleShare} className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg">
+          <FileUp size={30} />
+          <span className="mt-1 font-bold">Share</span>
+        </button>
+        <ShareSymptom isOpen={showShareSymptom} onClose={() => setShowShareSymptom(false)} />
+      </div>
+    </div>
   );
-}
+};
 
 export default PeriodTracker;
