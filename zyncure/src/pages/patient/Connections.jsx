@@ -65,12 +65,16 @@ const PatientConnectionsPage = () => {
     console.log('Total connections returned:', allConnections.length);
     console.log('User connections after filtering:', userConnections.length);
     
+    // FIXED: Only show pending requests where current user is the RECIPIENT
+    // For patients, they should only see pending requests where a doctor requested to connect with them
+    // This means filtering for requests where the doctor initiated the connection
     const pendingIncoming = userConnections.filter(
-      conn => conn.status === 'pending' 
+      conn => conn.status === 'pending' && conn.request_direction === 'incoming'
     );
     
+    // All other connections (accepted, rejected, or outgoing pending requests)
     const otherConnections = userConnections.filter(
-      conn => !(conn.status === 'pending' )
+      conn => !(conn.status === 'pending' && conn.request_direction === 'incoming')
     );
     
     setConnections(otherConnections);

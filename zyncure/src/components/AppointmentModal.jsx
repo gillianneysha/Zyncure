@@ -2,6 +2,30 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 import { appointmentService } from '../services/AppointmentService';
 
+// Add this helper function to standardize time format
+const normalizeTimeFormat = (time) => {
+  if (!time) return '';
+  
+  // If time is already in HH:MM format, return as is
+  if (/^\d{2}:\d{2}$/.test(time)) {
+    return time;
+  }
+  
+  // If time is in 12-hour format (e.g., "2:30 PM"), convert to 24-hour
+  if (time.includes('AM') || time.includes('PM')) {
+    const [timePart, period] = time.split(' ');
+    let [hours, minutes] = timePart.split(':');
+    hours = parseInt(hours);
+    
+    if (period === 'AM' && hours === 12) hours = 0;
+    if (period === 'PM' && hours !== 12) hours += 12;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  }
+  
+  return time;
+};
+
 const AppointmentModal = ({
   isOpen,
   onClose,
@@ -25,10 +49,16 @@ const AppointmentModal = ({
   const displayError = parentError || localError;
 
   const formatDate = useCallback((date) => {
-    return date.toISOString().split('T')[0];
+    // Use local date string to avoid timezone conversion
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }, []);
 
-  // Refresh available slots function with enhanced error handling
+
+
+  // Fix 2: Update the time validation logic in refreshAvailableSlots
   const refreshAvailableSlots = useCallback(async (showRefreshingIndicator = true) => {
     if (!newAppointment.doctor_id || !selectedDate) {
       setAvailableTimeSlots([]);
@@ -43,25 +73,45 @@ const AppointmentModal = ({
       const dateStr = formatDate(selectedDate);
       console.log(`Fetching available slots for doctor ${newAppointment.doctor_id} on ${dateStr}`);
       
-      const { data: slots, error } = await appointmentService.getAvailableTimeSlots(
-        newAppointment.doctor_id, 
-        dateStr
-      );
-      
-      if (error) {
-        console.error('Error fetching time slots:', error);
+      const [slotsResult, appointmentsResult] = await Promise.all([
+        appointmentService.getAvailableTimeSlots(newAppointment.doctor_id, dateStr),
+        appointmentService.getAppointments(dateStr, newAppointment.doctor_id)
+      ]);
+
+      if (slotsResult.error) {
+        console.error('Error fetching time slots:', slotsResult.error);
         setLocalError('Failed to load available time slots. Please try again.');
         setAvailableTimeSlots([]);
       } else {
-        console.log('Available slots:', slots);
-        setAvailableTimeSlots(slots || []);
-        setLocalError(''); // Clear 
+        const allTimeSlots = [
+          '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM',
+          '11:00 AM', '11:30 AM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
+          '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM'
+        ];
+        
+        const availableSlots = slotsResult.data || [];
+        const bookedTimes = appointmentsResult.data ? appointmentsResult.data.map(apt => apt.time) : [];
+        
+        const slotsWithStatus = allTimeSlots.map(slot => ({
+          time: slot,
+          available: availableSlots.includes(slot),
+          booked: bookedTimes.includes(slot)
+        }));
+        
+        console.log('Slots with status:', slotsWithStatus);
+        setAvailableTimeSlots(slotsWithStatus);
+        setLocalError('');
         setLastRefreshTime(new Date());
         
-        // If currently selected time is no longer available, clear !
-        if (newAppointment.time && slots && !slots.includes(newAppointment.time)) {
-          setNewAppointment(prev => ({ ...prev, time: '' }));
-          setLocalError('Your selected time is no longer available. Please choose a different time.');
+        // Fix 3: Correct the time validation logic
+        if (newAppointment.time && availableSlots) {
+          const normalizedSelectedTime = normalizeTimeFormat(newAppointment.time);
+          const normalizedSlots = availableSlots.map(slot => normalizeTimeFormat(slot));
+          
+          if (!normalizedSlots.includes(normalizedSelectedTime)) {
+            setNewAppointment(prev => ({ ...prev, time: '' }));
+            setLocalError('Your selected time is no longer available. Please choose a different time.');
+          }
         }
       }
     } catch (err) {
@@ -127,10 +177,13 @@ const AppointmentModal = ({
       return;
     }
 
-    // Double-check if selected time is still available
-    if (!availableTimeSlots.includes(newAppointment.time)) {
+    const selectedSlot = availableTimeSlots.find(slot => 
+      (slot.time || slot) === newAppointment.time
+    );
+
+    if (!selectedSlot || selectedSlot.booked || !selectedSlot.available) {
       setLocalError('Selected time slot is no longer available. Please choose a different time.');
-      await refreshAvailableSlots(); // Refresh the slots
+      await refreshAvailableSlots();
       return;
     }
 
@@ -292,14 +345,24 @@ const AppointmentModal = ({
                   : refreshingSlots 
                     ? 'Loading times...'
                     : availableTimeSlots.length === 0
-                      ? 'No available times'
+                      ? 'No time slots'
                       : 'Select time...'}
               </option>
-              {availableTimeSlots.map(time => (
-                <option key={time} value={time}>
-                  {time}
-                </option>
-              ))}
+              {availableTimeSlots.map(slot => {
+                const timeValue = typeof slot === 'object' ? slot.time : slot;
+                const isBooked = typeof slot === 'object' ? slot.booked : false;
+                const isAvailable = typeof slot === 'object' ? slot.available : true;
+                
+                return (
+                  <option 
+                    key={timeValue} 
+                    value={timeValue}
+                    disabled={isBooked || !isAvailable}
+                  >
+                    {timeValue}{isBooked ? ' (Booked)' : !isAvailable ? ' (Unavailable)' : ''}
+                  </option>
+                );
+              })}
             </select>
             {newAppointment.doctor_id && !refreshingSlots && availableTimeSlots.length === 0 && (
               <p className="text-sm text-amber-600 mt-2">

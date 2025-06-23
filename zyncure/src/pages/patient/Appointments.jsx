@@ -64,6 +64,15 @@ const PersonalAppointmentTracker = () => {
     initializeData();
   }, []);
 
+const formatDateForStorage = (date) => {
+  // Create a new date object to avoid timezone issues
+  const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
   const handleDateSelect = (date) => {
     setSelectedDate(date);
     setError(''); 
@@ -94,7 +103,7 @@ const PersonalAppointmentTracker = () => {
         setError('Please provide a more detailed reason (at least 10 characters)');
         return false;
       }
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = formatDateForStorage(selectedDate);
       const { data: availableSlots, error: slotsError } = 
         await appointmentService.getAvailableTimeSlots(newAppointment.doctor_id, dateStr);
 
