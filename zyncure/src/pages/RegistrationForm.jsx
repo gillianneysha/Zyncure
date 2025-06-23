@@ -2,6 +2,7 @@ import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
+import DoctorVerificationModal from "../components/DoctorVerificationModal";
 
 
 const FormField = memo(({ 
@@ -58,6 +59,8 @@ export default function RegistrationForm() {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
+  const [doctorVerification, setDoctorVerification] = useState(null);
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -139,35 +142,47 @@ const handleSubmit = useCallback(async (event) => {
 
   if (!validateForm()) return;
 
+  // If Doctor, show modal first
+  if (formData.userType === "doctor" && !doctorVerification) {
+    setShowDoctorModal(true);
+    return;
+  }
+
   setIsLoading(true);
   setErrors({});
   setSuccessMessage("");
 
   try {
-    
+    // Add doctorVerification fields if doctor
+    const optionsData = {
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      contact_number: formData.contactNumber,
+      birthdate: formData.birthdate,
+      user_type: formData.userType,
+    };
+    if (formData.userType === "doctor" && doctorVerification) {
+      optionsData.license_number = doctorVerification.licenseNumber;
+      optionsData.license_file_url = doctorVerification.licenseFileUrl;
+      optionsData.status = "pending";
+    }
+
     const { error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
-        data: {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          contact_number: formData.contactNumber,
-          birthdate: formData.birthdate,
-          user_type: formData.userType,
-        },
-       
+        data: optionsData,
         emailRedirectTo: `${window.location.origin}/dashboard`
       },
     });
 
     if (authError) throw authError;
 
- 
     setSuccessMessage(
       "Registration successful! Please check your email and click the confirmation link to activate your account."
     );
     resetForm();
+    setDoctorVerification(null);
 
   } catch (error) {
     console.error("Registration error:", error);
@@ -177,7 +192,46 @@ const handleSubmit = useCallback(async (event) => {
   } finally {
     setIsLoading(false);
   }
-}, [formData, validateForm, resetForm]);
+}, [formData, validateForm, resetForm, doctorVerification]);
+
+  // Handle doctor modal submit
+  const handleDoctorModalSubmit = async (data) => {
+    setIsLoading(true);
+    setShowDoctorModal(false);
+
+    // Upload license file to Supabase Storage
+    let licenseFileUrl = "";
+    if (data.licenseFile) {
+      const fileExt = data.licenseFile.name.split('.').pop();
+      const filePath = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from("doctor-licenses")
+        .upload(filePath, data.licenseFile);
+
+      if (uploadError) {
+        setErrors({ submit: "Failed to upload license file. Please try again." });
+        setIsLoading(false);
+        return;
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from("doctor-licenses")
+        .getPublicUrl(filePath);
+      licenseFileUrl = publicUrlData.publicUrl;
+    }
+
+    setDoctorVerification({
+      licenseNumber: data.licenseNumber,
+      licenseFileUrl,
+    });
+    setIsLoading(false);
+
+    // Continue registration after modal
+    setTimeout(() => {
+      document.querySelector("form").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    }, 0);
+  };
 
   const handleGoogleSignUp = useCallback(async () => {
     try {
@@ -201,188 +255,196 @@ const handleSubmit = useCallback(async (event) => {
   }, []);
 
   return (
-    <form onSubmit={handleSubmit}>
-      {/* Success Message */}
-      {successMessage && (
-        <div className="w-4/5 mx-auto mb-4 p-3 bg-green-200 border border-green-400 text-green-800 rounded-lg text-sm">
-          {successMessage}
-        </div>
-      )}
+    <>
+      <form onSubmit={handleSubmit}>
+        {/* Success Message */}
+        {successMessage && (
+          <div className="w-4/5 mx-auto mb-4 p-3 bg-green-200 border border-green-400 text-green-800 rounded-lg text-sm">
+            {successMessage}
+          </div>
+        )}
 
-      {/* Error Message */}
-      {errors.submit && (
-        <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
-          {errors.submit}
-        </div>
-      )}
+        {/* Error Message */}
+        {errors.submit && (
+          <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
+            {errors.submit}
+          </div>
+        )}
 
-      <FormField 
-        label="First Name" 
-        name="firstName" 
-        placeholder="First Name"
-        value={formData.firstName}
-        onChange={handleChange}
-        error={errors.firstName}
-        disabled={isLoading}
-        labelClassName="text-[#F5E0D9]"
-        inputClassName="bg-[#FFEDE7]"
-      />
+        <FormField 
+          label="First Name" 
+          name="firstName" 
+          placeholder="First Name"
+          value={formData.firstName}
+          onChange={handleChange}
+          error={errors.firstName}
+          disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
+        />
 
-      <FormField 
-        label="Last Name" 
-        name="lastName" 
-        placeholder="Last Name"
-        value={formData.lastName}
-        onChange={handleChange}
-        error={errors.lastName}
-        disabled={isLoading}
-        labelClassName="text-[#F5E0D9]"
-        inputClassName="bg-[#FFEDE7]"
-      />
+        <FormField 
+          label="Last Name" 
+          name="lastName" 
+          placeholder="Last Name"
+          value={formData.lastName}
+          onChange={handleChange}
+          error={errors.lastName}
+          disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
+        />
 
-      <FormField 
-        label="Contact Number" 
-        name="contactNumber" 
-        placeholder="Contact Number"
-        value={formData.contactNumber}
-        onChange={handleChange}
-        error={errors.contactNumber}
-        disabled={isLoading}
-        labelClassName="text-[#F5E0D9]"
-        inputClassName="bg-[#FFEDE7]"
-      />
+        <FormField 
+          label="Contact Number" 
+          name="contactNumber" 
+          placeholder="Contact Number"
+          value={formData.contactNumber}
+          onChange={handleChange}
+          error={errors.contactNumber}
+          disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
+        />
 
-      <FormField 
-        label="Birthdate" 
-        name="birthdate" 
-        type="date"
-        value={formData.birthdate}
-        onChange={handleChange}
-        error={errors.birthdate}
-        disabled={isLoading}
-        labelClassName="text-[#F5E0D9]"
-        inputClassName="bg-[#FFEDE7]"
-      />
+        <FormField 
+          label="Birthdate" 
+          name="birthdate" 
+          type="date"
+          value={formData.birthdate}
+          onChange={handleChange}
+          error={errors.birthdate}
+          disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
+        />
 
-      <FormField 
-        label="User Type" 
-        name="userType"
-        value={formData.userType}
-        onChange={handleChange}
-        error={errors.userType}
-        disabled={isLoading}
-        labelClassName="text-[#F5E0D9]"
-        inputClassName="bg-[#FFEDE7]"
-      >
-        <div className="relative w-4/5 mx-auto">
-          <select
-            name="userType"
-            value={formData.userType}
+        <FormField 
+          label="User Type" 
+          name="userType"
+          value={formData.userType}
+          onChange={handleChange}
+          error={errors.userType}
+          disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
+        >
+          <div className="relative w-4/5 mx-auto">
+            <select
+              name="userType"
+              value={formData.userType}
+              onChange={handleChange}
+              className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${
+                errors.userType ? "ring-2 ring-red-400" : ""
+              }`}
+              required
+              disabled={isLoading}
+            >
+              <option value="" className="text-[#b0b0b0]">
+                Select user type
+              </option>
+              <option value="patient" className="text-black">
+                Patient
+              </option>
+              <option value="doctor" className="text-black">
+                Doctor
+              </option>
+            </select>
+            {/* Custom down arrow */}
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b0b0]">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </FormField>
+
+        <FormField 
+          label="Email" 
+          name="email" 
+          type="email" 
+          placeholder="Email"
+          value={formData.email}
+          onChange={handleChange}
+          error={errors.email}
+          disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
+        />
+
+        <div className="w-4/5 mx-auto">
+          <PasswordInput
+            label="Password:"
+            name="password"
+            value={formData.password}
             onChange={handleChange}
-            className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${
-              errors.userType ? "ring-2 ring-red-400" : ""
-            }`}
-            required
+            placeholder="Password"
+            error={errors.password}
+            disabled={isLoading}
+            labelClassName="text-[#F5E0D9]"
+            inputClassName="bg-[#FFEDE7]"
+          />
+        </div>
+
+        <div className="w-4/5 mx-auto">
+          <PasswordInput
+            label="Confirm Password:"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            placeholder="Confirm Password"
+            error={errors.confirmPassword}
+            disabled={isLoading}
+            labelClassName="text-[#F5E0D9]"
+            inputClassName="bg-[#FFEDE7]"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
+            isLoading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-[#55A1A4] hover:bg-[#368487]"
+          }`}
+        >
+          {isLoading ? "Creating Account..." : "Sign Up"}
+        </button>
+
+        <div className="mt-2 w-4/5 mx-auto text-[#F5E0D9] text-xs text-left">
+          By creating an account, you agree to our{" "}
+          <span className="underline cursor-pointer">Terms</span> and have read and acknowledge
+          the <span className="underline cursor-pointer">Privacy Agreement</span>.
+        </div>
+
+        <div className="w-full flex items-center justify-center mt-8 mb-8">
+          <span className="flex-1 h-px bg-[#FEDED2] mx-11"></span>
+          <span className="text-[#F5E0D9] text-base font-semibold">OR</span>
+          <span className="flex-1 h-px bg-[#FEDED2] mx-11"></span>
+        </div>
+
+        <div className="flex flex-col items-center mb-8">
+          <button
+            type="button"
+            onClick={handleGoogleSignUp}
+            className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Sign up with Google"
             disabled={isLoading}
           >
-            <option value="" className="text-[#b0b0b0]">
-              Select user type
-            </option>
-            <option value="patient" className="text-black">
-              Patient
-            </option>
-            <option value="doctor" className="text-black">
-              Doctor
-            </option>
-          </select>
-          {/* Custom down arrow */}
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b0b0]">
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-              <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <GoogleIcon className="w-10 h-10" />
+          </button>
+          <span className="mt-3 text-[#F5E0D9] text-sm">
+            Sign up using your Google account
           </span>
         </div>
-      </FormField>
-
-      <FormField 
-        label="Email" 
-        name="email" 
-        type="email" 
-        placeholder="Email"
-        value={formData.email}
-        onChange={handleChange}
-        error={errors.email}
-        disabled={isLoading}
-        labelClassName="text-[#F5E0D9]"
-        inputClassName="bg-[#FFEDE7]"
+      </form>
+      <DoctorVerificationModal
+        open={showDoctorModal}
+        onClose={() => setShowDoctorModal(false)}
+        onSubmit={handleDoctorModalSubmit}
+        loading={isLoading}
       />
-
-      <div className="w-4/5 mx-auto">
-        <PasswordInput
-          label="Password:"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          placeholder="Password"
-          error={errors.password}
-          disabled={isLoading}
-          labelClassName="text-[#F5E0D9]"
-          inputClassName="bg-[#FFEDE7]"
-        />
-      </div>
-
-      <div className="w-4/5 mx-auto">
-        <PasswordInput
-          label="Confirm Password:"
-          name="confirmPassword"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          placeholder="Confirm Password"
-          error={errors.confirmPassword}
-          disabled={isLoading}
-          labelClassName="text-[#F5E0D9]"
-          inputClassName="bg-[#FFEDE7]"
-        />
-      </div>
-
-      <button
-        type="submit"
-        disabled={isLoading}
-        className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
-          isLoading
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-[#55A1A4] hover:bg-[#368487]"
-        }`}
-      >
-        {isLoading ? "Creating Account..." : "Sign Up"}
-      </button>
-
-      <div className="mt-2 w-4/5 mx-auto text-[#F5E0D9] text-xs text-left">
-        By creating an account, you agree to our{" "}
-        <span className="underline cursor-pointer">Terms</span> and have read and acknowledge
-        the <span className="underline cursor-pointer">Privacy Agreement</span>.
-      </div>
-
-      <div className="w-full flex items-center justify-center mt-8 mb-8">
-        <span className="flex-1 h-px bg-[#FEDED2] mx-11"></span>
-        <span className="text-[#F5E0D9] text-base font-semibold">OR</span>
-        <span className="flex-1 h-px bg-[#FEDED2] mx-11"></span>
-      </div>
-
-      <div className="flex flex-col items-center mb-8">
-        <button
-          type="button"
-          onClick={handleGoogleSignUp}
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="Sign up with Google"
-          disabled={isLoading}
-        >
-          <GoogleIcon className="w-10 h-10" />
-        </button>
-        <span className="mt-3 text-[#F5E0D9] text-sm">
-          Sign up using your Google account
-        </span>
-      </div>
-    </form>
+    </>
   );
 }
