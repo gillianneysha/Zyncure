@@ -32,6 +32,7 @@ import AdminProfessionals from "./pages/admin/Professionals";
 import AdminReports from "./pages/admin/Reports";
 import AdminSupport from "./pages/admin/Support";
 import AdminBugs from "./pages/admin/Bugs";
+import AdminDoctorApprovals from "./pages/AdminDoctorApprovals";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { user, isLoading } = useUser();
@@ -159,6 +160,7 @@ export default function AppRouter() {
         <Route path="reports" element={<AdminReports />} />
         <Route path="support" element={<AdminSupport />} />
         <Route path="bugs" element={<AdminBugs />} />
+        <Route path="doctor-approvals" element={<AdminDoctorApprovals />} />
       </Route>
 
       <Route path="/auth/callback" element={<AuthCallbackHandler />} />
