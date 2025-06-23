@@ -13,13 +13,15 @@ const convertTo24Hour = (time12h) => {
   const [time, modifier] = time12h.split(' ');
   let [hours, minutes] = time.split(':');
   
-  if (hours === '12') {
-    hours = modifier === 'AM' ? '00' : '12';
+  hours = parseInt(hours, 10);
+  
+  if (hours === 12) {
+    hours = modifier === 'AM' ? 0 : 12;
   } else if (modifier === 'PM') {
-    hours = (parseInt(hours, 10) + 12).toString();
+    hours = hours + 12;
   }
   
-  return `${hours.padStart(2, '0')}:${minutes}:00`;
+  return `${hours.toString().padStart(2, '0')}:${minutes}:00`;
 };
 
 /**
@@ -40,14 +42,19 @@ const convertTo12Hour = (time24h) => {
  * @param {string} appointmentDate 
  * @returns {object} 
  */
-const formatAppointmentDateTime = (appointmentDate) => ({
-  date: appointmentDate.split('T')[0],
-  time: new Date(appointmentDate).toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit', 
-    hour12: true 
-  })
-});
+const formatAppointmentDateTime = (appointmentDate) => {
+  const date = appointmentDate.split('T')[0];
+  const timePart = appointmentDate.split('T')[1];
+  const [hours, minutes] = timePart.split(':');
+  
+  // Convert to 12-hour format manually to avoid timezone issues
+  const hour24 = parseInt(hours, 10);
+  const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+  const time = `${hour12}:${minutes} ${ampm}`;
+  
+  return { date, time };
+};
 
 /**
 
@@ -74,6 +81,10 @@ export const appointmentService = {
 async createAppointment(appointmentData) {
   try {
     const user = await getCurrentUser();
+  
+if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
+  throw new Error('You can only create appointments for yourself.');
+}
     const time24h = convertTo24Hour(appointmentData.time);
     const fullDateTime = `${appointmentData.date}T${time24h}`;
 
@@ -181,58 +192,59 @@ async createAppointment(appointmentData) {
    * @param {string} doctorId 
    * @returns {object} 
    */
-  async getAppointments(date, doctorId = null) {
-    try {
-      let query = supabase
-        .from('appointments')
-        .select(`
-          appointment_id,
-          appointment_date,
-          status,
-          reason,
-          patient_id,
-          med_id,
-          medicalprofessionals!inner(first_name, last_name, user_type)
-        `)
-        .gte('appointment_date', `${date}T00:00:00`)
-        .lt('appointment_date', `${date}T23:59:59`)
-        .in('status', ['confirmed', 'pending'])
-        .order('appointment_date');
+async getAppointments(date, doctorId = null) {
+  try {
+    const user = await getCurrentUser();
+    
+    let query = supabase
+      .from('appointments')
+      .select(`
+        appointment_id,
+        appointment_date,
+        status,
+        reason,
+        patient_id,
+        med_id,
+        medicalprofessionals!inner(first_name, last_name, user_type)
+      `)
+      .eq('patient_id', user.id)  // Always filter by current user
+      .gte('appointment_date', `${date}T00:00:00`)
+      .lt('appointment_date', `${date}T23:59:59`)
+      .in('status', ['confirmed', 'pending'])
+      .order('appointment_date');
 
-      if (doctorId) {
-        query = query.eq('med_id', doctorId);
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        console.error('Error fetching appointments:', error);
-        throw error;
-      }
-
-  
-      const transformedData = (data || []).map(apt => {
-        const { date, time } = formatAppointmentDateTime(apt.appointment_date);
-        return {
-          id: apt.appointment_id,
-          patient_id: apt.patient_id,
-          doctor_id: apt.med_id,
-          date,
-          time,
-          status: apt.status,
-          reason: apt.reason,
-          type: 'Consultation',
-          doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
-          specialty: apt.medicalprofessionals.user_type
-        };
-      });
-
-      return { data: transformedData, error: null };
-    } catch (error) {
-      console.error('Error in getAppointments:', error);
-      return { data: [], error: error.message };
+    if (doctorId) {
+      query = query.eq('med_id', doctorId);
     }
-  },
 
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching appointments:', error);
+      throw error;
+    }
+
+    const transformedData = (data || []).map(apt => {
+      const { date, time } = formatAppointmentDateTime(apt.appointment_date);
+      return {
+        id: apt.appointment_id,
+        patient_id: apt.patient_id,
+        doctor_id: apt.med_id,
+        date,
+        time,
+        status: apt.status,
+        reason: apt.reason,
+        type: 'Consultation',
+        doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
+        specialty: apt.medicalprofessionals.user_type
+      };
+    });
+
+    return { data: transformedData, error: null };
+  } catch (error) {
+    console.error('Error in getAppointments:', error);
+    return { data: [], error: error.message };
+  }
+},
   /**
 
    * @param {string} userId
@@ -290,47 +302,50 @@ async createAppointment(appointmentData) {
  
    * @returns {object} 
    */
-  async getConnectedDoctors() {
-    try {
-      // Use the simplified view
-      const { data, error } = await supabase
-        .from('patient_connection_details')
-        .select(`
-          med_id,
-          doctor_first_name,
-          doctor_last_name,
-          doctor_type,
-          doctor_email,
-          doctor_short_id,
-          status
-        `)
-        .eq('status', 'accepted')
-        .order('doctor_first_name');
+async getConnectedDoctors() {
+  try {
+    const user = await getCurrentUser();
+    
+    // Use the simplified view but filter by current user
+    const { data, error } = await supabase
+      .from('patient_connection_details')
+      .select(`
+        med_id,
+        doctor_first_name,
+        doctor_last_name,
+        doctor_type,
+        doctor_email,
+        doctor_short_id,
+        status
+      `)
+      .eq('patient_id', user.id)  // This is the critical line that was missing
+      .eq('status', 'accepted')
+      .order('doctor_first_name');
 
-      if (error) {
-        console.error('Error fetching connected doctors:', error);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        return { data: [], error: null };
-      }
-
-      const transformedData = data.map(connection => ({
-        id: connection.med_id,
-        name: `Dr. ${connection.doctor_first_name} ${connection.doctor_last_name}`,
-        specialty: connection.doctor_type,
-        email: connection.doctor_email,
-        available: true,
-        shortId: connection.doctor_short_id
-      }));
-
-      return { data: transformedData, error: null };
-    } catch (error) {
-      console.error('Error in getConnectedDoctors:', error);
-      return { data: [], error: error.message };
+    if (error) {
+      console.error('Error fetching connected doctors:', error);
+      throw error;
     }
-  },
+
+    if (!data || data.length === 0) {
+      return { data: [], error: null };
+    }
+
+    const transformedData = data.map(connection => ({
+      id: connection.med_id,
+      name: `Dr. ${connection.doctor_first_name} ${connection.doctor_last_name}`,
+      specialty: connection.doctor_type,
+      email: connection.doctor_email,
+      available: true,
+      shortId: connection.doctor_short_id
+    }));
+
+    return { data: transformedData, error: null };
+  } catch (error) {
+    console.error('Error in getConnectedDoctors:', error);
+    return { data: [], error: error.message };
+  }
+},
 
   /**
 
@@ -362,15 +377,22 @@ async createAppointment(appointmentData) {
         '15:00', '15:30', '16:00', '16:30', '17:00'
       ];
 
-      const bookedTimes = (existingAppointments || []).map(apt => 
-        new Date(apt.appointment_date).toTimeString().substring(0, 5)
-      );
+      // Extract booked times and convert to 24-hour format for comparison
+const bookedTimes = (existingAppointments || []).map(apt => {
+  const timePart = apt.appointment_date.split('T')[1];
+  return timePart.substring(0, 5); // Get HH:MM format
+});
 
+console.log('Booked times for date:', date, bookedTimes);
 
-      const availableSlots24h = allTimeSlots24h.filter(time => !bookedTimes.includes(time));
-      const availableSlots12h = availableSlots24h.map(time => convertTo12Hour(time + ':00'));
+// Filter out booked times
+const availableSlots24h = allTimeSlots24h.filter(time => !bookedTimes.includes(time));
+const availableSlots12h = availableSlots24h.map(time => convertTo12Hour(time + ':00'));
 
-      return { data: availableSlots12h, error: null };
+console.log('Available slots:', availableSlots12h);
+
+return { data: availableSlots12h, error: null };
+
     } catch (error) {
       console.error('Error in getAvailableTimeSlots:', error);
       return { data: [], error: error.message };
@@ -384,6 +406,7 @@ async createAppointment(appointmentData) {
    * @returns {object} 
    */
   async updateAppointment(appointmentId, updateData) {
+    
     try {
       const dataToUpdate = {};
       

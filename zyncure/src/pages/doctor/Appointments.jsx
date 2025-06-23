@@ -22,9 +22,25 @@ const DoctorAppointments = () => {
   const [patientDetails, setPatientDetails] = useState(null);
   const [appointmentsByDate, setAppointmentsByDate] = useState({});
 
-  // Define loadAppointments first, before useEffect that uses it
-  // Inside loadAppointments function, add debug logging:
-
+const formatTimeForDisplay = (time) => {
+  if (!time) return '';
+  
+  // If time is in 24-hour format (HH:MM), convert to 12-hour format
+  if (/^\d{2}:\d{2}$/.test(time)) {
+    const [hours, minutes] = time.split(':');
+    const hour24 = parseInt(hours);
+    const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+    const period = hour24 >= 12 ? 'PM' : 'AM';
+    return `${hour12}:${minutes} ${period}`;
+  }
+  
+  // If already in 12-hour format, return as is
+  if (time.includes('AM') || time.includes('PM')) {
+    return time;
+  }
+  
+  return time;
+};
 const loadAppointments = useCallback(async () => {
   setLoading(true);
   setError('');
@@ -59,12 +75,12 @@ const loadAppointments = useCallback(async () => {
   }
 }, [selectedDate, statusFilter]);
 
-  // Load doctor profile on component mount
+
   useEffect(() => {
     loadDoctorProfile();
   }, []);
 
-  // Load appointments when date or filter changes
+
   useEffect(() => {
     loadAppointments();
   }, [loadAppointments]);
@@ -88,7 +104,6 @@ const loadAppointments = useCallback(async () => {
     }
   };
 
-  // Load appointments for calendar display (optional - for showing appointment indicators)
   const loadAppointmentsForCalendar = useCallback(async () => {
     try {
       const year = currentDate.getFullYear();
@@ -102,7 +117,6 @@ const loadAppointments = useCallback(async () => {
       );
       
       if (!error && data) {
-        // Group appointments by date
         const appointmentsByDate = {};
         data.forEach(apt => {
           const date = apt.date;
@@ -118,17 +132,16 @@ const loadAppointments = useCallback(async () => {
     }
   }, [currentDate]);
 
-  // Load calendar appointments when month changes
   useEffect(() => {
     if (doctorAppointmentService.getDoctorAppointmentsRange) {
       loadAppointmentsForCalendar();
     }
   }, [currentDate, loadAppointmentsForCalendar]);
 
-  // Calendar functionality
+
   const handleDateSelect = (date) => {
     setSelectedDate(date);
-    setCurrentPage(1); // Reset to first page when changing date
+    setCurrentPage(1); 
     setError('');
   };
 
@@ -138,10 +151,9 @@ const loadAppointments = useCallback(async () => {
     setCurrentDate(newDate);
   };
 
-  // Filter functionality
   const handleStatusFilterChange = (status) => {
     setStatusFilter(status);
-    setCurrentPage(1); // Reset to first page when changing filter
+    setCurrentPage(1);
   };
 
   // Pagination functions
@@ -163,7 +175,6 @@ const loadAppointments = useCallback(async () => {
     }
   };
 
-  // Appointment actions
   const handleConfirmAppointment = async (appointmentId) => {
     setLoading(true);
     try {
@@ -171,7 +182,6 @@ const loadAppointments = useCallback(async () => {
       if (error) {
         setError(`Failed to confirm appointment: ${error}`);
       } else {
-        // Refresh appointments list
         await loadAppointments();
       }
     } catch (err) {
@@ -185,13 +195,10 @@ const loadAppointments = useCallback(async () => {
   const handleRescheduleAppointment = async (appointmentId) => {
     setLoading(true);
     try {
-      // For now, just change status to pending_reschedule
-      // In a full implementation, you'd show a modal to select new date/time
       const { error } = await doctorAppointmentService.updateAppointmentStatus(appointmentId, 'pending');
       if (error) {
         setError(`Failed to reschedule appointment: ${error}`);
       } else {
-        // Refresh appointments list
         await loadAppointments();
       }
     } catch (err) {
@@ -202,55 +209,52 @@ const loadAppointments = useCallback(async () => {
     }
   };
 
-  const handleCancelAppointment = async (appointmentId) => {
-    setLoading(true);
-    try {
-      const { error } = await doctorAppointmentService.cancelAppointment(appointmentId, 'Cancelled by doctor');
-      if (error) {
-        setError(`Failed to cancel appointment: ${error}`);
-      } else {
-        // Refresh appointments list
-        await loadAppointments();
-      }
-    } catch (err) {
-      setError('Failed to cancel appointment');
-      console.error('Error cancelling appointment:', err);
-    } finally {
-      setLoading(false);
+const handleCancelAppointment = async (appointmentId) => {
+  setLoading(true);
+  try {
+    // Call cancelAppointment without any reason
+    const { error } = await doctorAppointmentService.cancelAppointment(appointmentId);
+    if (error) {
+      setError(`Failed to cancel appointment: ${error}`);
+    } else {
+      await loadAppointments();
     }
-  };
+  } catch (err) {
+    setError('Failed to cancel appointment');
+    console.error('Error cancelling appointment:', err);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleViewDetails = async (appointment) => {
-    setSelectedAppointment(appointment);
-    setShowDetailsModal(true);
-    
-    // Load patient details
-    try {
-      const { data, error } = await doctorAppointmentService.getPatientDetails(appointment.patient_id);
-      if (error) {
-        console.error('Error loading patient details:', error);
-        setPatientDetails(null);
-      } else {
-        setPatientDetails(data);
-      }
-    } catch (err) {
-      console.error('Error loading patient details:', err);
+const handleViewDetails = async (appointment) => {
+  setSelectedAppointment(appointment);
+  setShowDetailsModal(true);
+
+  try {
+    const { data, error } = await doctorAppointmentService.getPatientDetails(appointment.patient_id);
+    if (error) {
+      console.error('Error loading patient details:', error);
       setPatientDetails(null);
+    } else {
+      setPatientDetails(data);
     }
-  };
+  } catch (err) {
+    console.error('Error loading patient details:', err);
+    setPatientDetails(null);
+  }
+};
 
-  // Get appointments for selected date
   const getAppointmentsForDate = () => {
-    // Appointments are already filtered by date from the service
     return appointments;
   };
 
-  // Get filtered appointments (already filtered by service, but we keep this for UI logic)
+
   const getFilteredAppointments = () => {
     return appointments;
   };
 
-  // Get paginated appointments
+
   const getPaginatedAppointments = () => {
     const filteredAppointments = getFilteredAppointments();
     const startIndex = (currentPage - 1) * appointmentsPerPage;
@@ -268,7 +272,7 @@ const loadAppointments = useCallback(async () => {
     }
   };
 
-  // Simple calendar component
+
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -285,18 +289,18 @@ const loadAppointments = useCallback(async () => {
 
     const days = [];
     
-    // Empty cells for days before the first day of the month
+
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(<div key={`empty-${i}`} className="p-2"></div>);
     }
     
-    // Days of the month
+
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
       const isToday = date.toDateString() === today.toDateString();
       const isSelected = date.toDateString() === selectedDate.toDateString();
       
-      // Check if this day has appointments from the loaded data
+
       const dateString = date.toISOString().split('T')[0];
       const hasAppointments = appointmentsByDate[dateString] && appointmentsByDate[dateString].length > 0;
 
@@ -363,7 +367,6 @@ const loadAppointments = useCallback(async () => {
   const confirmedCount = selectedDateAppointments.filter(apt => apt.status === 'confirmed').length;
   const totalPages = Math.ceil(filteredAppointments.length / appointmentsPerPage);
 
-  // Get status counts for filter badges
   const getStatusCounts = () => {
     const counts = {};
     selectedDateAppointments.forEach(apt => {
@@ -374,7 +377,7 @@ const loadAppointments = useCallback(async () => {
 
   const statusCounts = getStatusCounts();
 
-  // Determine header text based on selected date
+
   const getHeaderText = () => {
     const today = new Date();
     const isToday = selectedDate.toDateString() === today.toDateString();
@@ -525,8 +528,8 @@ const loadAppointments = useCallback(async () => {
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-3">
                         <div className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-sm font-semibold">
-                          {appointment.time}
-                        </div>
+  {formatTimeForDisplay(appointment.time)}
+</div>
                         <div>
                           <h3 className="font-semibold text-gray-800">
                             {appointment.patient_name}
@@ -669,7 +672,7 @@ const loadAppointments = useCallback(async () => {
                   </label>
                   <div className="flex items-center gap-2">
                     <Clock className="w-5 h-5 text-gray-400" />
-                    <span className="text-lg font-semibold">{selectedAppointment.time}</span>
+                    <span className="text-lg font-semibold">{formatTimeForDisplay(selectedAppointment.time)}</span>
                   </div>
                 </div>
                 
@@ -680,12 +683,12 @@ const loadAppointments = useCallback(async () => {
                   <span className="text-gray-600">{selectedAppointment.patient_id}</span>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact
-                  </label>
-                  <span className="text-gray-600">{selectedAppointment.contact || 'N/A'}</span>
-                </div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Contact
+  </label>
+  <span className="text-gray-600">{patientDetails?.contact_no || 'Loading...'}</span>
+</div>
               </div>
 
               {/* Additional patient details if loaded */}
