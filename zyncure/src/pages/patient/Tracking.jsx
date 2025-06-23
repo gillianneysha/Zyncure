@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Droplet, Droplets, FileDown, FileUp, CloudSun, Leaf, Sun, Moon, Circle,
-  Rainbow, Flame, Check, Lollipop, Scale, CircleAlert,
+  Rainbow, Flame, Check, Lollipop, Scale, CircleAlert, Share2, Download
 } from 'lucide-react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { supabase } from '../../client';
+import ShareSymptom from '../../components/ShareSymptom'; // Make sure the path matches your project
 
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Period');
@@ -15,71 +16,46 @@ const PeriodTracker = () => {
   const [selectedMetabolism, setSelectedMetabolism] = useState('');
   const [date, setDate] = useState(new Date());
   const [loggedDates, setLoggedDates] = useState([]);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [modalMessage, setModalMessage] = useState('');
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
+  const [showShareSymptom, setShowShareSymptom] = useState(false);
 
   useEffect(() => {
     const fetchLoggedDates = async () => {
       try {
-        const {
-          data: { user },
-          error: authError
-        } = await supabase.auth.getUser ();
-
-        if (authError || !user) {
-          console.error("Auth Error:", authError?.message);
-          return;
-        }
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) return console.error("Auth Error:", authError?.message);
 
         const { data, error } = await supabase
           .from('symptomlog')
           .select('date_logged, symptoms')
           .eq('patients_id', user.id);
 
-        if (error) {
-          console.error('Supabase fetch error:', error.message);
-          return;
-        }
+        if (error) return console.error('Supabase fetch error:', error.message);
+        if (!data || data.length === 0) return console.warn("No data returned from Supabase.");
 
-        if (!data || data.length === 0) {
-          console.warn("No data returned from Supabase.");
-          return;
-        }
-
-        const normalizedData = data.map((entry) => ({
+        const normalizedData = data.map(entry => ({
           ...entry,
-          date_logged: new Date(entry.date_logged),  
+          date_logged: new Date(entry.date_logged),
         }));
 
-        console.log("Fetched and normalized data:", normalizedData);
         setLoggedDates(normalizedData);
-        localStorage.setItem('loggedDates', JSON.stringify(normalizedData)); 
+        localStorage.setItem('loggedDates', JSON.stringify(normalizedData));
       } catch (err) {
         console.error("Unexpected error:", err);
       }
     };
 
     fetchLoggedDates();
-
     const storedLoggedDates = localStorage.getItem('loggedDates');
-    if (storedLoggedDates) {
-      setLoggedDates(JSON.parse(storedLoggedDates));
-    }
+    if (storedLoggedDates) setLoggedDates(JSON.parse(storedLoggedDates));
   }, []);
 
-  const handleFlowSelect = (flow) => setSelectedFlow(flow);
-  const handleFeelingSelect = (feeling) => setSelectedFeeling(feeling);
-  const handleSkinSelect = (skin) => setSelectedSkin(skin);
-  const handleMetabolismSelect = (metabolism) => setSelectedMetabolism(metabolism);
-
   const handleSave = async () => {
-    const { data: { user }, error: userError } = await supabase.auth.getUser ();
-
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      setErrorMessage('You must be logged in to save your data.');
-      setShowErrorModal(true);
+      setModalContent({ title: 'Error', message: 'You must be logged in to save your data.', isError: true });
+      setShowModal(true);
       return;
     }
 
@@ -91,10 +67,13 @@ const PeriodTracker = () => {
     };
 
     const selectedValue = selectedValues[selectedTab];
-
     if (!selectedValue) {
-      setErrorMessage(`Please select a ${selectedTab.toLowerCase()} option`);
-      setShowErrorModal(true);
+      setModalContent({
+        title: 'Error',
+        message: `Please select a ${selectedTab.toLowerCase()} option`,
+        isError: true
+      });
+      setShowModal(true);
       return;
     }
 
@@ -109,32 +88,63 @@ const PeriodTracker = () => {
     };
 
     const { error } = await supabase.from('symptomlog').insert([dataToSave]);
-
     if (error) {
-      setErrorMessage(`Failed to save: ${error.message}`);
-      setShowErrorModal(true);
+      setModalContent({ title: 'Error', message: `Failed to save: ${error.message}`, isError: true });
+      setShowModal(true);
     } else {
       const formattedDate = normalizedDate.toDateString();
-      setModalMessage(`${selectedTab} saved as ${selectedValue} on ${formattedDate}`);
-      setShowSuccessModal(true);
+      setModalContent({
+        title: 'Success!',
+        message: `${selectedTab} saved as ${selectedValue} on ${formattedDate}`,
+        isError: false
+      });
+      setShowModal(true);
 
-      setLoggedDates((prev) => {
-        const alreadyExists = prev.some(
-          (entry) =>
-            new Date(entry.date_logged).toDateString() === normalizedDate.toDateString() &&
-            entry.symptoms === selectedTab
+      setLoggedDates(prev => {
+        const alreadyExists = prev.some(entry =>
+          new Date(entry.date_logged).toDateString() === normalizedDate.toDateString() &&
+          entry.symptoms === selectedTab
         );
         const updatedDates = alreadyExists ? prev : [...prev, { ...dataToSave }];
-        localStorage.setItem('loggedDates', JSON.stringify(updatedDates)); 
+        localStorage.setItem('loggedDates', JSON.stringify(updatedDates));
         return updatedDates;
       });
 
-      
       if (selectedTab === 'Period') setSelectedFlow('');
       else if (selectedTab === 'Feelings') setSelectedFeeling('');
       else if (selectedTab === 'Skin') setSelectedSkin('');
       else if (selectedTab === 'Metabolism') setSelectedMetabolism('');
     }
+  };
+
+  const handleShare = () => {
+  setShowShareSymptom(true);
+};
+
+
+  const handleDownload = () => {
+    const data = {
+      selectedTab,
+      selectedFlow,
+      selectedFeeling,
+      selectedSkin,
+      selectedMetabolism,
+      date,
+      loggedDates
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `period-tracker-data-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setModalContent({ title: 'Download Complete', message: 'Your data has been downloaded successfully', isError: false });
+    setShowModal(true);
   };
 
   const tabConfigs = {
@@ -145,7 +155,7 @@ const PeriodTracker = () => {
         { name: 'Heavy', icon: Droplet, size: 64 },
       ],
       selected: selectedFlow,
-      onSelect: handleFlowSelect,
+      onSelect: setSelectedFlow,
     },
     Feelings: {
       options: [
@@ -155,7 +165,7 @@ const PeriodTracker = () => {
         { name: 'Sad', icon: Moon, size: 48 },
       ],
       selected: selectedFeeling,
-      onSelect: handleFeelingSelect,
+      onSelect: setSelectedFeeling,
     },
     Skin: {
       options: [
@@ -165,7 +175,7 @@ const PeriodTracker = () => {
         { name: 'Dry', icon: Flame, size: 48 },
       ],
       selected: selectedSkin,
-      onSelect: handleSkinSelect,
+      onSelect: setSelectedSkin,
     },
     Metabolism: {
       options: [
@@ -175,7 +185,7 @@ const PeriodTracker = () => {
         { name: 'Metabolic Risk', icon: CircleAlert, size: 48 },
       ],
       selected: selectedMetabolism,
-      onSelect: handleMetabolismSelect,
+      onSelect: setSelectedMetabolism,
     },
   };
 
@@ -185,7 +195,7 @@ const PeriodTracker = () => {
     const normalized = new Date(date);
     normalized.setHours(0, 0, 0, 0);
 
-    const matches = loggedDates.filter((entry) => {
+    const matches = loggedDates.filter(entry => {
       const entryDate = new Date(entry.date_logged);
       entryDate.setHours(0, 0, 0, 0);
       return entryDate.getTime() === normalized.getTime();
@@ -200,13 +210,10 @@ const PeriodTracker = () => {
       Metabolism: '#FFD800',
     };
 
-    const uniqueSymptoms = [...new Set(matches.map((m) => m.symptoms))];
+    const uniqueSymptoms = [...new Set(matches.map(m => m.symptoms))];
 
     return (
-      <div
-        className="flex justify-center mt-1 space-x-0.5"
-        title={uniqueSymptoms.join(', ')}
-      >
+      <div className="flex justify-center mt-1 space-x-0.5" title={uniqueSymptoms.join(', ')}>
         {uniqueSymptoms.map((symptom, idx) => (
           <span
             key={idx}
@@ -219,192 +226,119 @@ const PeriodTracker = () => {
   };
 
   return (
-    <>
-      <style>{`
-        html, body {
-          overflow: hidden; /* Prevent scrolling */
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-          font-family: 'Inter', sans-serif;
-          background-color: #FFF0EA;
-          color: #B65C4B;
-        }
-        *, *::before, *::after {
-          box-sizing: inherit;
-        }
-        .calendar-container {
-          max-width: 100%;
-          padding: 0 2vw; /* Use relative units */
-          overflow-x: hidden;
-          margin: 0 auto;
-        }
-        .fixed-bottom-buttons {
-          position: fixed;
-          bottom: 2vh; /* Use relative units */
-          right: 2vw; /* Use relative units */
-          z-index: 50;
-          display: flex;
-          gap: 1vw; /* Use relative units */
-          background-color: #FFEFE9;
-          border: 1px solid #F8C8B6;
-          padding: 1vh 2vw; /* Use relative units */
-          border-radius: 16px;
-          box-sizing: border-box;
-          max-width: 320px;
-          width: calc(100vw - 4vw); /* Use relative units */
-          justify-content: center;
-          flex-wrap: nowrap;
-          overflow-x: hidden;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .fixed-bottom-buttons button {
-          flex: 1 1 auto;
-          min-width: 80px; /* Adjusted for smaller screens */
-          max-width: 120px; /* Adjusted for smaller screens */
-        }
-        @media (max-width: 480px) {
-          .fixed-bottom-buttons {
-            right: 50%;
-            transform: translateX(50%);
-            max-width: 90vw;
-            padding: 1.5vh 2vw; /* Use relative units */
-            gap: 1vw; /* Use relative units */
+    <div className="calendar-container min-h-[100vh] w-full relative">
+      <div className="flex flex-col items-center px-4 md:px-8 py-4 space-y-6 w-full max-w-screen-md mx-auto">
+        <Calendar
+          onChange={setDate}
+          value={date}
+          className="!border-none !bg-[#FFD8C9] rounded-2xl p-4 text-base md:text-lg w-full shadow-lg"
+          tileContent={getTileContent}
+          tileClassName={({ date: d }) =>
+            d.toDateString() === date.toDateString()
+              ? '!bg-[#C2EDEA] !text-[#3BA4A0] rounded-full'
+              : ''
           }
-          .fixed-bottom-buttons button {
-            min-width: 90px; /* Adjusted for smaller screens */
-            max-width: none;
+          formatShortWeekday={(locale, date) =>
+            date.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase()
           }
-        }
-      `}</style>
-      <div className="calendar-container min-h-[100vh] w-full relative">
-        <div className="flex flex-col items-center px-4 md:px-8 py-4 space-y-6 w-full max-w-screen-md mx-auto">
-          <Calendar
-            onChange={setDate}
-            value={date}
-            className="!border-none !bg-[#FFD8C9] rounded-2xl p-4 text-base md:text-lg w-full shadow-lg"
-            tileContent={getTileContent}
-            tileClassName={({ date: d }) =>
-              d.toDateString() === date.toDateString()
-                ? '!bg-[#C2EDEA] !text-[#3BA4A0] rounded-full'
-                : ''
-            }
-            formatShortWeekday={(locale, date) =>
-              date.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase()
-            }
-            next2Label={null}
-            prev2Label={null}
-          />
+          next2Label={null}
+          prev2Label={null}
+        />
 
-          <div className="flex flex-wrap gap-2 justify-center w-full">
-            {Object.keys(tabConfigs).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setSelectedTab(tab)}
-                className={`text-base md:text-lg px-5 py-2 rounded-full font-semibold transition-all ${
-                  selectedTab === tab
-                    ? 'bg-[#F98679] text-white shadow-lg scale-105'
-                    : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
-                }`}
-                style={{ minWidth: 90 }} 
+        <div className="flex flex-wrap gap-2 justify-center w-full">
+          {Object.keys(tabConfigs).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setSelectedTab(tab)}
+              className={`text-base md:text-lg px-5 py-2 rounded-full font-semibold transition-all ${
+                selectedTab === tab ? 'bg-[#F98679] text-white shadow-lg scale-105' : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
+              }`}
+              style={{ minWidth: 90 }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 rounded-2xl w-full">
+          <div className={selectedTab === 'Period' ? 'flex justify-between gap-2' : 'grid grid-cols-2 gap-2 md:flex md:justify-around md:gap-4'}>
+            {currentConfig.options.map(({ name, icon: Icon, size }) => (
+              <div
+                key={name}
+                onClick={() => currentConfig.onSelect(name)}
+                className="flex flex-col items-center cursor-pointer w-full max-w-[90px] py-2"
               >
-                {tab}
-              </button>
+                <div
+                  className={`w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-4 transition-all ${
+                    currentConfig.selected === name ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md' : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6] hover:border-[#3BA4A0] hover:bg-[#F0F9F9]'
+                  }`}
+                >
+                  {Icon && <Icon size={size || 40} />}
+                </div>
+                <span className={`mt-2 text-base md:text-lg font-semibold text-center transition-all ${
+                  currentConfig.selected === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'
+                }`}>
+                  {name}
+                </span>
+              </div>
             ))}
           </div>
-
-          <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 sm:p-4 rounded-2xl w-full">
-            <div className={
-              selectedTab === 'Period'
-                ? 'flex justify-between gap-2'
-                : 'grid grid-cols-2 gap-2 md:flex md:justify-around md:gap-4'
-            }>
-              {currentConfig.options.map(({ name, icon: Icon, size }) => (
-                <div
-                  key={name}
-                  onClick={() => currentConfig.onSelect(name)}
-                  className="flex flex-col items-center cursor-pointer w-full max-w-[90px] py-2"
-                >
-                  <div
-                    className={`w-14 h-14 md:w-16 md:h-16 flex items-center justify-center rounded-full border-4 transition-all ${
-                      currentConfig.selected === name
-                        ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md'
-                        : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6] hover:border-[#3BA4A0] hover:bg-[#F0F9F9]'
-                    }`}
-                  >
-                    {Icon && <Icon size={size || 40} />}
-                  </div>
-                  <span className={`mt-2 text-base md:text-lg font-semibold text-center transition-all ${
-                    currentConfig.selected === name ? 'text-[#3BA4A0]' : 'text-[#F98679]'
-                  }`}>
-                    {name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={handleSave}
-            className="bg-[#3BA4A0] hover:bg-[#2E8B87] text-white text-lg md:text-xl px-8 py-2 rounded-full transition-all shadow-lg active:scale-95"
-          >
-            Save {selectedTab}
-          </button>
         </div>
 
-        {showSuccessModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 shadow-2xl text-center max-w-sm w-full">
-              <h2 className="text-xl font-bold text-[#3BA4A0] mb-2">Shared Successfully!</h2>
-              <p className="text-[#555] mb-4">{modalMessage}</p>
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                className="bg-[#F98679] text-white font-semibold px-6 py-2 rounded-full hover:bg-[#d87364] transition"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showErrorModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 shadow-2xl text-center max-w-sm w-full">
-              <h2 className="text-xl font-bold text-red-600 mb-2">Save Failed</h2>
-              <p className="text-[#555] mb-4">{errorMessage}</p>
-              <button
-                onClick={() => setShowErrorModal(false)}
-                className="bg-red-500 text-white font-semibold px-6 py-2 rounded-full hover:bg-red-600 transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div
-          className="fixed-bottom-buttons"
-          role="region"
-          aria-label="Download and Share Controls"
+        <button
+          onClick={handleSave}
+          className="bg-[#3BA4A0] hover:bg-[#2E8B87] text-white text-lg md:text-xl px-8 py-2 rounded-full transition-all shadow-lg active:scale-95"
         >
-          <button
-            className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition w-full"
-            aria-label="Download"
-          >
-            <FileDown size={24} />
-            <span className="text-base mt-1 font-bold">Download</span>
-          </button>
-          <button
-            className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition w-full"
-            aria-label="Share"
-          >
-            <FileUp size={24} />
-            <span className="text-base mt-1 font-bold">Share</span>
-          </button>
-        </div>
+          Save {selectedTab}
+        </button>
       </div>
-    </>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 shadow-2xl text-center max-w-sm w-full">
+            <h2 className={`text-xl font-bold ${modalContent.isError ? 'text-red-600' : 'text-[#3BA4A0]'}`}>
+              {modalContent.title}
+            </h2>
+            <p className="text-[#555] mb-4">{modalContent.message}</p>
+            <button
+              onClick={() => setShowModal(false)}
+              className={`${modalContent.isError ? 'bg-red-500 hover:bg-red-600' : 'bg-[#F98679] hover:bg-[#d87364]'} text-white font-semibold px-6 py-2 rounded-full transition`}
+            >
+              {modalContent.isError ? 'Close' : 'Got it'}
+            </button>
+          </div>
+        </div>
+      )}
+
+ <div
+  className="fixed bottom-6 right-6 flex flex-row gap-5"
+  role="region"
+  aria-label="Download and Share Controls"
+>
+  <button
+    onClick={handleDownload}
+    className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg"
+    aria-label="Download"
+  >
+    <FileDown size={30} />
+    <span className="mt-1 font-bold">Download</span>
+  </button>
+  <button
+    onClick={handleShare}
+    className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg"
+    aria-label="Share"
+  >
+    <FileUp size={30} />
+    <span className="mt-1 font-bold">Share</span>
+  </button>
+
+  <ShareSymptom isOpen={showShareSymptom} onClose={() => setShowShareSymptom(false)} />
+</div>
+
+
+    {/* Closing tag for calendar-container */}
+  </div>
   );
-};
+}
 
 export default PeriodTracker;
