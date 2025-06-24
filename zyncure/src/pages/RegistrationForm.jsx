@@ -2,15 +2,14 @@ import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
-import DoctorVerificationModal from "../components/DoctorVerificationModal";
+import TermsModal from "../components/TermsModal"; // Import the Terms Modal
 
-
-const FormField = memo(({ 
-  label, 
-  name, 
-  type = "text", 
-  placeholder, 
-  required = true, 
+const FormField = memo(({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  required = true,
   children,
   value,
   onChange,
@@ -28,9 +27,8 @@ const FormField = memo(({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] ${
-          error ? "ring-2 ring-red-400" : ""
-        }`}
+        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] ${error ? "ring-2 ring-red-400" : ""
+          }`}
         required={required}
         disabled={disabled}
       />
@@ -59,8 +57,10 @@ export default function RegistrationForm() {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [showDoctorModal, setShowDoctorModal] = useState(false);
-  const [doctorVerification, setDoctorVerification] = useState(null);
+
+  // Terms and Conditions state
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -69,7 +69,6 @@ export default function RegistrationForm() {
       [name]: value
     }));
   }, []);
-
 
   const validateForm = useCallback(() => {
     const newErrors = {};
@@ -81,6 +80,11 @@ export default function RegistrationForm() {
     if (!formData.userType) newErrors.userType = "User type is required";
     if (!formData.contactNumber.trim()) newErrors.contactNumber = "Contact number is required";
     if (!formData.birthdate) newErrors.birthdate = "Birthdate is required";
+
+    // Terms acceptance validation
+    if (!hasAcceptedTerms) {
+      newErrors.terms = "You must accept the Terms and Conditions to proceed";
+    }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -113,7 +117,7 @@ export default function RegistrationForm() {
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
       const dayDiff = today.getDate() - birthDate.getDate();
-      
+
       if (age < 18 || (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)))) {
         newErrors.birthdate = "You must be at least 18 years old to register";
       }
@@ -121,7 +125,7 @@ export default function RegistrationForm() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData]);
+  }, [formData, hasAcceptedTerms]);
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -134,8 +138,11 @@ export default function RegistrationForm() {
       password: "",
       confirmPassword: "",
     });
+    setHasAcceptedTerms(false);
   }, []);
 
+  const handleSubmit = useCallback(async (event) => {
+    event.preventDefault();
 
 // Modified handleSubmit function with better error handling
 const handleSubmit = useCallback(async (event) => {
@@ -175,7 +182,11 @@ const handleSubmit = useCallback(async (event) => {
       },
     });
 
-    if (authError) throw authError;
+
+    setIsLoading(true);
+    setErrors({});
+    setSuccessMessage("");
+
 
     // For doctors, handle file upload after user creation
     if (formData.userType === "doctor" && doctorVerification?.licenseFile) {
@@ -249,15 +260,9 @@ const handleSubmit = useCallback(async (event) => {
     resetForm();
     setDoctorVerification(null);
 
-  } catch (error) {
-    console.error("Registration error:", error);
-    setErrors({
-      submit: error.message || "Registration failed. Please try again.",
-    });
-  } finally {
-    setIsLoading(false);
-  }
-}, [formData, validateForm, resetForm, doctorVerification]);
+
+      if (authError) throw authError;
+
 
 // Simplified handleDoctorModalSubmit - just store the file, don't upload yet
 const handleDoctorModalSubmit = async (data) => {
@@ -278,8 +283,15 @@ const handleDoctorModalSubmit = async (data) => {
   }, 0);
 };
 
- 
+
   const handleGoogleSignUp = useCallback(async () => {
+    if (!hasAcceptedTerms) {
+      setErrors({
+        terms: "You must accept the Terms and Conditions before signing up with Google"
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
@@ -288,7 +300,7 @@ const handleDoctorModalSubmit = async (data) => {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       });
-      
+
       if (error) throw error;
     } catch (error) {
       console.error("Google sign up error:", error);
@@ -298,6 +310,24 @@ const handleDoctorModalSubmit = async (data) => {
     } finally {
       setIsLoading(false);
     }
+  }, [hasAcceptedTerms]);
+
+  // Terms modal handlers
+  const handleOpenTermsModal = useCallback(() => {
+    setIsTermsModalOpen(true);
+  }, []);
+
+  const handleCloseTermsModal = useCallback(() => {
+    setIsTermsModalOpen(false);
+  }, []);
+
+  const handleAcceptTerms = useCallback(() => {
+    setHasAcceptedTerms(true);
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.terms;
+      return newErrors;
+    });
   }, []);
 
   return (
@@ -317,9 +347,9 @@ const handleDoctorModalSubmit = async (data) => {
           </div>
         )}
 
-        <FormField 
-          label="First Name" 
-          name="firstName" 
+        <FormField
+          label="First Name"
+          name="firstName"
           placeholder="First Name"
           value={formData.firstName}
           onChange={handleChange}
@@ -329,9 +359,9 @@ const handleDoctorModalSubmit = async (data) => {
           inputClassName="bg-[#FFEDE7]"
         />
 
-        <FormField 
-          label="Last Name" 
-          name="lastName" 
+        <FormField
+          label="Last Name"
+          name="lastName"
           placeholder="Last Name"
           value={formData.lastName}
           onChange={handleChange}
@@ -341,9 +371,9 @@ const handleDoctorModalSubmit = async (data) => {
           inputClassName="bg-[#FFEDE7]"
         />
 
-        <FormField 
-          label="Contact Number" 
-          name="contactNumber" 
+        <FormField
+          label="Contact Number"
+          name="contactNumber"
           placeholder="Contact Number"
           value={formData.contactNumber}
           onChange={handleChange}
@@ -353,9 +383,9 @@ const handleDoctorModalSubmit = async (data) => {
           inputClassName="bg-[#FFEDE7]"
         />
 
-        <FormField 
-          label="Birthdate" 
-          name="birthdate" 
+        <FormField
+          label="Birthdate"
+          name="birthdate"
           type="date"
           value={formData.birthdate}
           onChange={handleChange}
@@ -365,8 +395,8 @@ const handleDoctorModalSubmit = async (data) => {
           inputClassName="bg-[#FFEDE7]"
         />
 
-        <FormField 
-          label="User Type" 
+        <FormField
+          label="User Type"
           name="userType"
           value={formData.userType}
           onChange={handleChange}
@@ -380,9 +410,8 @@ const handleDoctorModalSubmit = async (data) => {
               name="userType"
               value={formData.userType}
               onChange={handleChange}
-              className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${
-                errors.userType ? "ring-2 ring-red-400" : ""
-              }`}
+              className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${errors.userType ? "ring-2 ring-red-400" : ""
+                }`}
               required
               disabled={isLoading}
             >
@@ -399,16 +428,16 @@ const handleDoctorModalSubmit = async (data) => {
             {/* Custom down arrow */}
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b0b0]">
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
           </div>
         </FormField>
 
-        <FormField 
-          label="Email" 
-          name="email" 
-          type="email" 
+        <FormField
+          label="Email"
+          name="email"
+          type="email"
           placeholder="Email"
           value={formData.email}
           onChange={handleChange}
@@ -449,19 +478,54 @@ const handleDoctorModalSubmit = async (data) => {
         <button
           type="submit"
           disabled={isLoading}
-          className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
-            isLoading
+          className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${isLoading
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#55A1A4] hover:bg-[#368487]"
-          }`}
+            }`}
         >
           {isLoading ? "Creating Account..." : "Sign Up"}
         </button>
 
-        <div className="mt-2 w-4/5 mx-auto text-[#F5E0D9] text-xs text-left">
-          By creating an account, you agree to our{" "}
-          <span className="underline cursor-pointer">Terms</span> and have read and acknowledge
-          the <span className="underline cursor-pointer">Privacy Agreement</span>.
+        {/* Updated Terms and Conditions Section */}
+        <div className="mt-2 w-4/5 mx-auto">
+          <div className="flex items-start space-x-2">
+            <input
+              type="checkbox"
+              id="acceptTerms"
+              checked={hasAcceptedTerms}
+              onChange={(e) => {
+                if (!e.target.checked) {
+                  setHasAcceptedTerms(false);
+                } else {
+                  // Don't allow checking without reading terms
+                  e.target.checked = false;
+                  handleOpenTermsModal();
+                }
+              }}
+              className="mt-1 w-4 h-4 text-[#55A1A4] bg-[#FFEDE7] border-gray-300 rounded focus:ring-[#55A1A4] focus:ring-2"
+              disabled={isLoading}
+            />
+            <div className="text-[#F5E0D9] text-xs text-left">
+              <label htmlFor="acceptTerms" className="cursor-pointer">
+                I agree to the{" "}
+                <button
+                  type="button"
+                  onClick={handleOpenTermsModal}
+                  className="underline hover:text-white transition-colors duration-200"
+                  disabled={isLoading}
+                >
+                  Terms and Conditions
+                </button>{" "}
+                and have read and acknowledge the{" "}
+                <span className="underline cursor-pointer">Privacy Agreement</span>.
+              </label>
+            </div>
+          </div>
+          {errors.terms && (
+            <p className="mt-1 text-sm text-red-300">
+              {errors.terms}
+            </p>
+          )}
         </div>
 
         <div className="w-full flex items-center justify-center mt-8 mb-8">
@@ -485,11 +549,12 @@ const handleDoctorModalSubmit = async (data) => {
           </span>
         </div>
       </form>
-      <DoctorVerificationModal
-        open={showDoctorModal}
-        onClose={() => setShowDoctorModal(false)}
-        onSubmit={handleDoctorModalSubmit}
-        loading={isLoading}
+
+      {/* Terms and Conditions Modal */}
+      <TermsModal
+        isOpen={isTermsModalOpen}
+        onClose={handleCloseTermsModal}
+        onAccept={handleAcceptTerms}
       />
     </>
   );
