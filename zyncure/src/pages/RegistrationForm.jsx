@@ -2,7 +2,7 @@ import React, { useCallback, useState, memo } from "react";
 import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
-import TermsModal from "../components/TermsModal"; // Import the Terms Modal
+import TermsModal from "../components/TermsModal";
 
 const FormField = memo(({
   label,
@@ -14,10 +14,12 @@ const FormField = memo(({
   value,
   onChange,
   error,
-  disabled
+  disabled,
+  labelClassName,
+  inputClassName
 }) => (
   <div className="mb-3">
-    <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
+    <label className={`block w-4/5 mx-auto mb-1 text-left ${labelClassName || "text-[#F5E0D9]"}`}>
       {label}:
     </label>
     {children || (
@@ -27,8 +29,9 @@ const FormField = memo(({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] ${error ? "ring-2 ring-red-400" : ""
-          }`}
+        className={`w-4/5 block mx-auto mb-1 p-2 border-none rounded-[15.5px] ${inputClassName || "bg-[#FFEDE7]"} ${
+          error ? "ring-2 ring-red-400" : ""
+        }`}
         required={required}
         disabled={disabled}
       />
@@ -41,8 +44,114 @@ const FormField = memo(({
   </div>
 ));
 
+// Doctor Verification Modal Component
+const DoctorVerificationModal = memo(({ isOpen, onClose, onSubmit, isLoading }) => {
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [licenseFile, setLicenseFile] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const newErrors = {};
+
+    if (!licenseNumber.trim()) {
+      newErrors.licenseNumber = "License number is required";
+    }
+    if (!licenseFile) {
+      newErrors.licenseFile = "License file is required";
+    }
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length === 0) {
+      onSubmit({ licenseNumber, licenseFile });
+      // Reset form
+      setLicenseNumber("");
+      setLicenseFile(null);
+      setErrors({});
+    }
+  };
+
+  const handleClose = () => {
+    setLicenseNumber("");
+    setLicenseFile(null);
+    setErrors({});
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <h2 className="text-xl font-bold mb-4 text-gray-800">Doctor Verification</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              License Number:
+            </label>
+            <input
+              type="text"
+              value={licenseNumber}
+              onChange={(e) => setLicenseNumber(e.target.value)}
+              className={`w-full p-2 border rounded-lg ${
+                errors.licenseNumber ? "border-red-400" : "border-gray-300"
+              }`}
+              placeholder="Enter your medical license number"
+              disabled={isLoading}
+            />
+            {errors.licenseNumber && (
+              <p className="text-red-500 text-sm mt-1">{errors.licenseNumber}</p>
+            )}
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              License Document:
+            </label>
+            <input
+              type="file"
+              onChange={(e) => setLicenseFile(e.target.files[0])}
+              className={`w-full p-2 border rounded-lg ${
+                errors.licenseFile ? "border-red-400" : "border-gray-300"
+              }`}
+              accept=".pdf,.jpg,.jpeg,.png"
+              disabled={isLoading}
+            />
+            {errors.licenseFile && (
+              <p className="text-red-500 text-sm mt-1">{errors.licenseFile}</p>
+            )}
+            <p className="text-gray-500 text-xs mt-1">
+              Accepted formats: PDF, JPG, PNG (Max 10MB)
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-[#55A1A4] text-white rounded-lg hover:bg-[#368487] transition-colors disabled:opacity-50"
+              disabled={isLoading}
+            >
+              {isLoading ? "Processing..." : "Submit"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+});
+
 export default function RegistrationForm() {
   console.log('RegistrationForm rendered');
+  
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -61,6 +170,10 @@ export default function RegistrationForm() {
   // Terms and Conditions state
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+
+  // Doctor verification state
+  const [doctorVerification, setDoctorVerification] = useState(null);
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -139,150 +252,153 @@ export default function RegistrationForm() {
       confirmPassword: "",
     });
     setHasAcceptedTerms(false);
+    setDoctorVerification(null);
   }, []);
 
+  // Handle doctor modal submission
+  const handleDoctorModalSubmit = useCallback(async (data) => {
+    setShowDoctorModal(false);
+    
+    // Store the doctor verification data including the actual file
+    setDoctorVerification({
+      licenseNumber: data.licenseNumber,
+      licenseFile: data.licenseFile,
+    });
+
+    // Continue with registration after a brief delay
+    setTimeout(() => {
+      // Trigger form submission programmatically
+      const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
+      const form = document.querySelector('form');
+      if (form) {
+        form.dispatchEvent(submitEvent);
+      }
+    }, 100);
+  }, []);
+
+  const handleDoctorModalClose = useCallback(() => {
+    setShowDoctorModal(false);
+  }, []);
+
+  // Main form submission handler
   const handleSubmit = useCallback(async (event) => {
     event.preventDefault();
 
-// Modified handleSubmit function with better error handling
-const handleSubmit = useCallback(async (event) => {
-  event.preventDefault();
+    if (!validateForm()) return;
 
-  if (!validateForm()) return;
-
-  // If Doctor, show modal first
-  if (formData.userType === "doctor" && !doctorVerification) {
-    setShowDoctorModal(true);
-    return;
-  }
-
-  setIsLoading(true);
-  setErrors({});
-  setSuccessMessage("");
-
-  try {
-    // First, create the user account
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          contact_number: formData.contactNumber,
-          birthdate: formData.birthdate,
-          user_type: formData.userType,
-          // Add initial doctor data without file URL
-          ...(formData.userType === "doctor" && doctorVerification && {
-            license_number: doctorVerification.licenseNumber,
-            status: "pending"
-          })
-        },
-        emailRedirectTo: `${window.location.origin}/dashboard`
-      },
-    });
-
+    // If Doctor and no verification data yet, show modal first
+    if (formData.userType === "doctor" && !doctorVerification) {
+      setShowDoctorModal(true);
+      return;
+    }
 
     setIsLoading(true);
     setErrors({});
     setSuccessMessage("");
 
-
-    // For doctors, handle file upload after user creation
-    if (formData.userType === "doctor" && doctorVerification?.licenseFile) {
-      console.log('Uploading license file for user:', authData.user.id);
-      
-      // Wait a moment to ensure user is fully created
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if user is authenticated
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.error('User not authenticated for file upload:', userError);
-        throw new Error('Authentication required for file upload');
-      }
-      
-      const fileExt = doctorVerification.licenseFile.name.split('.').pop();
-      const filePath = `${authData.user.id}/${Date.now()}_license.${fileExt}`;
-      
-      try {
-        const { error: uploadError } = await supabase.storage
-          .from("doctor-licenses")
-          .upload(filePath, doctorVerification.licenseFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          // If it's a policy error, provide helpful message
-          if (uploadError.message.includes('policy')) {
-            throw new Error('File upload permission denied. Please contact support.');
-          }
-          throw uploadError;
-        }
-
-        // Get public URL and update user metadata
-        const { data: publicUrlData } = supabase.storage
-          .from("doctor-licenses")
-          .getPublicUrl(filePath);
-          
-        // Update user metadata with the file URL
-        const { error: updateError } = await supabase.auth.updateUser({
-          data: { 
-            license_file_url: publicUrlData.publicUrl 
-          }
-        });
-        
-        if (updateError) {
-          console.error('Failed to update user with license file URL:', updateError);
-          // Don't throw here as the main registration was successful
-        }
-
-        console.log('License file uploaded successfully:', publicUrlData.publicUrl);
-        
-      } catch (uploadError) {
-        console.error('File upload failed:', uploadError);
-        // User account is created, but file upload failed
-        // You might want to show a different message here
-        setErrors({
-          submit: `Account created successfully, but license file upload failed: ${uploadError.message}. Please contact support to complete your verification.`,
-        });
-        return;
-      }
-    }
-
-    setSuccessMessage(
-      formData.userType === "doctor" 
-        ? "Registration successful! Please check your email and click the confirmation link to activate your account. Your license will be reviewed once confirmed."
-        : "Registration successful! Please check your email and click the confirmation link to activate your account."
-    );
-    resetForm();
-    setDoctorVerification(null);
-
+    try {
+      // Create the user account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            contact_number: formData.contactNumber,
+            birthdate: formData.birthdate,
+            user_type: formData.userType,
+            // Add initial doctor data without file URL
+            ...(formData.userType === "doctor" && doctorVerification && {
+              license_number: doctorVerification.licenseNumber,
+              status: "pending"
+            })
+          },
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        },
+      });
 
       if (authError) throw authError;
 
+      // For doctors, handle file upload after user creation
+      if (formData.userType === "doctor" && doctorVerification?.licenseFile && authData.user) {
+        console.log('Uploading license file for user:', authData.user.id);
+        
+        // Wait a moment to ensure user is fully created
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if user is authenticated
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.error('User not authenticated for file upload:', userError);
+          throw new Error('Authentication required for file upload');
+        }
+        
+        const fileExt = doctorVerification.licenseFile.name.split('.').pop();
+        const filePath = `${authData.user.id}/${Date.now()}_license.${fileExt}`;
+        
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from("doctor-licenses")
+            .upload(filePath, doctorVerification.licenseFile, {
+              cacheControl: '3600',
+              upsert: false
+            });
 
-// Simplified handleDoctorModalSubmit - just store the file, don't upload yet
-const handleDoctorModalSubmit = async (data) => {
-  setShowDoctorModal(false);
-  
-  // Store the doctor verification data including the actual file
-  setDoctorVerification({
-    licenseNumber: data.licenseNumber,
-    licenseFile: data.licenseFile, // Store the actual file object
-  });
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            // If it's a policy error, provide helpful message
+            if (uploadError.message.includes('policy')) {
+              throw new Error('File upload permission denied. Please contact support.');
+            }
+            throw uploadError;
+          }
 
-  // Continue with registration
-  setTimeout(() => {
-    const form = document.querySelector("form");
-    if (form) {
-      form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+          // Get public URL and update user metadata
+          const { data: publicUrlData } = supabase.storage
+            .from("doctor-licenses")
+            .getPublicUrl(filePath);
+            
+          // Update user metadata with the file URL
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: { 
+              license_file_url: publicUrlData.publicUrl 
+            }
+          });
+          
+          if (updateError) {
+            console.error('Failed to update user with license file URL:', updateError);
+            // Don't throw here as the main registration was successful
+          }
+
+          console.log('License file uploaded successfully:', publicUrlData.publicUrl);
+          
+        } catch (uploadError) {
+          console.error('File upload failed:', uploadError);
+          // User account is created, but file upload failed
+          setErrors({
+            submit: `Account created successfully, but license file upload failed: ${uploadError.message}. Please contact support to complete your verification.`,
+          });
+          return;
+        }
+      }
+
+      setSuccessMessage(
+        formData.userType === "doctor" 
+          ? "Registration successful! Please check your email and click the confirmation link to activate your account. Your license will be reviewed once confirmed."
+          : "Registration successful! Please check your email and click the confirmation link to activate your account."
+      );
+      resetForm();
+
+    } catch (error) {
+      console.error("Registration error:", error);
+      setErrors({
+        submit: `Registration failed: ${error.message}`,
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, 0);
-};
-
+  }, [formData, hasAcceptedTerms, doctorVerification, validateForm, resetForm]);
 
   const handleGoogleSignUp = useCallback(async () => {
     if (!hasAcceptedTerms) {
@@ -410,8 +526,9 @@ const handleDoctorModalSubmit = async (data) => {
               name="userType"
               value={formData.userType}
               onChange={handleChange}
-              className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${errors.userType ? "ring-2 ring-red-400" : ""
-                }`}
+              className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${
+                errors.userType ? "ring-2 ring-red-400" : ""
+              }`}
               required
               disabled={isLoading}
             >
@@ -478,15 +595,16 @@ const handleDoctorModalSubmit = async (data) => {
         <button
           type="submit"
           disabled={isLoading}
-          className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${isLoading
+          className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
+            isLoading
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#55A1A4] hover:bg-[#368487]"
-            }`}
+          }`}
         >
           {isLoading ? "Creating Account..." : "Sign Up"}
         </button>
 
-        {/* Updated Terms and Conditions Section */}
+        {/* Terms and Conditions Section */}
         <div className="mt-2 w-4/5 mx-auto">
           <div className="flex items-start space-x-2">
             <input
@@ -549,6 +667,14 @@ const handleDoctorModalSubmit = async (data) => {
           </span>
         </div>
       </form>
+
+      {/* Doctor Verification Modal */}
+      <DoctorVerificationModal
+        isOpen={showDoctorModal}
+        onClose={handleDoctorModalClose}
+        onSubmit={handleDoctorModalSubmit}
+        isLoading={isLoading}
+      />
 
       {/* Terms and Conditions Modal */}
       <TermsModal
