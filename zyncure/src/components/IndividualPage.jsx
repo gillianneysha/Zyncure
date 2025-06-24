@@ -1,4 +1,4 @@
-import { PencilIcon, ChevronRight, ArrowLeft, Eye, EyeClosed } from "lucide-react";
+import { PencilIcon, ChevronRight, ArrowLeft, Eye, EyeClosed, Smartphone, CreditCard } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "../client";
 import PasswordInput from "./PasswordInput";
@@ -6,6 +6,7 @@ import PasswordSuccessModal from "./PasswordSuccessModal";
 import PersonalInfoSuccessModal from "./PersonalInfoSuccessModal";
 import LogoutModal from "./LogoutModal"; 
 import DeleteAccountModal from "./DeleteAccountModal";
+
 
 export function PersonalInfoForm() {
   const [formData, setFormData] = useState({
@@ -224,9 +225,9 @@ export function SecurityPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showOldPassword, setShowOldPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // const [showOldPassword, setShowOldPassword] = useState(false);
+  // const [showNewPassword, setShowNewPassword] = useState(false);
+  // const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   if (showChangePassword) {
     const handleChangePassword = async (e) => {
@@ -351,7 +352,7 @@ export function SecurityPage() {
     const Toggle = ({ enabled, onChange }) => (
       <button
         type="button"
-        className={`relative inline-flex h-6 w-11 items-center rounded-full ${enabled ? "bg-profileHeader" : "bg-gray-200"}`}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full ${enabled ? "bg-profileHeader" : "bg-mySidebar"}`}
         onClick={() => onChange(!enabled)}
       >
         <span
@@ -523,22 +524,164 @@ export function NotificationPage() {
   );
 }
 
+
+
+
+
+
 export function BillingPage() {
   const [showPlans, setShowPlans] = useState(false);
   const [selectedTier, setSelectedTier] = useState("");
-  const [billingStep, setBillingStep] = useState("home");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [user, setUser] = useState(null);
+  const [currentSubscription, setCurrentSubscription] = useState(null);
+
+  // Tier pricing (in PHP)
+  const tierPricing = {
+    premium: 299,
+    pro: 599
+  };
+
+  // Get current user and subscription on component mount
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        
+        setUser(user);
+        
+        if (user) {
+          // Fixed subscription query - use proper filter format
+          const { data: subscription, error: subError } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(); // Use maybeSingle instead of single to avoid error if no records
+          
+          if (subError) {
+            console.error('Subscription fetch error:', subError);
+          } else {
+            setCurrentSubscription(subscription);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user:', error);
+      }
+    };
+
+    getCurrentUser();
+  }, []);
 
   const handleOptionClick = (option) => {
     if (option === "Subscriptions") setShowPlans(true);
-    else if (option === "Payment methods") setBillingStep("methods");
     else if (option === "Contact Information") {
-      // Add logic for Contact Information if ever
+      // Add logic for Contact Information if needed
     }
+  };
+
+  // Create PayMongo Payment Link
+  const createPaymentLink = async (amount, description) => {
+    if (!user) {
+      alert('Please log in to continue');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      
+      // Create payment record with proper data structure
+      const paymentData = {
+        user_id: user.id,
+        amount: amount * 100, // Convert to centavos
+        currency: 'PHP',
+        status: 'pending',
+        payment_method: 'online', // Generic since PayMongo handles the specific method
+        tier: selectedTier
+      };
+
+      console.log('Creating payment record:', paymentData);
+
+      const { data: paymentRecord, error: paymentError } = await supabase
+        .from('payments')
+        .insert(paymentData)
+        .select()
+        .single();
+
+      if (paymentError) {
+        console.error('Payment insert error:', paymentError);
+        throw new Error(`Failed to create payment record: ${paymentError.message}`);
+      }
+
+      console.log('Payment record created:', paymentRecord);
+
+      // Create PayMongo payment link using edge function
+      const { data: paymentLinkData, error: linkError } = await supabase.functions.invoke('create-payment-link', {
+        body: {
+          amount: amount * 100, // Convert to centavos
+          currency: 'PHP',
+          description: description,
+          remarks: `ZynCure ${selectedTier} subscription - User: ${user.id}`,
+          payment_record_id: paymentRecord.id
+        }
+      });
+
+      if (linkError) {
+        console.error('Payment link creation error:', linkError);
+        throw new Error(`Failed to create payment link: ${linkError.message}`);
+      }
+
+      if (paymentLinkData?.checkout_url) {
+        // Update payment record with PayMongo link ID
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({ 
+            paymongo_link_id: paymentLinkData.link_id,
+            paymongo_payment_id: paymentLinkData.payment_id 
+          })
+          .eq('id', paymentRecord.id);
+
+        if (updateError) {
+          console.error('Payment update error:', updateError);
+        }
+
+        // Redirect to PayMongo checkout
+        window.location.href = paymentLinkData.checkout_url;
+      } else {
+        throw new Error('No checkout URL received from payment link creation');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert(`Payment processing failed: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle subscription
+  const handleSubscribe = () => {
+    if (!selectedTier) {
+      alert('Please select a subscription tier');
+      return;
+    }
+    
+    if (!user) {
+      alert('Please log in to continue');
+      return;
+    }
+    
+    const amount = tierPricing[selectedTier];
+    const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription`;
+    
+    createPaymentLink(amount, description);
   };
 
   const SecurityOption = ({ title, onClick }) => (
     <div
-      className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
+      className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-50 transition-colors"
       onClick={() => onClick(title)}
     >
       <span className="text-mySidebar">{title}</span>
@@ -546,24 +689,51 @@ export function BillingPage() {
     </div>
   );
 
+  // Show current subscription status
+  const renderSubscriptionStatus = () => {
+    if (!currentSubscription) return null;
+    
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+        <h3 className="text-green-800 font-semibold">Current Subscription</h3>
+        <p className="text-green-600">
+          {currentSubscription.tier.charAt(0).toUpperCase() + currentSubscription.tier.slice(1)} Plan
+        </p>
+        {currentSubscription.expires_at && (
+          <p className="text-green-600 text-sm">
+            Expires: {new Date(currentSubscription.expires_at).toLocaleDateString()}
+          </p>
+        )}
+        <p className="text-green-600 text-sm">
+          Status: {currentSubscription.status.charAt(0).toUpperCase() + currentSubscription.status.slice(1)}
+        </p>
+      </div>
+    );
+  };
+
+  // Subscriptions page
   if (showPlans) {
     return (
       <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
         <button
           onClick={() => setShowPlans(false)}
-          className="flex items-center text-mySidebar mb-6 hover:underline"
+          className="flex items-center text-gray-600 mb-6 hover:underline"
         >
           <ArrowLeft className="mr-2" size={20} /> Back to Billing
         </button>
-        <h2 className="text-4xl text-[#55A1A4] font-bold mb-2">Upgrade to Premium</h2>
-        <p className="text-[#55A1A4] mb-8">Enjoy an enhanced experience</p>
+        
+        {renderSubscriptionStatus()}
+        
+        <h2 className="text-4xl text-teal-600 font-bold mb-2">Upgrade to Premium</h2>
+        <p className="text-teal-600 mb-8">Enjoy an enhanced experience</p>
+        
         <div className="flex gap-6">
-          {/* Tier 1 */}
-          <div className="bg-[#FFEDE7] rounded-2xl p-6 flex-1 relative">
-            <h3 className="font-bold text-[#F46B5D] mb-2">
+          {/* Tier 1 - Free */}
+          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
+            <h3 className="font-bold text-orange-600 mb-2">
               Tier 1: Free <span className="font-normal text-sm">(Basic Access)</span>
             </h3>
-            <ul className="text-[#F46B5D] text-sm space-y-2">
+            <ul className="text-orange-600 text-sm space-y-2">
               <li>✓ View and manage personal health records.</li>
               <li>✓ Upload and store up to 2GB of medical files.</li>
               <li>✓ Share records with up to 3 healthcare providers.</li>
@@ -573,50 +743,46 @@ export function BillingPage() {
               <li>✓ Ability to export health records in a standard format (e.g., PDF).</li>
             </ul>
           </div>
-          {/* Tier 2 */}
-          <div className="bg-[#FFEDE7] rounded-2xl p-6 flex-1 relative">
+          
+          {/* Tier 2 - Premium */}
+          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
             <input
               type="radio"
               name="subscriptionTier"
               value="premium"
               checked={selectedTier === "premium"}
               onChange={() => setSelectedTier("premium")}
-              className="absolute top-6 right-6 w-5 h-5 accent-[#F46B5D] cursor-pointer"
+              className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
               aria-label="Select Premium"
-              style={{
-                borderWidth: "1.5px",
-                borderColor: "#F46B5D"
-              }}
             />
-            <h3 className="font-bold text-[#F46B5D] mb-2">
+            <h3 className="font-bold text-orange-600 mb-2">
               Tier 2: Premium <span className="font-normal text-sm">(Enhanced Access)</span>
             </h3>
-            <ul className="text-[#F46B5D] text-sm space-y-2">
+            <p className="text-orange-600 font-bold mb-2">₱299/month</p>
+            <ul className="text-orange-600 text-sm space-y-2">
               <li>✓ All features in the Free tier</li>
               <li>✓ Increased storage capacity up to 5GB.</li>
               <li>✓ Track all predefined symptoms and custom symptoms.</li>
               <li>✓ Share records with unlimited healthcare providers.</li>
             </ul>
           </div>
-          {/* Tier 3 */}
-          <div className="bg-[#FFEDE7] rounded-2xl p-6 flex-1 relative">
+          
+          {/* Tier 3 - Pro */}
+          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
             <input
               type="radio"
               name="subscriptionTier"
               value="pro"
               checked={selectedTier === "pro"}
               onChange={() => setSelectedTier("pro")}
-              className="absolute top-6 right-6 w-5 h-5 accent-[#F46B5D] cursor-pointer"
+              className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
               aria-label="Select Pro"
-              style={{
-                borderWidth: "1.5px",
-                borderColor: "#F46B5D"
-              }}
             />
-            <h3 className="font-bold text-[#F46B5D] mb-2">
+            <h3 className="font-bold text-orange-600 mb-2">
               Tier 3: Pro <span className="font-normal text-sm">(Comprehensive Access)</span>
             </h3>
-            <ul className="text-[#F46B5D] text-sm space-y-2">
+            <p className="text-orange-600 font-bold mb-2">₱599/month</p>
+            <ul className="text-orange-600 text-sm space-y-2">
               <li>✓ All features in the Premium tier</li>
               <li>✓ Priority support for technical issues</li>
               <li>✓ Early access to future feature expansions and integrations.</li>
@@ -624,129 +790,52 @@ export function BillingPage() {
             </ul>
           </div>
         </div>
+        
         <div className="flex justify-center mt-8">
           <button
-            className="bg-[#55A1A4] text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition"
-            disabled={!selectedTier}
+            className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
+            disabled={!selectedTier || isProcessing || !user}
+            onClick={handleSubscribe}
           >
-            Subscribe
+            {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (billingStep === "methods") {
-    return (
-      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
-        <button
-          onClick={() => setBillingStep("home")}
-          className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
-        >
-          <ArrowLeft className="mr-2" size={20} /> Back to Billing
-        </button>
-        <h2 className="text-4xl text-profileHeader font-bold mb-2">Payment Methods</h2>
-        <p className="text-zyncureOrange mb-8">Select your mode of payment and input your information</p>
-        <div
-          className="bg-[#FFEDE7] rounded-xl flex items-center px-6 py-5 cursor-pointer hover:bg-[#f9d3c2] transition mb-4"
-          onClick={() => setBillingStep("details")}
-        >
-          <div className="w-10 h-10 mr-4 rounded-lg flex items-center justify-center bg-black">
-            <img
-              src="https://cdn.brandfetch.io/id_IE4goUp/theme/dark/logo.svg?c=1dxbfHSJFAPEGdCLU4o5B"
-              alt="Maya Bank"
-              className="w-8 h-8"
-              style={{ objectFit: "contain" }}
-            />
-          </div>
-          <span className="text-[#F46B5D] font-semibold text-lg flex-1">Maya Bank</span>
-          <ChevronRight className="text-[#F46B5D]" size={28} />
-        </div>
-      </div>
-    );
-  }
-
-  if (billingStep === "details") {
-    return (
-      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
-        <button
-          onClick={() => setBillingStep("methods")}
-          className="flex items-center text-mySidebar mb-6 hover:underline w-fit"
-        >
-          <ArrowLeft className="mr-2" size={20} /> Back to Payment Methods
-        </button>
-        <h2 className="text-4xl text-profileHeader font-bold mb-2">Enter payment details</h2>
-        <p className="text-zyncureOrange mb-8">Select your mode of payment and input your information</p>
-        <div className="bg-[#FFEDE7] rounded-xl px-8 py-8 max-w-xl mx-auto">
-          <div className="flex items-center mb-6">
-            <div className="w-10 h-10 mr-4 rounded-lg flex items-center justify-center bg-black">
-              <img
-                src="https://cdn.brandfetch.io/id_IE4goUp/theme/dark/logo.svg?c=1dxbfHSJFAPEGdCLU4o5B"
-                alt="Maya Bank"
-                className="w-8 h-8"
-                style={{ objectFit: "contain" }}
-              />
-            </div>
-            <span className="text-[#F46B5D] font-semibold text-lg">Maya Bank</span>
-          </div>
-          <label className="block text-[#3BA4A0] font-semibold mb-2">
-            Enter your Maya mobile number
-          </label>
-          <div className="flex items-center mb-4">
-            <span className="px-4 py-2 bg-[#FEDED2] border border-[#F46B5D] rounded-l-[15.5px] text-[#F46B5D] font-semibold">+63</span>
-            <input
-              type="tel"
-              className="w-full p-2 bg-[#FEDED2] border-t border-b border-r border-[#F46B5D] rounded-r-[15.5px] outline-none"
-              placeholder="Mobile Number"
-            />
-          </div>
-          <p className="text-[#F46B5D] text-xs mb-4">
-            By checking the checkbox below, you agree that ZynCure will automatically continue your membership and charge the membership fee to your payment method until you cancel. You may cancel at any time to avoid future charges.
-          </p>
-          <div className="flex items-center mb-6">
-            <input type="checkbox" id="agree" className="mr-2 accent-[#F46B5D] w-5 h-5" />
-            <label htmlFor="agree" className="text-[#F46B5D] font-semibold">I Agree.</label>
-          </div>
-          <div className="flex justify-center mb-4">
-            <button className="bg-[#55A1A4] text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition">
-              Save
-            </button>
-          </div>
-          <p className="text-[#F46B5D] text-xs text-center">
-            You'll be taken to Maya to complete the payment setup, but you won't be charged right away.
+        
+        <div className="text-center mt-4">
+          <p className="text-sm text-gray-600">
+            You'll be redirected to PayMongo to complete your payment securely.
+            <br />
+            All major payment methods are supported (Cards, GCash, Maya, etc.)
           </p>
         </div>
       </div>
     );
   }
 
-  // --- Default Billing Home ---
-  if (billingStep === "home") {
-    return (
-      <div className="bg-profileBg rounded-xl p-8 h-[700px]">
-        <div className="mb-6">
-          <h2 className="text-4xl text-profileHeader font-bold">Billing</h2>
-          <p className="text-zyncureOrange text-left mt-3">
-            Payment methods and subscriptions are monitored here
-          </p>
-        </div>
-        <div className="mt-8">
-          <SecurityOption
-            title="Subscriptions"
-            onClick={handleOptionClick}
-          />
-          <SecurityOption
-            title="Payment methods"
-            onClick={handleOptionClick}
-          />
-          <SecurityOption
-            title="Contact Information"
-            onClick={handleOptionClick}
-          />
-        </div>
+  // Default Billing Home
+  return (
+    <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+      <div className="mb-6">
+        <h2 className="text-4xl text-profileHeader font-bold">Billing</h2>
+        <p className="text-zyncureOrange text-left mt-3">
+          Manage your subscriptions and billing information
+        </p>
       </div>
-    );
-  }
+      
+      {renderSubscriptionStatus()}
+      
+      <div className="mt-8">
+        <SecurityOption
+          title="Subscriptions"
+          onClick={handleOptionClick}
+        />
+        <SecurityOption
+          title="Contact Information"
+          onClick={handleOptionClick}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function TermsOfServicePage({ onBack }) {

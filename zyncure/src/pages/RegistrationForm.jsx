@@ -144,44 +144,145 @@ export default function RegistrationForm() {
   const handleSubmit = useCallback(async (event) => {
     event.preventDefault();
 
-    if (!validateForm()) return;
+// Modified handleSubmit function with better error handling
+const handleSubmit = useCallback(async (event) => {
+  event.preventDefault();
+
+  if (!validateForm()) return;
+
+  // If Doctor, show modal first
+  if (formData.userType === "doctor" && !doctorVerification) {
+    setShowDoctorModal(true);
+    return;
+  }
+
+  setIsLoading(true);
+  setErrors({});
+  setSuccessMessage("");
+
+  try {
+    // First, create the user account
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          contact_number: formData.contactNumber,
+          birthdate: formData.birthdate,
+          user_type: formData.userType,
+          // Add initial doctor data without file URL
+          ...(formData.userType === "doctor" && doctorVerification && {
+            license_number: doctorVerification.licenseNumber,
+            status: "pending"
+          })
+        },
+        emailRedirectTo: `${window.location.origin}/dashboard`
+      },
+    });
+
 
     setIsLoading(true);
     setErrors({});
     setSuccessMessage("");
 
-    try {
-      const { error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            contact_number: formData.contactNumber,
-            birthdate: formData.birthdate,
-            user_type: formData.userType,
-          },
-          emailRedirectTo: `${window.location.origin}/dashboard`
-        },
-      });
+
+    // For doctors, handle file upload after user creation
+    if (formData.userType === "doctor" && doctorVerification?.licenseFile) {
+      console.log('Uploading license file for user:', authData.user.id);
+      
+      // Wait a moment to ensure user is fully created
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if user is authenticated
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('User not authenticated for file upload:', userError);
+        throw new Error('Authentication required for file upload');
+      }
+      
+      const fileExt = doctorVerification.licenseFile.name.split('.').pop();
+      const filePath = `${authData.user.id}/${Date.now()}_license.${fileExt}`;
+      
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from("doctor-licenses")
+          .upload(filePath, doctorVerification.licenseFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          // If it's a policy error, provide helpful message
+          if (uploadError.message.includes('policy')) {
+            throw new Error('File upload permission denied. Please contact support.');
+          }
+          throw uploadError;
+        }
+
+        // Get public URL and update user metadata
+        const { data: publicUrlData } = supabase.storage
+          .from("doctor-licenses")
+          .getPublicUrl(filePath);
+          
+        // Update user metadata with the file URL
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: { 
+            license_file_url: publicUrlData.publicUrl 
+          }
+        });
+        
+        if (updateError) {
+          console.error('Failed to update user with license file URL:', updateError);
+          // Don't throw here as the main registration was successful
+        }
+
+        console.log('License file uploaded successfully:', publicUrlData.publicUrl);
+        
+      } catch (uploadError) {
+        console.error('File upload failed:', uploadError);
+        // User account is created, but file upload failed
+        // You might want to show a different message here
+        setErrors({
+          submit: `Account created successfully, but license file upload failed: ${uploadError.message}. Please contact support to complete your verification.`,
+        });
+        return;
+      }
+    }
+
+    setSuccessMessage(
+      formData.userType === "doctor" 
+        ? "Registration successful! Please check your email and click the confirmation link to activate your account. Your license will be reviewed once confirmed."
+        : "Registration successful! Please check your email and click the confirmation link to activate your account."
+    );
+    resetForm();
+    setDoctorVerification(null);
+
 
       if (authError) throw authError;
 
-      setSuccessMessage(
-        "Registration successful! Please check your email and click the confirmation link to activate your account."
-      );
-      resetForm();
 
-    } catch (error) {
-      console.error("Registration error:", error);
-      setErrors({
-        submit: error.message || "Registration failed. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
+// Simplified handleDoctorModalSubmit - just store the file, don't upload yet
+const handleDoctorModalSubmit = async (data) => {
+  setShowDoctorModal(false);
+  
+  // Store the doctor verification data including the actual file
+  setDoctorVerification({
+    licenseNumber: data.licenseNumber,
+    licenseFile: data.licenseFile, // Store the actual file object
+  });
+
+  // Continue with registration
+  setTimeout(() => {
+    const form = document.querySelector("form");
+    if (form) {
+      form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     }
-  }, [formData, validateForm, resetForm]);
+  }, 0);
+};
+
 
   const handleGoogleSignUp = useCallback(async () => {
     if (!hasAcceptedTerms) {
