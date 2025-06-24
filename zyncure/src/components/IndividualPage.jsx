@@ -10,7 +10,6 @@ import DeleteAccountModal from "./DeleteAccountModal";
 export function PersonalInfoForm() {
   const [formData, setFormData] = useState({
     firstName: "",
-    middleName: "",
     lastName: "",
     email: "",
     birthdate: "",
@@ -47,7 +46,6 @@ export function PersonalInfoForm() {
       }
       setFormData({
         firstName: profile.first_name || "",
-        middleName: profile.middle_name || "",
         lastName: profile.last_name || "",
         email: user.email || "",
         birthdate: profile.birthdate || "",
@@ -55,7 +53,6 @@ export function PersonalInfoForm() {
       });
       setOriginalData({
         firstName: profile.first_name || "",
-        middleName: profile.middle_name || "",
         lastName: profile.last_name || "",
         email: user.email || "",
         birthdate: profile.birthdate || "",
@@ -92,7 +89,6 @@ export function PersonalInfoForm() {
       .upsert({
         id: user.id,
         first_name: formData.firstName,
-        middle_name: formData.middleName,
         last_name: formData.lastName,
         birthdate: formData.birthdate,
         contact_number: formData.mobileNumber,
@@ -145,17 +141,6 @@ export function PersonalInfoForm() {
             type="text"
             name="firstName"
             value={formData.firstName}
-            onChange={handleChange}
-            className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
-            disabled={!isEditing || loading || saving}
-          />
-        </div>
-        <div>
-          <label className="block text-mySidebar mb-1">Middle Name</label>
-          <input
-            type="text"
-            name="middleName"
-            value={formData.middleName}
             onChange={handleChange}
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
             disabled={!isEditing || loading || saving}
