@@ -461,6 +461,20 @@ return { data: availableSlots12h, error: null };
   },
 
   /**
+ * Cancel an appointment by updating its status
+ * @param {string} appointmentId 
+ * @returns {object} 
+ */
+async cancelAppointment(appointmentId) {
+  try {
+    return await this.updateAppointment(appointmentId, { status: 'cancelled' });
+  } catch (error) {
+    console.error('Error in cancelAppointment:', error);
+    return { data: null, error: error.message };
+  }
+},
+
+  /**
 
    * @param {string} appointmentId
    * @returns {object} 
