@@ -4,6 +4,7 @@ import Calendar from '../../components/Calendar';
 import AppointmentModal from '../../components/AppointmentModal';
 import AppointmentList from '../../components/AppointmentList';
 import { appointmentService, userService } from '../../services/AppointmentService';
+import RescheduleModal from '../../components/RescheduleModal'; 
 
 const PersonalAppointmentTracker = () => {
   const [userData, setUserData] = useState({
@@ -11,6 +12,8 @@ const PersonalAppointmentTracker = () => {
     id: "----",
   });
 
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [appointmentToReschedule, setAppointmentToReschedule] = useState(null); 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [appointments, setAppointments] = useState([]);
@@ -188,6 +191,64 @@ const formatDateForStorage = (date) => {
     });
   };
 
+  const handleRescheduleRequest = (appointment) => {
+  setAppointmentToReschedule(appointment);
+  setShowRescheduleModal(true);
+  setError('');
+};
+
+const handleCancelRequest = async (appointment) => {
+  if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+    return;
+  }
+  
+  setLoading(true);
+  try {
+    const { error: cancelError } = await appointmentService.updateAppointment(
+      appointment.id, 
+      { status: 'cancelled' }
+    );
+    
+    if (cancelError) {
+      setError(`Failed to cancel appointment: ${cancelError}`);
+    } else {
+      // Update local state
+      setAppointments(prevAppointments => 
+        prevAppointments.map(apt => 
+          apt.id === appointment.id 
+            ? { ...apt, status: 'cancelled' }
+            : apt
+        )
+      );
+    }
+  } catch (err) {
+    console.error('Error cancelling appointment:', err);
+    setError('Failed to cancel appointment. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleRescheduleComplete = (updatedAppointment) => {
+  // Update the appointments list with the rescheduled appointment
+  setAppointments(prevAppointments => 
+    prevAppointments.map(apt => 
+      apt.id === updatedAppointment.id 
+        ? updatedAppointment 
+        : apt
+    )
+  );
+  
+  setShowRescheduleModal(false);
+  setAppointmentToReschedule(null);
+};
+
+const handleCloseRescheduleModal = () => {
+  setShowRescheduleModal(false);
+  setAppointmentToReschedule(null);
+  setError('');
+};
+
   return (
     <div className="max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold text-myHeader mb-4 self-start">My Appointments</h1>
@@ -227,11 +288,13 @@ const formatDateForStorage = (date) => {
 
         {/* Right Appointments Section */}
         <div className="flex-1">
-          <AppointmentList
-            selectedDate={selectedDate}
-            appointments={appointments}
-            doctors={doctors}
-          />
+         <AppointmentList
+  selectedDate={selectedDate}
+  appointments={appointments}
+  doctors={doctors}
+  onRescheduleRequest={handleRescheduleRequest}
+  onCancelRequest={handleCancelRequest}
+/>
         </div>
       </div>
 
@@ -250,6 +313,15 @@ const formatDateForStorage = (date) => {
         error={error}
         setError={setError}
       />
+
+      {/* Reschedule Modal */}
+<RescheduleModal
+  isOpen={showRescheduleModal}
+  onClose={handleCloseRescheduleModal}
+  appointment={appointmentToReschedule}
+  doctors={doctors}
+  onRescheduleComplete={handleRescheduleComplete}
+/>
     </div>
   );
 };

@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Eye, Share2, Bell, Calendar, FileText } from 'lucide-react';
+import { Search, Eye, Share2, Bell, Calendar, FileText, Users } from 'lucide-react';
+import { supabase } from '../../client'; 
+
+
 
 const Dashboard = () => {
+  // State for backend data
+  const [connectedPatients, setConnectedPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
+  // Keep existing hardcoded data for other sections
   const [recentRecords] = useState([
     { id: 1, patient: 'Jane Smith', type: 'Blood Test', date: '03/22/2025' },
     { id: 2, patient: 'Anne Doe', type: 'Blood Test', date: '03/22/2025' },
@@ -15,24 +23,96 @@ const Dashboard = () => {
     { id: 3, message: 'Upcoming appointment with Jane Smith', time: 'Today 5:00PM' }
   ]);
 
-  const [patients] = useState([
-    { id: 1, name: 'Maria Santos', lastVisit: '03/25/2025', status: 'Active' },
-    { id: 2, name: 'Maria Santos', lastVisit: '03/25/2025', status: 'Active' },
-    { id: 3, name: 'Maria Santos', lastVisit: '03/25/2025', status: 'Active' }
-  ]);
-
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredPatients, setFilteredPatients] = useState(patients);
+  const [filteredPatients, setFilteredPatients] = useState([]);
 
-  // Filter patients based on search - can be replaced with backend search
+  // Fetch doctor's connected patients from Supabase
+  const fetchConnectedPatients = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Use the doctor_connection_details view to get connected patients
+      const { data, error: supabaseError } = await supabase
+        .from('doctor_connection_details')
+        .select('*')
+        .eq('status', 'accepted'); // Only get accepted connections
+
+      if (supabaseError) {
+        throw supabaseError;
+      }
+
+      setConnectedPatients(data || []);
+
+    } catch (err) {
+      console.error('Error fetching connected patients:', err);
+      setError(err.message);
+      // Fallback to demo data for development
+      setConnectedPatients([
+        {
+          id: 1,
+          patient_id: 'demo-1',
+          patient_first_name: 'Maria',
+          patient_last_name: 'Santos',
+          patient_email: 'maria.santos@email.com',
+          patient_short_id: 'MS01',
+          created_at: '2025-03-25T10:00:00Z',
+          status: 'accepted'
+        },
+        {
+          id: 2,
+          patient_id: 'demo-2',
+          patient_first_name: 'Juan',
+          patient_last_name: 'Dela Cruz',
+          patient_email: 'juan.delacruz@email.com',
+          patient_short_id: 'JD02',
+          created_at: '2025-03-24T14:30:00Z',
+          status: 'accepted'
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter patients based on search
   useEffect(() => {
-    const filtered = patients.filter(patient =>
-      patient.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const filtered = connectedPatients.filter(patient =>
+      patient.patient_first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.patient_last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.patient_short_id?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredPatients(filtered);
-  }, [searchTerm, patients]);
+  }, [searchTerm, connectedPatients]);
 
-  // Placeholder functions for backend integration
+  // Load data on component mount
+  useEffect(() => {
+    fetchConnectedPatients();
+  }, []);
+
+  // Handle connection actions
+  const handleRemoveConnection = async (connectionId) => {
+    if (!confirm('Are you sure you want to remove this patient connection?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .rpc('remove_connection', { connection_id: connectionId });
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh data
+      await fetchConnectedPatients();
+    } catch (err) {
+      console.error('Error removing connection:', err);
+      alert('Failed to remove connection');
+    }
+  };
+
+  // Helper functions
   const handleViewRecord = (recordId) => {
     console.log(`View record ${recordId}`);
     // TODO: Navigate to record detail or open modal
@@ -45,7 +125,7 @@ const Dashboard = () => {
 
   const handleViewPatient = (patientId) => {
     console.log(`View patient ${patientId}`);
-    // TODO: Navigate to patient detail
+    // TODO: Navigate to patient detail page
   };
 
   const handleSharePatient = (patientId) => {
@@ -53,11 +133,19 @@ const Dashboard = () => {
     // TODO: Open share dialog or functionality
   };
 
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Dashboard Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-teal-600 mb-2">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-teal-600 mb-2">Doctor Dashboard</h1>
       </div>
 
       {/* Top Section - Recently Shared Records and Alerts */}
@@ -114,12 +202,12 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Patient List Section */}
+      {/* Connected Patients Section */}
       <div className="bg-red-50 rounded-lg p-6 border border-red-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-teal-600 flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Patient List
+            <Users className="w-5 h-5" />
+            Connected Patients ({connectedPatients.length})
           </h2>
           
           {/* Search Bar */}
@@ -127,7 +215,7 @@ const Dashboard = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Patient Name"
+              placeholder="Search patients..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
@@ -135,59 +223,93 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Patient Table */}
-        <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
-          {/* Table Header */}
-          <div className="grid grid-cols-4 gap-4 p-4 bg-red-100 border-b border-red-200">
-            <div className="font-medium text-red-700">Patient Name</div>
-            <div className="font-medium text-red-700">Last Visit</div>
-            <div className="font-medium text-red-700">Status</div>
-            <div className="font-medium text-red-700">Action</div>
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-8">
+            <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading patient connections...</p>
           </div>
+        )}
 
-          {/* Table Body */}
-          <div className="divide-y divide-red-100">
-            {filteredPatients.map((patient) => (
-              <div key={patient.id} className="grid grid-cols-4 gap-4 p-4 hover:bg-red-25 transition-colors">
-                <div className="text-red-700 font-medium">{patient.name}</div>
-                <div className="text-gray-600">{patient.lastVisit}</div>
-                <div className="text-red-600 font-medium">{patient.status}</div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleViewPatient(patient.id)}
-                    className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"
-                  >
-                    <Eye className="w-3 h-3" />
-                    View
-                  </button>
-                  <button
-                    onClick={() => handleSharePatient(patient.id)}
-                    className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"
-                  >
-                    <Share2 className="w-3 h-3" />
-                    Share
-                  </button>
-                </div>
-              </div>
-            ))}
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-8 text-red-600">
+            <p>Error loading connections: {error}</p>
+            <button
+              onClick={fetchConnectedPatients}
+              className="mt-2 px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors"
+            >
+              Retry
+            </button>
           </div>
+        )}
 
-          {/* Empty State */}
-          {filteredPatients.length === 0 && (
-            <div className="p-8 text-center text-gray-500">
-              <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>No patients found matching your search.</p>
+        {/* Connected Patients Table */}
+        {!loading && !error && (
+          <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
+            {/* Table Header */}
+            <div className="grid grid-cols-5 gap-4 p-4 bg-red-100 border-b border-red-200">
+              <div className="font-medium text-red-700">Patient ID</div>
+              <div className="font-medium text-red-700">Patient Name</div>
+              <div className="font-medium text-red-700">Email</div>
+              <div className="font-medium text-red-700">Connected Since</div>
+              <div className="font-medium text-red-700">Actions</div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Loading/Error States - Ready for backend integration */}
-      {/* 
-      Example usage:
-      {loading && <div className="text-center py-8">Loading...</div>}
-      {error && <div className="text-center py-8 text-red-600">Error: {error}</div>}
-      */}
+            {/* Table Body */}
+            <div className="divide-y divide-red-100">
+              {filteredPatients.map((patient) => (
+                <div key={patient.id} className="grid grid-cols-5 gap-4 p-4 hover:bg-red-25 transition-colors">
+                  <div className="text-red-700 font-mono font-medium">{patient.patient_short_id}</div>
+                  <div className="text-red-700 font-medium">
+                    {patient.patient_first_name} {patient.patient_last_name}
+                  </div>
+                  <div className="text-gray-600">{patient.patient_email}</div>
+                  <div className="text-gray-600">{formatDate(patient.created_at)}</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleViewPatient(patient.patient_id)}
+                      className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"
+                    >
+                      <Eye className="w-3 h-3" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleSharePatient(patient.patient_id)}
+                      className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                    >
+                      <Share2 className="w-3 h-3" />
+                      Share
+                    </button>
+                    <button
+                      onClick={() => handleRemoveConnection(patient.id)}
+                      className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Empty State */}
+            {filteredPatients.length === 0 && !searchTerm && (
+              <div className="p-8 text-center text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No connected patients yet.</p>
+              </div>
+            )}
+
+            {/* Empty State for Search */}
+            {filteredPatients.length === 0 && searchTerm && (
+              <div className="p-8 text-center text-gray-500">
+                <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No patients found matching "{searchTerm}".</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
