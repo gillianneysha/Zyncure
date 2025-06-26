@@ -4,9 +4,8 @@ import { supabase } from "../client";
 import PasswordInput from "./PasswordInput";
 import PasswordSuccessModal from "./PasswordSuccessModal";
 import PersonalInfoSuccessModal from "./PersonalInfoSuccessModal";
-import LogoutModal from "./LogoutModal"; 
+import LogoutModal from "./LogoutModal";
 import DeleteAccountModal from "./DeleteAccountModal";
-
 
 export function PersonalInfoForm() {
   const [formData, setFormData] = useState({
@@ -22,49 +21,71 @@ export function PersonalInfoForm() {
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [originalData, setOriginalData] = useState(null); 
+  const [originalData, setOriginalData] = useState(null);
 
-  
   useEffect(() => {
     async function fetchUserInfo() {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError) {
+          console.error("Error getting user:", userError);
+          setError("Failed to authenticate user");
+          setLoading(false);
+          return;
+        }
+
+        if (!user) {
+          setError("No user found");
+          setLoading(false);
+          return;
+        }
+
+        console.log("User ID:", user.id); // Debug log
+
+        let profile = {};
+        let { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 is "not found"
+          console.error("Error fetching profile:", profileError);
+          setError("Failed to fetch profile data");
+          setLoading(false);
+          return;
+        }
+
+        if (profileData) {
+          profile = profileData;
+          console.log("Profile data found:", profile); // Debug log
+        } else {
+          profile = user.user_metadata || {};
+          console.log("Using user metadata:", profile); // Debug log
+        }
+
+        const userData = {
+          firstName: profile.first_name || "",
+          lastName: profile.last_name || "",
+          email: user.email || "",
+          birthdate: profile.birthdate || "",
+          mobileNumber: profile.contact_number || "",
+        };
+
+        setFormData(userData);
+        setOriginalData(userData);
         setLoading(false);
-        return;
+      } catch (err) {
+        console.error("Unexpected error in fetchUserInfo:", err);
+        setError("An unexpected error occurred");
+        setLoading(false);
       }
-  
-      let profile = {};
-      let { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      if (profileData) {
-        profile = profileData;
-      } else {
-        profile = user.user_metadata || {};
-      }
-      setFormData({
-        firstName: profile.first_name || "",
-        lastName: profile.last_name || "",
-        email: user.email || "",
-        birthdate: profile.birthdate || "",
-        mobileNumber: profile.contact_number || "",
-      });
-      setOriginalData({
-        firstName: profile.first_name || "",
-        lastName: profile.last_name || "",
-        email: user.email || "",
-        birthdate: profile.birthdate || "",
-        mobileNumber: profile.contact_number || "",
-      }); // <-- Add this
-      setLoading(false);
     }
     fetchUserInfo();
   }, []);
 
- 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -73,43 +94,81 @@ export function PersonalInfoForm() {
     }));
   };
 
- 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     setSuccess("");
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setError("Not authenticated.");
-      setSaving(false);
-      return;
-    }
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .upsert({
+
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error("Error getting user for save:", userError);
+        setError("Authentication failed");
+        setSaving(false);
+        return;
+      }
+
+      if (!user) {
+        setError("Not authenticated.");
+        setSaving(false);
+        return;
+      }
+
+      console.log("Attempting to save for user:", user.id); // Debug log
+      console.log("Form data to save:", formData); // Debug log
+
+      // Prepare the data for upsert
+      const profileData = {
         id: user.id,
         first_name: formData.firstName,
         last_name: formData.lastName,
         birthdate: formData.birthdate,
         contact_number: formData.mobileNumber,
         updated_at: new Date().toISOString(),
-      });
-    if (updateError) {
-      setError("Failed to save changes.");
-    } else {
-      setSuccess("");
-      setShowSuccessModal(true); 
-      setIsEditing(false);
+      };
+
+      console.log("Profile data for upsert:", profileData); // Debug log
+
+      const { data, error: updateError } = await supabase
+        .from("profiles")
+        .upsert(profileData, {
+          onConflict: 'id'
+        });
+
+      if (updateError) {
+        console.error("Database error:", updateError);
+        setError(`Failed to save changes: ${updateError.message}`);
+      } else {
+        console.log("Save successful:", data); // Debug log
+        setSuccess("");
+        setShowSuccessModal(true);
+        setIsEditing(false);
+        // Update originalData to reflect the saved state
+        setOriginalData({ ...formData });
+      }
+    } catch (err) {
+      console.error("Unexpected error in handleSave:", err);
+      setError("An unexpected error occurred while saving");
     }
+
     setSaving(false);
   };
 
   const isChanged = originalData
     ? Object.keys(formData).some(
-        (key) => formData[key] !== originalData[key]
-      )
+      (key) => formData[key] !== originalData[key]
+    )
     : false;
+
+  if (loading) {
+    return (
+      <div className="bg-profileBg rounded-xl p-8 h-[700px] flex items-center justify-center">
+        <div className="text-mySidebar">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
@@ -195,9 +254,8 @@ export function PersonalInfoForm() {
         <div className="flex justify-center pt-4">
           <button
             type="submit"
-            className={`bg-[#55A1A4] text-white px-6 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition ${
-              (!isEditing || loading || saving || !isChanged) ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`bg-[#55A1A4] text-white px-6 py-2 rounded-xl font-semibold text-lg hover:bg-[#368487] transition ${(!isEditing || loading || saving || !isChanged) ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             disabled={!isEditing || loading || saving || !isChanged}
           >
             {saving ? "Saving..." : "Save"}
@@ -250,11 +308,11 @@ export function SecurityPage() {
 
       setLoading(true);
       try {
-        
+
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
 
-        
+
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: user.email,
           password: oldPassword,
@@ -265,7 +323,7 @@ export function SecurityPage() {
           return;
         }
 
-       
+
         const { error: updateError } = await supabase.auth.updateUser({
           password: newPassword,
         });
@@ -284,8 +342,8 @@ export function SecurityPage() {
 
     const handleModalClose = () => {
       setShowSuccessModal(false);
-     
-      setShowChangePassword(false); 
+
+      setShowChangePassword(false);
     };
 
     return (
@@ -348,7 +406,7 @@ export function SecurityPage() {
   }
 
   if (showTwoFactor) {
-   
+
     const Toggle = ({ enabled, onChange }) => (
       <button
         type="button"
@@ -434,7 +492,7 @@ export function NotificationPage() {
   const [eventPush, setEventPush] = useState(true);
   const [eventEmail, setEventEmail] = useState(true);
 
-  
+
   const Toggle = ({ enabled, onChange }) => {
     return (
       <button
@@ -451,7 +509,7 @@ export function NotificationPage() {
     );
   };
 
-  
+
   const NotificationCategory = ({
     title,
     description,
@@ -548,9 +606,9 @@ export function BillingPage() {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
-        
+
         setUser(user);
-        
+
         if (user) {
           // Fixed subscription query - use proper filter format
           const { data: subscription, error: subError } = await supabase
@@ -561,7 +619,7 @@ export function BillingPage() {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(); // Use maybeSingle instead of single to avoid error if no records
-          
+
           if (subError) {
             console.error('Subscription fetch error:', subError);
           } else {
@@ -592,7 +650,7 @@ export function BillingPage() {
 
     try {
       setIsProcessing(true);
-      
+
       // Create payment record with proper data structure
       const paymentData = {
         user_id: user.id,
@@ -638,9 +696,9 @@ export function BillingPage() {
         // Update payment record with PayMongo link ID
         const { error: updateError } = await supabase
           .from('payments')
-          .update({ 
+          .update({
             paymongo_link_id: paymentLinkData.link_id,
-            paymongo_payment_id: paymentLinkData.payment_id 
+            paymongo_payment_id: paymentLinkData.payment_id
           })
           .eq('id', paymentRecord.id);
 
@@ -667,15 +725,15 @@ export function BillingPage() {
       alert('Please select a subscription tier');
       return;
     }
-    
+
     if (!user) {
       alert('Please log in to continue');
       return;
     }
-    
+
     const amount = tierPricing[selectedTier];
     const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription`;
-    
+
     createPaymentLink(amount, description);
   };
 
@@ -692,7 +750,7 @@ export function BillingPage() {
   // Show current subscription status
   const renderSubscriptionStatus = () => {
     if (!currentSubscription) return null;
-    
+
     return (
       <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
         <h3 className="text-green-800 font-semibold">Current Subscription</h3>
@@ -721,12 +779,12 @@ export function BillingPage() {
         >
           <ArrowLeft className="mr-2" size={20} /> Back to Billing
         </button>
-        
+
         {renderSubscriptionStatus()}
-        
+
         <h2 className="text-4xl text-teal-600 font-bold mb-2">Upgrade to Premium</h2>
         <p className="text-teal-600 mb-8">Enjoy an enhanced experience</p>
-        
+
         <div className="flex gap-6">
           {/* Tier 1 - Free */}
           <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
@@ -743,7 +801,7 @@ export function BillingPage() {
               <li>✓ Ability to export health records in a standard format (e.g., PDF).</li>
             </ul>
           </div>
-          
+
           {/* Tier 2 - Premium */}
           <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
             <input
@@ -766,7 +824,7 @@ export function BillingPage() {
               <li>✓ Share records with unlimited healthcare providers.</li>
             </ul>
           </div>
-          
+
           {/* Tier 3 - Pro */}
           <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
             <input
@@ -790,7 +848,7 @@ export function BillingPage() {
             </ul>
           </div>
         </div>
-        
+
         <div className="flex justify-center mt-8">
           <button
             className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
@@ -800,7 +858,7 @@ export function BillingPage() {
             {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
           </button>
         </div>
-        
+
         <div className="text-center mt-4">
           <p className="text-sm text-gray-600">
             You'll be redirected to PayMongo to complete your payment securely.
@@ -821,9 +879,9 @@ export function BillingPage() {
           Manage your subscriptions and billing information
         </p>
       </div>
-      
+
       {renderSubscriptionStatus()}
-      
+
       <div className="mt-8">
         <SecurityOption
           title="Subscriptions"
@@ -1066,8 +1124,8 @@ export function PrivacyPolicyPage({ onBack }) {
         <p>
           If you have any questions, concerns, or requests regarding this Privacy Agreement or your data, please contact us at:<br />
           <b>Email:</b> <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a><br />
-          <b>Phone:</b> +63 (2) 1234-5678 
- 
+          <b>Phone:</b> +63 (2) 1234-5678
+
         </p>
         <p>
           Thank you for trusting ZynCure with your health information. We are committed to supporting you on your PCOS journey while protecting your privacy every step of the way.
