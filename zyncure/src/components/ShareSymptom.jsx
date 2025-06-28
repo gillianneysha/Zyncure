@@ -114,10 +114,13 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 className="w-full p-2 border border-gray-300 rounded-md"
               >
                 <option value="">Choose which symptoms</option>
-                <option value="Period">Period</option>
+                <option value="Period Flows">Period Flows</option>
+                <option value="Symptoms">Symptoms</option>
                 <option value="Feelings">Feelings</option>
-                <option value="Skin">Skin</option>
-                <option value="Metabolism">Metabolism</option>
+                <option value="Cravings">Cravings</option>
+                <option value="Energy">Energy</option>
+                <option value="Weight">Weight</option>
+                <option value="Custom">Custom</option>
               </select>
             </div>
 
