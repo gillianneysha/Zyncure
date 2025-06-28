@@ -185,7 +185,7 @@ const Home = () => {
         </div>
 
         {/* Health Tracking Navigation */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
+        {/* <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Quick Symptom Logging</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button className="p-4 rounded-lg border-2 border-pink-200 hover:border-pink-400 hover:bg-pink-50 transition-colors">
@@ -205,7 +205,7 @@ const Home = () => {
               <div className="font-medium text-gray-700">Metabolism</div>
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Charts Section */}
         <PatientCharts />
