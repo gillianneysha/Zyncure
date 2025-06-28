@@ -449,43 +449,8 @@ const PatientCharts = () => {
                 )}
             </div>
 
-            {/* Summary Section */}
-            <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-6 border border-pink-200">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                    📊 Your PCOS Tracking Summary
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                    <div className="bg-white rounded-lg p-3">
-                        <div className="text-2xl font-bold text-pink-600">{symptomData.length}</div>
-                        <div className="text-sm text-gray-600">Total Entries</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3">
-                        <div className="text-2xl font-bold text-purple-600">
-                            {new Set(symptomData.map(item => item.symptoms)).size}
-                        </div>
-                        <div className="text-sm text-gray-600">Categories Tracked</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3">
-                        <div className="text-2xl font-bold text-blue-600">
-                            {new Set(symptomData.map(item => 
-                                new Date(item.date_logged).toDateString()
-                            )).size}
-                        </div>
-                        <div className="text-sm text-gray-600">Days Logged</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3">
-                        <div className="text-2xl font-bold text-green-600">
-                            {Math.round((new Set(symptomData.map(item => 
-                                new Date(item.date_logged).toDateString()
-                            )).size / 30) * 100) || 0}%
-                        </div>
-                        <div className="text-sm text-gray-600">Monthly Consistency</div>
-                    </div>
-                </div>
-                <p className="text-sm text-gray-700 mt-4 text-center">
-                    💡 Keep tracking consistently to identify patterns and share insights with your healthcare provider.
-                </p>
-            </div>
+           
+           
         </div>
     );
 };
