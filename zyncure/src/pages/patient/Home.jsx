@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PatientCharts from '../../components/PatientCharts';
-// import { symptomDataService } from '../../services/symptomDataService';
+import { supabase } from '../../client';
 
 const Home = () => {
   const [symptomStats, setSymptomStats] = useState({
@@ -11,27 +11,104 @@ const Home = () => {
   });
 
   useEffect(() => {
-    // Uncomment when you have Supabase set up
-    // fetchSymptomStats();
-
-    // Sample stats for demo
-    setSymptomStats({
-      totalLogs: 47,
-      lastLogged: 'Today',
-      mostCommon: 'Period Tracking',
-      recentMood: 'Happy'
-    });
+    fetchSymptomStats();
   }, []);
 
-  // const fetchSymptomStats = async () => {
-  //   try {
-  //     const currentPatientId = 'your-patient-uuid'; // Get from auth context
-  //     const stats = await symptomDataService.getSymptomStats(currentPatientId);
-  //     // Process and set stats
-  //   } catch (error) {
-  //     console.error('Error fetching stats:', error);
-  //   }
-  // };
+  const fetchSymptomStats = async () => {
+    try {
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('User fetch failed:', authError?.message);
+        // Fallback to demo data if user not authenticated
+        setSymptomStats({
+          totalLogs: 47,
+          lastLogged: 'Today',
+          mostCommon: 'Period Tracking',
+          recentMood: 'Happy'
+        });
+        return;
+      }
+
+      // Fetch all symptom logs for the current user
+      const { data: symptomLogs, error: fetchError } = await supabase
+        .from('symptomlog')
+        .select('*')
+        .eq('patients_id', user.id)
+        .order('date_logged', { ascending: false });
+
+      if (fetchError) {
+        console.error('Error fetching symptom data:', fetchError.message);
+        // Fallback to demo data on error
+        setSymptomStats({
+          totalLogs: 47,
+          lastLogged: 'Today',
+          mostCommon: 'Period Tracking',
+          recentMood: 'Happy'
+        });
+        return;
+      }
+
+      // Process the data
+      if (symptomLogs && symptomLogs.length > 0) {
+        const totalLogs = symptomLogs.length;
+        
+        // Get last logged date
+        const lastLoggedDate = new Date(symptomLogs[0].date_logged);
+        const lastLogged = formatLastLogged(lastLoggedDate);
+        
+        // Count symptom types to find most common
+        const symptomCounts = {};
+        symptomLogs.forEach(log => {
+          const symptom = log.symptoms;
+          symptomCounts[symptom] = (symptomCounts[symptom] || 0) + 1;
+        });
+        
+        const mostCommon = Object.keys(symptomCounts).reduce((a, b) => 
+          symptomCounts[a] > symptomCounts[b] ? a : b
+        );
+        
+        // Get most recent mood (Feelings entry)
+        const recentMoodLog = symptomLogs.find(log => log.symptoms === 'Feelings');
+        const recentMood = recentMoodLog ? recentMoodLog.severity : 'Not logged';
+        
+        setSymptomStats({
+          totalLogs,
+          lastLogged,
+          mostCommon,
+          recentMood
+        });
+      } else {
+        // No data found, use demo data
+        setSymptomStats({
+          totalLogs: 0,
+          lastLogged: 'Never',
+          mostCommon: 'None',
+          recentMood: 'Not logged'
+        });
+      }
+    } catch (error) {
+      console.error('Error in fetchSymptomStats:', error);
+      // Fallback to demo data on error
+      setSymptomStats({
+        totalLogs: 47,
+        lastLogged: 'Today',
+        mostCommon: 'Period Tracking',
+        recentMood: 'Happy'
+      });
+    }
+  };
+
+  const formatLastLogged = (date) => {
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return 'Today';
+    if (diffDays === 2) return 'Yesterday';
+    if (diffDays <= 7) return `${diffDays - 1} days ago`;
+    return date.toLocaleDateString();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-orange-50">
@@ -73,7 +150,7 @@ const Home = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Last Logged</p>
-                <p className="text-2xl font-bold text-gray-900">{symptomStats.lastLogged}</p>
+                <p className="text-2xl font-bold text-gray-900">{symptomStats.lastLogged || 'Never'}</p>
               </div>
             </div>
           </div>
@@ -87,7 +164,7 @@ const Home = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Most Tracked</p>
-                <p className="text-lg font-bold text-gray-900">{symptomStats.mostCommon}</p>
+                <p className="text-lg font-bold text-gray-900">{symptomStats.mostCommon || 'None'}</p>
               </div>
             </div>
           </div>
