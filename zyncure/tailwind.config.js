@@ -21,6 +21,9 @@ export default {
         profileHeader: "#55A1A4",
         profileSubtext: "#FB8F67"
       },
+      fontFamily: {
+        sans: ['Kumbh Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
     },
   },
   plugins: [],
