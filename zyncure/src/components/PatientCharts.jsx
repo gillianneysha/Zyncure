@@ -3,7 +3,7 @@ import { supabase } from '../client';
 import {
     LineChart, Line, AreaChart, Area, BarChart, Bar,
     PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
-    Tooltip, Legend, ResponsiveContainer
+    Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter
 } from 'recharts';
 
 const PatientCharts = () => {
@@ -17,136 +17,30 @@ const PatientCharts = () => {
 
     const fetchSymptomData = async () => {
         try {
-            console.log('=== STARTING FETCH SYMPTOM DATA ===');
-            
             // Get current user
             const { data: { user }, error: authError } = await supabase.auth.getUser();
             
-            if (authError) {
-                console.error('Auth error:', authError);
-                setLoading(false);
-                return;
-            }
-
-            if (!user) {
-                console.log('No authenticated user found');
-                setSymptomData([]);
+            if (authError || !user) {
+                console.error('Auth error:', authError?.message);
                 setLoading(false);
                 return;
             }
 
             setCurrentUser(user);
-            console.log('=== USER INFO ===');
-            console.log('Current user:', user);
-            console.log('User ID:', user.id);
-            console.log('User ID type:', typeof user.id);
-            console.log('User ID length:', user.id.length);
 
-            // Test basic connection to database - FIXED COUNT SYNTAX
-            console.log('=== TESTING DATABASE CONNECTION ===');
-            const { count, error: testError } = await supabase
-                .from('symptomlog')
-                .select('*', { count: 'exact', head: true });
-
-            console.log('Database test result:', { count, testError });
-
-            // Get ALL data to see what's in the database
-            console.log('=== FETCHING ALL DATA ===');
-            const { data: allData, error: allError } = await supabase
-                .from('symptomlog')
-                .select('*')
-                .order('date_logged', { ascending: false }); // Added ordering
-
-            console.log('All data query result:', {
-                error: allError,
-                totalRecords: allData?.length || 0,
-                allData: allData
-            });
-
-            if (allData && allData.length > 0) {
-                console.log('=== ANALYZING ALL DATA ===');
-                const uniquePatientIds = [...new Set(allData.map(item => item.patients_id))];
-                console.log('All unique patient IDs found:', uniquePatientIds);
-                
-                uniquePatientIds.forEach(id => {
-                    console.log(`Patient ID: ${id} (type: ${typeof id}, length: ${id?.length || 'N/A'})`);
-                    console.log(`Matches current user: ${id === user.id}`);
-                    console.log(`String comparison: ${id?.toString() === user.id.toString()}`);
-                });
-
-                // Count records per patient
-                const patientCounts = {};
-                allData.forEach(record => {
-                    const patientId = record.patients_id;
-                    patientCounts[patientId] = (patientCounts[patientId] || 0) + 1;
-                });
-                console.log('Records per patient:', patientCounts);
-            }
-
-            // Try multiple query variations
-            console.log('=== TRYING DIFFERENT QUERY METHODS ===');
-
-            // Method 1: Direct equality with ordering
-            const { data: method1Data, error: method1Error } = await supabase
+            // Fetch symptom data for current user
+            const { data: symptomLogs, error: fetchError } = await supabase
                 .from('symptomlog')
                 .select('*')
                 .eq('patients_id', user.id)
                 .order('date_logged', { ascending: false });
 
-            console.log('Method 1 (direct equality):', {
-                error: method1Error,
-                count: method1Data?.length || 0,
-                data: method1Data
-            });
-
-            // Method 2: Using RLS policy check - ensure user can see their data
-            const { data: method2Data, error: method2Error } = await supabase
-                .from('symptomlog')
-                .select('*')
-                .order('date_logged', { ascending: false });
-
-            console.log('Method 2 (all data with RLS):', {
-                error: method2Error,
-                count: method2Data?.length || 0,
-                data: method2Data
-            });
-
-            // Method 3: Check if RLS is causing issues by trying without filters
-            const { data: method3Data, error: method3Error } = await supabase
-                .from('symptomlog')
-                .select('log_id, patients_id, symptoms, severity, date_logged')
-                .limit(10);
-
-            console.log('Method 3 (limited fields, no filter):', {
-                error: method3Error,
-                count: method3Data?.length || 0,
-                data: method3Data
-            });
-
-            // Determine which data to use
-            let finalData = [];
-            
-            if (method1Data && method1Data.length > 0) {
-                finalData = method1Data;
-                console.log('Using Method 1 data (filtered by user)');
-            } else if (method2Data && method2Data.length > 0) {
-                // Filter manually if RLS didn't work as expected
-                finalData = method2Data.filter(item => item.patients_id === user.id);
-                console.log('Using Method 2 data (filtered manually)');
-            } else if (method3Data && method3Data.length > 0) {
-                // For debugging - use sample data but filter by user
-                finalData = method3Data.filter(item => item.patients_id === user.id);
-                console.log('Using Method 3 data (debug sample)');
+            if (fetchError) {
+                console.error('Error fetching symptom data:', fetchError.message);
+                setSymptomData([]);
             } else {
-                console.log('No data found for current user');
-                finalData = [];
+                setSymptomData(symptomLogs || []);
             }
-
-            console.log('=== FINAL RESULT ===');
-            console.log('Final data to be set:', finalData);
-            console.log('Final data count:', finalData.length);
-            
-            setSymptomData(finalData);
             
         } catch (err) {
             console.error('Unexpected error in fetchSymptomData:', err);
@@ -156,12 +50,10 @@ const PatientCharts = () => {
         }
     };
 
-    // Process data for Period chart
-    const processPeriodData = () => {
-        const periodData = symptomData.filter(item => item.symptoms === 'Period');
-        console.log('Period data found:', periodData);
-        
-        const counts = { Light: 0, Moderate: 0, Heavy: 0 };
+    // Process data for Period Flow chart
+    const processPeriodFlowData = () => {
+        const periodData = symptomData.filter(item => item.symptoms === 'Period Flow');
+        const counts = { Light: 0, Moderate: 0, Heavy: 0, 'Extremely Heavy': 0 };
 
         periodData.forEach(item => {
             const severity = item.severity;
@@ -170,100 +62,149 @@ const PatientCharts = () => {
             }
         });
 
-        const result = Object.entries(counts)
+        return Object.entries(counts)
             .map(([name, value]) => ({
                 name,
                 value,
-                color: name === 'Light' ? '#FFB6C1' : name === 'Moderate' ? '#FF69B4' : '#DC143C'
+                color: name === 'Light' ? '#FFB6C1' : 
+                       name === 'Moderate' ? '#FF69B4' : 
+                       name === 'Heavy' ? '#DC143C' : '#8B0000'
             }))
             .filter(item => item.value > 0);
-
-        console.log('Processed period data:', result);
-        return result;
     };
 
-    // Process data for Feelings chart
-    const processFeelingsData = () => {
-        const feelingsData = symptomData.filter(item => item.symptoms === 'Feelings');
-        console.log('Feelings data found:', feelingsData);
-        
-        const dailyFeelings = {};
+    // Process data for PCOS Symptoms frequency
+    const processSymptomFrequency = () => {
+        const symptomData_filtered = symptomData.filter(item => item.symptoms === 'Symptoms');
+        const counts = {};
 
-        feelingsData.forEach(item => {
-            const date = new Date(item.date_logged).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric' 
-            });
-            dailyFeelings[date] = item.severity;
+        symptomData_filtered.forEach(item => {
+            const symptom = item.severity;
+            counts[symptom] = (counts[symptom] || 0) + 1;
         });
 
-        const result = Object.entries(dailyFeelings).map(([date, feeling]) => ({
-            date,
-            feeling,
-            value: feeling === 'Happy' ? 4 : feeling === 'Fine' ? 3 : feeling === 'Mood Swings' ? 2 : 1
-        }));
-
-        console.log('Processed feelings data:', result);
-        return result;
-    };
-
-    // Process data for Skin chart
-    const processSkinData = () => {
-        const skinData = symptomData.filter(item => item.symptoms === 'Skin');
-        console.log('Skin data found:', skinData);
-        
-        const counts = { Normal: 0, Oily: 0, Dry: 0, Acne: 0 };
-
-        skinData.forEach(item => {
-            const severity = item.severity;
-            if (severity in counts) {
-                counts[severity]++;
-            }
-        });
-
-        const result = Object.entries(counts)
-            .map(([condition, count]) => ({
-                condition,
+        return Object.entries(counts)
+            .map(([symptom, count]) => ({
+                symptom: symptom.length > 12 ? symptom.substring(0, 12) + '...' : symptom,
+                fullName: symptom,
                 count,
-                fill: condition === 'Normal' ? '#10B981' : condition === 'Oily' ? '#F59E0B' :
-                    condition === 'Dry' ? '#EF4444' : '#8B5CF6'
+                fill: '#FF6B6B'
             }))
-            .filter(item => item.count > 0);
-
-        console.log('Processed skin data:', result);
-        return result;
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8); // Top 8 symptoms
     };
 
-    // Process data for Metabolism chart
-    const processMetabolismData = () => {
-        const metabolismData = symptomData.filter(item => item.symptoms === 'Metabolism');
-        console.log('Metabolism data found:', metabolismData);
-        
-        const timelineData = {};
+    // Process data for Mood tracking over time
+    const processMoodTimeline = () => {
+        const feelingsData = symptomData
+            .filter(item => item.symptoms === 'Feelings')
+            .sort((a, b) => new Date(a.date_logged) - new Date(b.date_logged));
 
-        metabolismData.forEach(item => {
+        return feelingsData.map(item => {
             const date = new Date(item.date_logged).toLocaleDateString('en-US', { 
                 month: 'short', 
                 day: 'numeric' 
             });
-            timelineData[date] = item.severity;
+            
+            // Convert mood to numeric value for charting
+            const moodValue = {
+                'Energized': 5,
+                'Happy': 4,
+                'Calm': 3,
+                'Mood swings': 2,
+                'Anxiety': 1,
+                'Sad': 1,
+                'Exhausted': 1
+            }[item.severity] || 3;
+
+            return {
+                date,
+                mood: item.severity,
+                value: moodValue
+            };
+        });
+    };
+
+    // Process data for Energy levels over time
+    const processEnergyLevels = () => {
+        const energyData = symptomData
+            .filter(item => item.symptoms === 'Energy')
+            .sort((a, b) => new Date(a.date_logged) - new Date(b.date_logged));
+
+        return energyData.map(item => {
+            const date = new Date(item.date_logged).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric' 
+            });
+            
+            const energyValue = {
+                'energetic': 4,
+                'ok': 3,
+                'tired': 2,
+                'exhausted': 1
+            }[item.severity] || 2;
+
+            return {
+                date,
+                energy: item.severity,
+                value: energyValue
+            };
+        });
+    };
+
+    // Process data for Weight tracking
+    const processWeightData = () => {
+        const weightData = symptomData
+            .filter(item => item.symptoms === 'Weight' && item.severity)
+            .sort((a, b) => new Date(a.date_logged) - new Date(b.date_logged));
+
+        return weightData.map(item => {
+            const date = new Date(item.date_logged).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric' 
+            });
+            
+            // Extract numeric weight value
+            const weightMatch = item.severity.match(/(\d+(?:\.\d+)?)/);
+            const weight = weightMatch ? parseFloat(weightMatch[1]) : null;
+
+            return {
+                date,
+                weight,
+                unit: item.severity.includes('kg') ? 'kg' : 'lbs'
+            };
+        }).filter(item => item.weight !== null);
+    };
+
+    // Process data for Cravings distribution
+    const processCravingsData = () => {
+        const cravingsData = symptomData.filter(item => item.symptoms === 'Cravings');
+        const counts = {};
+
+        cravingsData.forEach(item => {
+            const craving = item.severity;
+            counts[craving] = (counts[craving] || 0) + 1;
         });
 
-        const result = Object.entries(timelineData).map(([date, status]) => ({
-            date,
-            status,
-            risk: status === 'Healthy' ? 1 : status === 'High Sugar' ? 3 :
-                status === 'Overweight' ? 2 : status === 'Metabolic Risk' ? 4 : 2
-        }));
-
-        console.log('Processed metabolism data:', result);
-        return result;
+        return Object.entries(counts)
+            .map(([craving, count]) => ({
+                craving,
+                count,
+                fill: {
+                    'Salty': '#FFA500',
+                    'Sweet': '#FF69B4',
+                    'Meat': '#8B4513',
+                    'Fruit': '#32CD32',
+                    'Fried things': '#FFD700',
+                    'Chocolate': '#D2691E'
+                }[craving] || '#999999'
+            }));
     };
 
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-coral-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
             </div>
         );
     }
@@ -276,7 +217,7 @@ const PatientCharts = () => {
                         Please Log In
                     </h3>
                     <p className="text-yellow-700">
-                        You need to be logged in to view your symptom charts.
+                        You need to be logged in to view your PCOS tracking charts.
                     </p>
                 </div>
             </div>
@@ -288,153 +229,263 @@ const PatientCharts = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
                 <div className="col-span-full bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
                     <h3 className="text-lg font-semibold text-blue-800 mb-2">
-                        No Data Yet
+                        Start Your PCOS Journey
                     </h3>
                     <p className="text-blue-700">
-                        Start tracking your symptoms to see charts and insights here.
+                        Begin tracking your symptoms, mood, and cycle to see personalized insights here.
                     </p>
-                    <div className="mt-4 text-sm text-blue-600">
-                        <p>Debug info:</p>
-                        <p>Current user ID: {currentUser?.id}</p>
-                        <p>Check console for more details</p>
-                    </div>
+                    <p className="text-sm text-blue-600 mt-2">
+                        Track period flow, symptoms, feelings, energy, weight, and cravings to get comprehensive health insights.
+                    </p>
                 </div>
             </div>
         );
     }
 
-    const periodData = processPeriodData();
-    const feelingsData = processFeelingsData();
-    const skinData = processSkinData();
-    const metabolismData = processMetabolismData();
+    const periodFlowData = processPeriodFlowData();
+    const symptomFrequencyData = processSymptomFrequency();
+    const moodTimelineData = processMoodTimeline();
+    const energyLevelsData = processEnergyLevels();
+    const weightData = processWeightData();
+    const cravingsData = processCravingsData();
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-            {/* Enhanced Debug info */}
-            {/* <div className="col-span-full bg-gray-50 p-4 rounded-lg text-sm">
-                <strong>Debug Info:</strong> 
-                <br />User: {currentUser?.id} 
-                <br />Total Records: {symptomData.length} 
-                <br />Period: {periodData.length} | Feelings: {feelingsData.length} | Skin: {skinData.length} | Metabolism: {metabolismData.length}
-                <br />Sample patient IDs in data: {[...new Set(symptomData.slice(0, 3).map(item => item.patients_id))].join(', ')}
-            </div> */}
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Your PCOS Health Dashboard</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Period Flow Distribution */}
+                {periodFlowData.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-pink-100">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <span className="w-3 h-3 bg-pink-500 rounded-full mr-2"></span>
+                            Period Flow Patterns
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                                <Pie
+                                    data={periodFlowData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    outerRadius={80}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                >
+                                    {periodFlowData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <p className="text-sm text-gray-600 mt-2">
+                            Understanding your flow patterns can help identify PCOS-related irregularities.
+                        </p>
+                    </div>
+                )}
 
-            {/* Period Tracking - Pie Chart */}
-            {periodData.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                        Period Flow Distribution
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                            <Pie
-                                data={periodData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="value"
-                            >
-                                {periodData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                            </Pie>
-                            <Tooltip />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
-            )}
+                {/* PCOS Symptoms Frequency */}
+                {symptomFrequencyData.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-orange-100">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <span className="w-3 h-3 bg-orange-500 rounded-full mr-2"></span>
+                            Most Common Symptoms
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={symptomFrequencyData} layout="horizontal">
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" />
+                                <YAxis 
+                                    dataKey="symptom" 
+                                    type="category" 
+                                    width={80}
+                                    tick={{ fontSize: 12 }}
+                                />
+                                <Tooltip 
+                                    formatter={(value) => [value, 'Frequency']}
+                                    labelFormatter={(label, payload) => {
+                                        const item = payload?.[0]?.payload;
+                                        return item?.fullName || label;
+                                    }}
+                                />
+                                <Bar dataKey="count" fill="#FF6B6B" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                        <p className="text-sm text-gray-600 mt-2">
+                            Track recurring symptoms to discuss patterns with your healthcare provider.
+                        </p>
+                    </div>
+                )}
 
-            {/* Feelings Tracking - Line Chart */}
-            {feelingsData.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                        Mood Tracking Over Time
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={feelingsData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis
-                                domain={[0, 5]}
-                                tickFormatter={(value) => {
-                                    const moods = ['', 'Sad', 'Mood Swings', 'Fine', 'Happy'];
-                                    return moods[value] || '';
-                                }}
-                            />
-                            <Tooltip
-                                formatter={(value) => {
-                                    const moods = ['', 'Sad', 'Mood Swings', 'Fine', 'Happy'];
-                                    return [moods[value], 'Mood'];
-                                }}
-                            />
-                            <Line
-                                type="monotone"
-                                dataKey="value"
-                                stroke="#FF6B9D"
-                                strokeWidth={3}
-                                dot={{ fill: '#FF6B9D', strokeWidth: 2, r: 6 }}
-                                name="Mood Level"
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </div>
-            )}
+                {/* Mood Timeline */}
+                {moodTimelineData.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-100">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <span className="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
+                            Mood Tracking Over Time
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={moodTimelineData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis
+                                    domain={[0, 6]}
+                                    tickFormatter={(value) => {
+                                        const moods = ['', 'Low', 'Anxious', 'Neutral', 'Good', 'Energized'];
+                                        return moods[value] || '';
+                                    }}
+                                />
+                                <Tooltip
+                                    formatter={(value, name, props) => [props.payload.mood, 'Mood']}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke="#8B5CF6"
+                                    strokeWidth={3}
+                                    dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 5 }}
+                                    name="Mood Level"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                        <p className="text-sm text-gray-600 mt-2">
+                            PCOS can affect mood due to hormonal changes. Track patterns to better manage emotional wellbeing.
+                        </p>
+                    </div>
+                )}
 
-            {/* Skin Condition - Bar Chart */}
-            {skinData.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                        Skin Condition Frequency
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={skinData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="condition" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#8884d8" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            )}
+                {/* Energy Levels */}
+                {energyLevelsData.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-green-100">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                            Energy Level Trends
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <AreaChart data={energyLevelsData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis
+                                    domain={[0, 5]}
+                                    tickFormatter={(value) => {
+                                        const levels = ['', 'Exhausted', 'Tired', 'OK', 'Energetic'];
+                                        return levels[value] || '';
+                                    }}
+                                />
+                                <Tooltip
+                                    formatter={(value, name, props) => [props.payload.energy, 'Energy']}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="value"
+                                    stroke="#10B981"
+                                    fill="#10B981"
+                                    fillOpacity={0.6}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                        <p className="text-sm text-gray-600 mt-2">
+                            Fatigue is common with PCOS. Monitor energy patterns to optimize daily activities.
+                        </p>
+                    </div>
+                )}
 
-            {/* Metabolism Tracking - Area Chart */}
-            {metabolismData.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                        Metabolism Risk Timeline
-                    </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={metabolismData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis
-                                domain={[0, 5]}
-                                tickFormatter={(value) => {
-                                    const levels = ['', 'Healthy', 'Overweight', 'High Sugar', 'Metabolic Risk'];
-                                    return levels[value] || '';
-                                }}
-                            />
-                            <Tooltip
-                                formatter={(value) => {
-                                    const levels = ['', 'Healthy', 'Overweight', 'High Sugar', 'Metabolic Risk'];
-                                    return [levels[value], 'Risk Level'];
-                                }}
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="risk"
-                                stroke="#F59E0B"
-                                fill="#F59E0B"
-                                fillOpacity={0.6}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                {/* Weight Tracking */}
+                {weightData.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-100">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+                            Weight Management Progress
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={weightData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis />
+                                <Tooltip
+                                    formatter={(value, name, props) => [
+                                        `${value} ${props.payload.unit}`, 
+                                        'Weight'
+                                    ]}
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="weight"
+                                    stroke="#3B82F6"
+                                    strokeWidth={2}
+                                    dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                                    name="Weight"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                        <p className="text-sm text-gray-600 mt-2">
+                            PCOS can make weight management challenging. Track changes to support your health goals.
+                        </p>
+                    </div>
+                )}
+
+                {/* Cravings Distribution */}
+                {cravingsData.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-yellow-100">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                            <span className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
+                            Food Cravings Pattern
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={cravingsData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="craving" />
+                                <YAxis />
+                                <Tooltip />
+                                <Bar dataKey="count" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                        <p className="text-sm text-gray-600 mt-2">
+                            PCOS can influence cravings due to insulin resistance. Understanding patterns helps with dietary planning.
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            {/* Summary Section */}
+            <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-6 border border-pink-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                    📊 Your PCOS Tracking Summary
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="bg-white rounded-lg p-3">
+                        <div className="text-2xl font-bold text-pink-600">{symptomData.length}</div>
+                        <div className="text-sm text-gray-600">Total Entries</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                        <div className="text-2xl font-bold text-purple-600">
+                            {new Set(symptomData.map(item => item.symptoms)).size}
+                        </div>
+                        <div className="text-sm text-gray-600">Categories Tracked</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                        <div className="text-2xl font-bold text-blue-600">
+                            {new Set(symptomData.map(item => 
+                                new Date(item.date_logged).toDateString()
+                            )).size}
+                        </div>
+                        <div className="text-sm text-gray-600">Days Logged</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                        <div className="text-2xl font-bold text-green-600">
+                            {Math.round((new Set(symptomData.map(item => 
+                                new Date(item.date_logged).toDateString()
+                            )).size / 30) * 100) || 0}%
+                        </div>
+                        <div className="text-sm text-gray-600">Monthly Consistency</div>
+                    </div>
                 </div>
-            )}
+                <p className="text-sm text-gray-700 mt-4 text-center">
+                    💡 Keep tracking consistently to identify patterns and share insights with your healthcare provider.
+                </p>
+            </div>
         </div>
     );
 };
