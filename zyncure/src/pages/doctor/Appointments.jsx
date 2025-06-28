@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, User, FileText, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { doctorAppointmentService } from '../../services/DoctorAppointmentService';
+import RescheduleModal from '../../components/RescheduleModal'; 
 
 const DoctorAppointments = () => {
   const [doctorData, setDoctorData] = useState({
@@ -21,6 +22,8 @@ const DoctorAppointments = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [patientDetails, setPatientDetails] = useState(null);
   const [appointmentsByDate, setAppointmentsByDate] = useState({});
+
+  
 
 const formatTimeForDisplay = (time) => {
   if (!time) return '';
@@ -192,22 +195,25 @@ const loadAppointments = useCallback(async () => {
     }
   };
 
-  const handleRescheduleAppointment = async (appointmentId) => {
-    setLoading(true);
-    try {
-      const { error } = await doctorAppointmentService.updateAppointmentStatus(appointmentId, 'pending');
-      if (error) {
-        setError(`Failed to reschedule appointment: ${error}`);
-      } else {
-        await loadAppointments();
-      }
-    } catch (err) {
-      setError('Failed to reschedule appointment');
-      console.error('Error rescheduling appointment:', err);
-    } finally {
-      setLoading(false);
+const handleRescheduleAppointment = async (appointmentId) => {
+  setLoading(true);
+  try {
+    // Call cancelAppointment without any reason
+    const { error } = await doctorAppointmentService.rescheduleAppointment(appointmentId);
+    if (error) {
+      setError(`Failed to cancel appointment: ${error}`);
+    } else {
+      await loadAppointments();
     }
-  };
+  } catch (err) {
+    setError('Failed to cancel appointment');
+    console.error('Error cancelling appointment:', err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  
 
 const handleCancelAppointment = async (appointmentId) => {
   setLoading(true);

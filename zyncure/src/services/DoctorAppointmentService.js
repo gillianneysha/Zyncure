@@ -9,18 +9,18 @@ import { supabase } from '../client';
  * @param {string} time12h - Time in 12-hour format (e.g., "2:30 PM")
  * @returns {string} Time in 24-hour format (e.g., "14:30:00")
  */
-const convertTo24Hour = (time12h) => {
-  const [time, modifier] = time12h.split(' ');
-  let [hours, minutes] = time.split(':');
+// const convertTo24Hour = (time12h) => {
+//   const [time, modifier] = time12h.split(' ');
+//   let [hours, minutes] = time.split(':');
   
-  if (hours === '12') {
-    hours = modifier === 'AM' ? '00' : '12';
-  } else if (modifier === 'PM') {
-    hours = (parseInt(hours, 10) + 12).toString();
-  }
+//   if (hours === '12') {
+//     hours = modifier === 'AM' ? '00' : '12';
+//   } else if (modifier === 'PM') {
+//     hours = (parseInt(hours, 10) + 12).toString();
+//   }
   
-  return `${hours.padStart(2, '0')}:${minutes}:00`;
-};
+//   return `${hours.padStart(2, '0')}:${minutes}:00`;
+// };
 
 /**
  * Convert 24-hour time format to 12-hour format
@@ -407,14 +407,13 @@ export const doctorAppointmentService = {
     }
   },
 
-  /**
-   * Reschedule an appointment
+    /**
+   * Cancel an appointment
    * @param {string} appointmentId - Appointment ID
-   * @param {string} newDate - New date in YYYY-MM-DD format
-   * @param {string} newTime - New time in 12-hour format (e.g., "2:30 PM")
+   * @param {string} reason - Cancellation reason (optional)
    * @returns {object} Updated appointment data and error
    */
-  async rescheduleAppointment(appointmentId, newDate, newTime) {
+  async rescheduleAppointment(appointmentId, reason = '') {
     try {
       const user = await getCurrentUser();
       
@@ -433,24 +432,20 @@ export const doctorAppointmentService = {
         throw new Error('Unauthorized: This appointment does not belong to you');
       }
 
-      // Check if the new time slot is available
-      const { data: availableSlots } = await this.getAvailableTimeSlots(newDate);
-      if (!availableSlots || !availableSlots.includes(newTime)) {
-        throw new Error('The selected time slot is not available');
-      }
+      const updateData = {
+        status: 'rescheduled',
+        updated_at: new Date().toISOString()
+      };
 
-      // Convert time and create new datetime
-      const time24h = convertTo24Hour(newTime);
-      const newDateTime = `${newDate}T${time24h}`;
+      // Add cancellation reason if provided
+      if (reason.trim()) {
+        updateData.cancellation_reason = reason.trim();
+      }
 
       // Update the appointment in the original appointments table
       const { error } = await supabase
         .from('appointments')
-        .update({ 
-          appointment_date: newDateTime,
-          status: 'confirmed', // Set to confirmed after rescheduling
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('appointment_id', appointmentId)
         .select('appointment_id');
 
@@ -488,6 +483,7 @@ export const doctorAppointmentService = {
     }
   },
 
+  
   /**
    * Get available time slots for the doctor on a specific date
    * @param {string} date - Date in YYYY-MM-DD format
@@ -610,6 +606,8 @@ export const doctorAppointmentService = {
       return { data: null, error: error.message };
     }
   },
+
+  
 
   /**
    * Get appointment statistics for the doctor
