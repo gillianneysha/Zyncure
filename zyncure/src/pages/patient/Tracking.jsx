@@ -201,28 +201,200 @@ const PeriodTracker = () => {
     setShowModal(true);
   };
 
-  const handleDownload = () => {
-    const data = {
-      selectedTab,
-      selectedValues,
-      weightInput,
-      customInput,
-      date,
-      loggedDates
-    };
+  const generatePDF = async () => {
+    // Dynamically import jsPDF
+    const { jsPDF } = await import('jspdf');
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 20;
+    let yPosition = 30;
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `period-tracker-data-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Title
+    doc.setFontSize(24);
+    doc.setTextColor(59, 164, 160); // #3BA4A0
+    doc.text('Period Tracker Report', pageWidth / 2, yPosition, { align: 'center' });
+    
+    yPosition += 20;
+    
+    // Generate date
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth / 2, yPosition, { align: 'center' });
+    
+    yPosition += 30;
 
-    setModalContent({ title: 'Download Complete', message: 'Your data has been downloaded successfully.', isError: false });
+    // Summary Statistics
+    doc.setFontSize(18);
+    doc.setTextColor(182, 92, 75); // #B65C4B
+    doc.text('Summary', margin, yPosition);
+    yPosition += 15;
+
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    
+    const totalEntries = loggedDates.length;
+    const uniqueDates = [...new Set(loggedDates.map(entry => 
+      new Date(entry.date_logged).toDateString()
+    ))].length;
+    
+    const categoryStats = loggedDates.reduce((acc, entry) => {
+      acc[entry.symptoms] = (acc[entry.symptoms] || 0) + 1;
+      return acc;
+    }, {});
+
+    doc.text(`Total Entries: ${totalEntries}`, margin, yPosition);
+    yPosition += 10;
+    doc.text(`Days Tracked: ${uniqueDates}`, margin, yPosition);
+    yPosition += 10;
+    doc.text(`Most Tracked Category: ${Object.keys(categoryStats).reduce((a, b) => 
+      categoryStats[a] > categoryStats[b] ? a : b, 'None')}`, margin, yPosition);
+    
+    yPosition += 30;
+
+    // Category Breakdown
+    doc.setFontSize(18);
+    doc.setTextColor(182, 92, 75);
+    doc.text('Category Breakdown', margin, yPosition);
+    yPosition += 15;
+
+    Object.entries(categoryStats).forEach(([category, count]) => {
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`${category}: ${count} entries`, margin, yPosition);
+      yPosition += 10;
+    });
+
+    yPosition += 20;
+
+    // Recent Entries
+    doc.setFontSize(18);
+    doc.setTextColor(182, 92, 75);
+    doc.text('Recent Entries', margin, yPosition);
+    yPosition += 15;
+
+    // Sort by date (most recent first)
+    const sortedEntries = [...loggedDates]
+      .sort((a, b) => new Date(b.date_logged) - new Date(a.date_logged))
+      .slice(0, 20); // Last 20 entries
+
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+
+    // Table headers
+    const headers = ['Date', 'Category', 'Value'];
+    const colWidths = [50, 50, 80];
+    let xPosition = margin;
+
+    doc.setFont(undefined, 'bold');
+    headers.forEach((header, i) => {
+      doc.text(header, xPosition, yPosition);
+      xPosition += colWidths[i];
+    });
+    yPosition += 10;
+
+    // Table content
+    doc.setFont(undefined, 'normal');
+    sortedEntries.forEach(entry => {
+      // Check if we need a new page
+      if (yPosition > 270) {
+        doc.addPage();
+        yPosition = 30;
+      }
+
+      xPosition = margin;
+      const dateStr = new Date(entry.date_logged).toLocaleDateString();
+      const values = [dateStr, entry.symptoms, entry.severity];
+      
+      values.forEach((value, i) => {
+        const text = String(value).length > 25 ? String(value).substring(0, 25) + '...' : String(value);
+        doc.text(text, xPosition, yPosition);
+        xPosition += colWidths[i];
+      });
+      yPosition += 8;
+    });
+
+    // Add new page for monthly view if needed
+    if (yPosition > 200) {
+      doc.addPage();
+      yPosition = 30;
+    } else {
+      yPosition += 30;
+    }
+
+    // Monthly Overview
+    doc.setFontSize(18);
+    doc.setTextColor(182, 92, 75);
+    doc.text('Monthly Overview', margin, yPosition);
+    yPosition += 15;
+
+    // Group entries by month
+    const monthlyData = loggedDates.reduce((acc, entry) => {
+      const date = new Date(entry.date_logged);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!acc[monthKey]) acc[monthKey] = [];
+      acc[monthKey].push(entry);
+      return acc;
+    }, {});
+
+    Object.entries(monthlyData)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 6) // Last 6 months
+      .forEach(([month, entries]) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 30;
+        }
+
+        doc.setFontSize(14);
+        doc.setTextColor(59, 164, 160);
+        const [year, monthNum] = month.split('-');
+        const monthName = new Date(year, monthNum - 1).toLocaleDateString('en', { month: 'long', year: 'numeric' });
+        doc.text(monthName, margin, yPosition);
+        yPosition += 10;
+
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Total entries: ${entries.length}`, margin + 10, yPosition);
+        yPosition += 8;
+
+        const monthlyCategoryStats = entries.reduce((acc, entry) => {
+          acc[entry.symptoms] = (acc[entry.symptoms] || 0) + 1;
+          return acc;
+        }, {});
+
+        Object.entries(monthlyCategoryStats).forEach(([category, count]) => {
+          doc.text(`${category}: ${count}`, margin + 10, yPosition);
+          yPosition += 6;
+        });
+
+        yPosition += 10;
+      });
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, doc.internal.pageSize.height - 10, { align: 'right' });
+      doc.text('Generated by Period Tracker App', margin, doc.internal.pageSize.height - 10);
+    }
+
+    // Save the PDF
+    const fileName = `period-tracker-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+    doc.save(fileName);
+
+    setModalContent({ 
+      title: 'PDF Generated!', 
+      message: `Your period tracker report has been downloaded as "${fileName}"`, 
+      isError: false 
+    });
     setShowModal(true);
+  };
+
+  const handleDownload = () => {
+    generatePDF();
   };
 
   const handleShare = () => setShowShareSymptom(true);
@@ -512,7 +684,7 @@ const PeriodTracker = () => {
       <div className="fixed bottom-6 right-6 flex flex-row gap-5">
         <button onClick={handleDownload} className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg">
           <FileDown size={30} />
-          <span className="mt-1 font-bold">Download</span>
+          <span className="mt-1 font-bold">Download PDF</span>
         </button>
         <button onClick={handleShare} className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg">
           <FileUp size={30} />

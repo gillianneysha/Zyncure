@@ -22,6 +22,7 @@ export function PersonalInfoForm() {
   const [isEditing, setIsEditing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [originalData, setOriginalData] = useState(null);
+  const [userType, setUserType] = useState(null); // Track user type
 
   useEffect(() => {
     async function fetchUserInfo() {
@@ -44,38 +45,69 @@ export function PersonalInfoForm() {
 
         console.log("User ID:", user.id); // Debug log
 
-        let profile = {};
-        let { data: profileData, error: profileError } = await supabase
+        // First, try to get user type from profiles table
+        let { data: profileData, error: _profileError } = await supabase
           .from("profiles")
-          .select("*")
+          .select("user_type")
           .eq("id", user.id)
           .single();
 
-        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 is "not found"
-          console.error("Error fetching profile:", profileError);
-          setError("Failed to fetch profile data");
+        let currentUserType = null;
+        if (profileData && profileData.user_type) {
+          currentUserType = profileData.user_type;
+        } else {
+          // Fallback to user metadata if profiles table doesn't have user_type
+          currentUserType = user.user_metadata?.user_type;
+        }
+
+        if (!currentUserType) {
+          setError("User type not found");
           setLoading(false);
           return;
         }
 
-        if (profileData) {
-          profile = profileData;
-          console.log("Profile data found:", profile); // Debug log
+        setUserType(currentUserType);
+        console.log("User type:", currentUserType); // Debug log
+
+        // Determine which table to query based on user type
+        const tableName = currentUserType === 'patient' ? 'patients' : 'medicalprofessionals';
+        const idColumn = currentUserType === 'patient' ? 'patient_id' : 'med_id';
+        
+        console.log("Querying table:", tableName, "with ID column:", idColumn); // Debug log
+
+        // Fetch user data from the appropriate table
+        let { data: userData, error: userDataError } = await supabase
+          .from(tableName)
+          .select("*")
+          .eq(idColumn, user.id)
+          .single();
+
+        if (userDataError && userDataError.code !== 'PGRST116') { // PGRST116 is "not found"
+          console.error(`Error fetching from ${tableName}:`, userDataError);
+          setError(`Failed to fetch user data from ${tableName}`);
+          setLoading(false);
+          return;
+        }
+
+        let profile = {};
+        if (userData) {
+          profile = userData;
+          console.log(`${tableName} data found:`, profile); // Debug log
         } else {
           profile = user.user_metadata || {};
           console.log("Using user metadata:", profile); // Debug log
         }
 
-        const userData = {
+        const formattedData = {
           firstName: profile.first_name || "",
           lastName: profile.last_name || "",
-          email: user.email || "",
+          email: user.email || profile.email || "",
           birthdate: profile.birthdate || "",
-          mobileNumber: profile.contact_number || "",
+          mobileNumber: profile.contact_no || "",
         };
 
-        setFormData(userData);
-        setOriginalData(userData);
+        setFormData(formattedData);
+        setOriginalData(formattedData);
         setLoading(false);
       } catch (err) {
         console.error("Unexpected error in fetchUserInfo:", err);
@@ -117,24 +149,46 @@ export function PersonalInfoForm() {
       }
 
       console.log("Attempting to save for user:", user.id); // Debug log
+      console.log("User type:", userType); // Debug log
       console.log("Form data to save:", formData); // Debug log
 
-      // Prepare the data for upsert
-      const profileData = {
-        id: user.id,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        birthdate: formData.birthdate,
-        contact_number: formData.mobileNumber,
-        updated_at: new Date().toISOString(),
-      };
+      // Determine which table to update based on user type
+      const tableName = userType === 'patient' ? 'patients' : 'medicalprofessionals';
+      const idColumn = userType === 'patient' ? 'patient_id' : 'med_id';
 
-      console.log("Profile data for upsert:", profileData); // Debug log
+      // Prepare the data for upsert based on table structure
+      let updateData = {};
+      
+      if (userType === 'patient') {
+        updateData = {
+          patient_id: user.id,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          birthdate: formData.birthdate,
+          contact_no: formData.mobileNumber,
+          email: formData.email,
+          // Keep existing status if it exists, otherwise set default
+          status: 'active', // You might want to preserve existing status
+        };
+      } else if (userType === 'doctor') {
+        updateData = {
+          med_id: user.id,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          birthdate: formData.birthdate,
+          contact_no: formData.mobileNumber,
+          email: formData.email,
+          // Keep existing status if it exists, otherwise set default
+          status: 'active', // You might want to preserve existing status
+        };
+      }
+
+      console.log(`Updating ${tableName} with data:`, updateData); // Debug log
 
       const { data, error: updateError } = await supabase
-        .from("profiles")
-        .upsert(profileData, {
-          onConflict: 'id'
+        .from(tableName)
+        .upsert(updateData, {
+          onConflict: idColumn
         });
 
       if (updateError) {
