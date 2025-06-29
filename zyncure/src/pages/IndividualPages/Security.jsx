@@ -1,86 +1,147 @@
 import { ChevronRight, ArrowLeft } from "lucide-react";
-import { useState} from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../client";
 import PasswordInput from "../../components/PasswordInput";
 import PasswordSuccessModal from "../../components/PasswordSuccessModal";
-
 
 export default function SecurityPage() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // For change password form
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  // const [showOldPassword, setShowOldPassword] = useState(false);
-  // const [showNewPassword, setShowNewPassword] = useState(false);
-  // const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  if (showChangePassword) {
-    const handleChangePassword = async (e) => {
-      e.preventDefault();
-      setError("");
-      setSuccess("");
+  // Change password handler
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
 
-      if (!oldPassword || !newPassword || !confirmPassword) {
-        setError("All fields are required.");
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        setError("New passwords do not match.");
-        return;
-      }
-      if (newPassword.length < 6) {
-        setError("Password must be at least 6 characters.");
-        return;
-      }
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setError("All fields are required.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
 
-      setLoading(true);
-      try {
+    setLoading(true);
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-
-
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: user.email,
-          password: oldPassword,
-        });
-        if (signInError) {
-          setError("Old password is incorrect.");
-          setLoading(false);
-          return;
-        }
-
-
-        const { error: updateError } = await supabase.auth.updateUser({
-          password: newPassword,
-        });
-        if (updateError) throw updateError;
-
-        setShowSuccessModal(true);
-        setOldPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      } catch (err) {
-        setError(err.message || "Failed to update password.");
-      } finally {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: oldPassword,
+      });
+      if (signInError) {
+        setError("Old password is incorrect.");
         setLoading(false);
+        return;
       }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) throw updateError;
+
+      setShowSuccessModal(true);
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      setError(err.message || "Failed to update password.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Two-factor authentication handlers
+  const handleEnable2FA = async () => {
+    setError("");
+    setSuccess("");
+    setEnrolling(true);
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
+    if (error) {
+      setError(error.message);
+      setEnrolling(false);
+      return;
+    }
+    setQrUrl(data.totp.qr_code);
+  };
+
+  const handleVerify2FA = async () => {
+    setError("");
+    setSuccess("");
+    const { error } = await supabase.auth.mfa.verify({
+      factorType: "totp",
+      code: verificationCode,
+    });
+    if (error) {
+      setError("Invalid code. Please try again.");
+      return;
+    }
+    setSuccess("Two-factor authentication enabled!");
+    setTwoFactorEnabled(true);
+    setEnrolling(false);
+    setQrUrl("");
+    setVerificationCode("");
+  };
+
+  const handleDisable2FA = async () => {
+    setError("");
+    setSuccess("");
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    const factors = data?.factors || [];
+    const totpFactor = factors.find(f => f.factor_type === "totp");
+    if (!totpFactor) {
+      setError("No TOTP factor found.");
+      return;
+    }
+    await supabase.auth.mfa.unenroll({ factorId: totpFactor.id });
+    setSuccess("Two-factor authentication disabled.");
+    setTwoFactorEnabled(false);
+  };
+
+  // Modal close handler
+  const handleModalClose = () => {
+    setShowSuccessModal(false);
+    setShowChangePassword(false);
+  };
+
+  useEffect(() => {
+    // Check if user already has TOTP enabled
+    const check2FA = async () => {
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error) return; // handle error if needed
+      const factors = data?.factors || [];
+      const totpFactor = factors.find(f => f.factor_type === "totp");
+      setTwoFactorEnabled(!!totpFactor);
     };
+    if (showTwoFactor) check2FA();
+  }, [showTwoFactor]);
 
-    const handleModalClose = () => {
-      setShowSuccessModal(false);
-
-      setShowChangePassword(false);
-    };
-
+  // UI
+  if (showChangePassword) {
     return (
       <div className="bg-profileBg rounded-xl p-8 h-[700px] flex flex-col">
         <button
@@ -117,11 +178,11 @@ export default function SecurityPage() {
             label="Re-enter New Password"
             value={confirmPassword}
             onChange={e => setConfirmPassword(e.target.value)}
-            placeholder="Re-enter New Password"
-            disabled={loading}
-            name="confirmPassword"
-            inputClassName="mb-0.5 w-full"
-          />
+              placeholder="Re-enter New Password"
+              disabled={loading}
+              name="confirmPassword"
+              inputClassName="mb-0.5 w-full"
+            />
           <div className="flex justify-center mt-4">
             <button
               type="submit"
@@ -141,19 +202,6 @@ export default function SecurityPage() {
   }
 
   if (showTwoFactor) {
-
-    const Toggle = ({ enabled, onChange }) => (
-      <button
-        type="button"
-        className={`relative inline-flex h-6 w-11 items-center rounded-full ${enabled ? "bg-profileHeader" : "bg-mySidebar"}`}
-        onClick={() => onChange(!enabled)}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${enabled ? "translate-x-6" : "translate-x-1"}`}
-        />
-      </button>
-    );
-
     return (
       <div className="bg-profileBg rounded-xl p-8 h-[700px] flex flex-col">
         <button
@@ -163,26 +211,59 @@ export default function SecurityPage() {
           <ArrowLeft className="mr-2" size={20} /> Back to Security
         </button>
         <h2 className="text-4xl text-profileHeader font-bold mb-8">Two-factor Authentication</h2>
-        <div className="border border-[#F46B5D] rounded-xl bg-profileBg w-full transition-all duration-300">
-          <div className="flex items-center justify-between px-6 pt-5 pb-2">
-            <div>
-              <span className="block text-[#F46B5D] font-semibold text-base mb-1">
-                Enable Two-factor Authentication
-              </span>
-              <span className="block text-[#F46B5D] text-sm mb-1">
-                m*****@gmail.com
-              </span>
+        <div className="border border-[#F46B5D] rounded-xl bg-profileBg w-full transition-all duration-300 p-6">
+          {error && <div className="text-red-500 mb-2">{error}</div>}
+          {success && (
+            <div className="text-green-600 mb-2">
+              {success}
+              <br />
+              Next time you log in, you will be asked for a code from your authenticator app.
             </div>
-            <Toggle enabled={twoFactorEnabled} onChange={setTwoFactorEnabled} />
-          </div>
-          <div className="border-t border-[#F46B5D] px-6 py-4">
+          )}
+          {!twoFactorEnabled && !enrolling && (
             <button
-              type="button"
-              className="text-profileHeader font-semibold underline hover:text-[#368487] transition text-base"
+              className="bg-[#55A1A4] text-white px-4 py-2 rounded"
+              onClick={handleEnable2FA}
             >
-              Use a different email address
+              Enable 2FA (TOTP)
             </button>
-          </div>
+          )}
+
+          {enrolling && qrUrl && (
+            <div>
+              <div className="mb-4">
+                <p>Scan this QR code with your authenticator app:</p>
+                <img src={qrUrl} alt="2FA QR Code" width={180} height={180} />
+              </div>
+              <input
+                type="text"
+                placeholder="Enter code from app"
+                value={verificationCode}
+                onChange={e => setVerificationCode(e.target.value)}
+                className="border p-2 rounded mb-2"
+              />
+              <button
+                className="bg-[#55A1A4] text-white px-4 py-2 rounded ml-2"
+                onClick={handleVerify2FA}
+              >
+                Verify & Enable
+              </button>
+            </div>
+          )}
+
+          {twoFactorEnabled && !enrolling && (
+            <div>
+              <div className="mb-4 text-green-700 font-semibold">
+                Two-factor authentication is enabled for your account.
+              </div>
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded"
+                onClick={handleDisable2FA}
+              >
+                Disable 2FA
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );

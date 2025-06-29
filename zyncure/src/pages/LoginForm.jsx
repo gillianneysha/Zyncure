@@ -50,6 +50,9 @@ export default function LoginForm({ setToken }) {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [mfa, setMfa] = useState(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaError, setMfaError] = useState("");
 
 
   const handleChange = useCallback((event) => {
@@ -97,12 +100,18 @@ export default function LoginForm({ setToken }) {
 
     setIsLoading(true);
     setErrors({});
+    setMfaError("");
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
+
+      if (error && error.status === 400 && error.message === "MFA required") {
+        setMfa(data.mfa); // Save the mfa object for the next step
+        return;
+      }
 
       if (error) throw error;
 
@@ -173,8 +182,24 @@ export default function LoginForm({ setToken }) {
     }
   };
 
+  // 4. Handle MFA code submission
+  const handleMfaSubmit = async (event) => {
+    event.preventDefault();
+    setMfaError("");
+    const { data, error } = await supabase.auth.mfa.verify({
+      factorId: mfa.factors[0].id,
+      code: mfaCode,
+    });
+    if (error) {
+      setMfaError("Invalid code. Please try again.");
+      return;
+    }
+    setToken(data.session);
+    // ...redirect logic...
+  };
+
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={mfa ? handleMfaSubmit : handleSubmit}>
       {/* Error Message */}
       {errors.submit && (
         <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
@@ -182,97 +207,124 @@ export default function LoginForm({ setToken }) {
         </div>
       )}
 
-      <FormField 
-        label="Email" 
-        name="email" 
-        type="email" 
-        placeholder="Email" 
-        value={formData.email}
-        onChange={handleChange}
-        error={errors.email}
-        disabled={isLoading}
-        labelClassName="text-[#F5E0D9]"
-        inputClassName="bg-[#FFEDE7]"
-      />
-
-      <div className="w-4/5 mx-auto">
-        <PasswordInput
-          label="Password:"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          placeholder="Password"
-          error={errors.password}
-          disabled={isLoading}
-          labelClassName="text-[#F5E0D9]"
-          inputClassName="bg-[#FFEDE7]"
-        />
-      </div>
-
-      <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <input
-            id="rememberMe"
-            type="checkbox"
-            className="mr-2 accent-[#55A1A4] w-4 h-4 rounded"
+      {!mfa && (
+        <>
+          <FormField 
+            label="Email" 
+            name="email" 
+            type="email" 
+            placeholder="Email" 
+            value={formData.email}
+            onChange={handleChange}
+            error={errors.email}
+            disabled={isLoading}
           />
-          <label htmlFor="rememberMe" className="text-[#F5E0D9] text-sm select-none">
-            Remember me
-          </label>
-        </div>
-        <button
-          type="button"
-          onClick={handleForgotPassword}
-          className="text-xs text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
-          disabled={isLoading}
-        >
-          Forgot Password?
-        </button>
-      </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className={`w-4/5 block mx-auto py-2 mt-4 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
-          isLoading
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-[#55A1A4] hover:bg-[#368487]"
-        }`}
-      >
-        {isLoading ? "Logging In..." : "Log In"}
-      </button>
+          <div className="w-4/5 mx-auto">
+            <PasswordInput
+              label="Password:"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Password"
+              error={errors.password}
+              disabled={isLoading}
+            />
+          </div>
 
-      <div className="w-4/5 mx-auto mt-2 text-left">
-        <span className="text-[#F5E0D9] text-sm">
-          Don’t have an account?{" "}
-          <a
-            href="/register"
-            className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+          <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                className="mr-2 accent-[#55A1A4] w-4 h-4 rounded"
+              />
+              <label htmlFor="rememberMe" className="text-[#F5E0D9] text-sm select-none">
+                Remember me
+              </label>
+            </div>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              className="text-xs text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+              disabled={isLoading}
+            >
+              Forgot Password?
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className={`w-4/5 block mx-auto py-2 mt-4 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
+              isLoading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-[#55A1A4] hover:bg-[#368487]"
+            }`}
           >
-            Register Here
-          </a>
-        </span>
-      </div>
+            {isLoading ? "Logging In..." : "Log In"}
+          </button>
 
-      <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
-        <div className="flex items-center justify-center my-4">
-          <div className="flex-grow h-px bg-[#FEDED2]"></div>
-          <span className="px-2">OR</span>
-          <div className="flex-grow h-px bg-[#FEDED2]"></div>
+          <div className="w-4/5 mx-auto mt-2 text-left">
+            <span className="text-[#F5E0D9] text-sm">
+              Don’t have an account?{" "}
+              <a
+                href="/register"
+                className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+              >
+                Register Here
+              </a>
+            </span>
+          </div>
+
+          <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
+            <div className="flex items-center justify-center my-4">
+              <div className="flex-grow h-px bg-[#FEDED2]"></div>
+              <span className="px-2">OR</span>
+              <div className="flex-grow h-px bg-[#FEDED2]"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Sign in with Google"
+              disabled={isLoading}
+            >
+              <GoogleIcon className="w-10 h-10" />
+
+            </button>
+            <p className="mt-2">Log in using your Google account</p>
+          </div>
+        </>
+      )}
+
+      {mfa && (
+        <div className="w-4/5 mx-auto mt-4 p-4 bg-[#FFEDE7] rounded-lg shadow-md">
+          <p className="text-[#333] text-sm mb-2">
+            Two-factor authentication is enabled. Please enter the code from your authenticator app.
+          </p>
+          <FormField
+            label="MFA Code"
+            name="mfaCode"
+            type="text"
+            placeholder="Enter your MFA code"
+            value={mfaCode}
+            onChange={e => setMfaCode(e.target.value)}
+            error={mfaError}
+            disabled={isLoading}
+            labelClassName="text-[#333]"
+            inputClassName="bg-white"
+          />
+          <button
+            type="submit"
+            className="w-full py-2 mt-2 text-white bg-[#55A1A4] rounded-lg font-semibold transition-colors duration-200 hover:bg-[#368487]"
+            disabled={isLoading}
+          >
+            {isLoading ? "Verifying..." : "Verify MFA Code"}
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="Sign in with Google"
-          disabled={isLoading}
-        >
-          <GoogleIcon className="w-10 h-10" />
-
-        </button>
-        <p className="mt-2">Log in using your Google account</p>
-      </div>
+      )}
     </form>
   );
 }
