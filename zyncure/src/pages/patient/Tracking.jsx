@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Droplet, Droplets, FileDown, FileUp, CloudSun, Leaf, Sun, Moon, Circle,
-  Rainbow, Flame, Check, Lollipop, Scale, CircleAlert, Zap, Battery, Heart,
-  Coffee, Apple, Cookie, Beef, Cherry, Drumstick, Candy, Brain, Headphones,
-  Activity, AlertCircle, Eye, Bed, Target, Plus, Type
+  Rainbow, Flame, TriangleAlert, MessageCircleWarning,
+  Heart, Brain, Activity, CircleArrowDown, CircleArrowUp, CircleAlert, Eye, Bed,
+  Laugh, Frown, Popcorn, CakeSlice, Beef, Apple, Drumstick, Candy,
+  BatteryWarning, BatteryLow, BatteryMedium, BatteryFull, Gauge, NotebookPen, Check
 } from 'lucide-react';
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
+import TrackingCalendar from '../../components/TrackingCalendar';
 import { supabase } from '../../client';
 import ShareSymptom from '../../components/ShareSymptom';
+import { generatePDF } from '../../utils/generateTrackingReport';
 
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Feelings');
@@ -29,13 +30,39 @@ const PeriodTracker = () => {
   const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
   const [showShareSymptom, setShowShareSymptom] = useState(false);
 
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    email: '',
+    birthdate: ''
+  });
+
   useEffect(() => {
     const fetchAndStoreUserData = async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('Supabase user:', user); // Debug
       if (authError || !user) {
         console.error('User fetch failed:', authError?.message);
         return;
       }
+
+      // Fetch profile info from your patients table using patient_id
+      const { data: profile, error: profileError } = await supabase
+        .from('patients')
+        .select('first_name, last_name, email, birthdate')
+        .eq('patient_id', user.id)
+        .maybeSingle();
+
+      if (profileError || !profile) {
+        console.error('Profile fetch error:', profileError?.message || 'No matching patient found');
+        return;
+      }
+
+      setUserInfo({
+        name: `${profile.first_name} ${profile.last_name}`,
+        email: profile.email,
+        birthdate: profile.birthdate
+      });
 
       const userKey = `loggedDates-${user.id}`;
       const stored = localStorage.getItem(userKey);
@@ -45,7 +72,7 @@ const PeriodTracker = () => {
       } else {
         const { data, error } = await supabase
           .from('symptomlog')
-          .select('date_logged, symptoms, severity')
+          .select('date_logged, timestamp_logged, symptoms, severity')
           .eq('patients_id', user.id);
 
         if (error) {
@@ -78,7 +105,6 @@ const PeriodTracker = () => {
       return entryDate.getTime() === normalizedDate.getTime();
     });
 
-    // Reset all values first
     const newSelectedValues = {
       Feelings: '',
       Cravings: '',
@@ -89,7 +115,6 @@ const PeriodTracker = () => {
       Custom: ''
     };
 
-    // Set values based on logged entries
     entriesForDate.forEach(entry => {
       if (entry.symptoms && entry.severity) {
         newSelectedValues[entry.symptoms] = entry.severity;
@@ -97,7 +122,7 @@ const PeriodTracker = () => {
     });
 
     setSelectedValues(newSelectedValues);
-    
+
     // Set weight and custom inputs
     setWeightInput(newSelectedValues.Weight || '');
     setCustomInput(newSelectedValues.Custom || '');
@@ -112,19 +137,19 @@ const PeriodTracker = () => {
     }
 
     let valueToSave = selectedValues[selectedTab];
-    
+
     if (selectedTab === 'Weight' && !weightInput.trim()) {
       setModalContent({ title: 'Error', message: 'Please enter your weight.', isError: true });
       setShowModal(true);
       return;
     }
-    
+
     if (selectedTab === 'Custom' && !customInput.trim()) {
       setModalContent({ title: 'Error', message: 'Please enter custom data.', isError: true });
       setShowModal(true);
       return;
     }
-    
+
     if (!valueToSave && selectedTab !== 'Weight' && selectedTab !== 'Custom') {
       setModalContent({ title: 'Error', message: `Please select a ${selectedTab.toLowerCase()} option.`, isError: true });
       setShowModal(true);
@@ -137,22 +162,24 @@ const PeriodTracker = () => {
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Check if entry already exists for this date and symptom
     const existingEntryIndex = loggedDates.findIndex(entry => {
       const entryDate = new Date(entry.date_logged);
       entryDate.setHours(0, 0, 0, 0);
       return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === selectedTab;
     });
 
+    const now = new Date();
+
     const dataToSave = {
       symptoms: selectedTab,
       severity: valueToSave,
-      date_logged: normalizedDate.toLocaleDateString('en-CA'),
+      date_logged: now.toISOString().split('T')[0], 
+      timestamp_logged: now.toISOString(),          
       patients_id: user.id,
     };
 
     let supabaseError;
-    
+
     if (existingEntryIndex !== -1) {
       // Update existing entry
       const { error } = await supabase
@@ -161,29 +188,44 @@ const PeriodTracker = () => {
         .eq('patients_id', user.id)
         .eq('symptoms', selectedTab)
         .eq('date_logged', normalizedDate.toLocaleDateString('en-CA'));
-      
+
       supabaseError = error;
-      
+
       if (!error) {
-        // Update local state
-        setLoggedDates(prev => {
-          const updated = [...prev];
-          updated[existingEntryIndex] = { ...updated[existingEntryIndex], severity: valueToSave };
-          localStorage.setItem(`loggedDates-${user.id}`, JSON.stringify(updated));
-          return updated;
-        });
+        // Instead of just updating local state, re-fetch from Supabase:
+        const { data, error: fetchError } = await supabase
+          .from('symptomlog')
+          .select('date_logged, timestamp_logged, symptoms, severity')
+          .eq('patients_id', user.id);
+
+        if (!fetchError) {
+          const normalized = data.map(entry => ({
+            ...entry,
+            date_logged: new Date(entry.date_logged),
+          }));
+          setLoggedDates(normalized);
+          localStorage.setItem(`loggedDates-${user.id}`, JSON.stringify(normalized));
+        }
       }
     } else {
-      // Insert new entry
       const { error } = await supabase.from('symptomlog').insert([dataToSave]);
       supabaseError = error;
-      
+
       if (!error) {
-        setLoggedDates(prev => {
-          const updated = [...prev, { ...dataToSave, date_logged: normalizedDate }];
-          localStorage.setItem(`loggedDates-${user.id}`, JSON.stringify(updated));
-          return updated;
-        });
+        // Re-fetch from Supabase to ensure data consistency
+        const { data, error: fetchError } = await supabase
+          .from('symptomlog')
+          .select('date_logged, timestamp_logged, symptoms, severity')
+          .eq('patients_id', user.id);
+
+        if (!fetchError) {
+          const normalized = data.map(entry => ({
+            ...entry,
+            date_logged: new Date(entry.date_logged),
+          }));
+          setLoggedDates(normalized);
+          localStorage.setItem(`loggedDates-${user.id}`, JSON.stringify(normalized));
+        }
       }
     }
 
@@ -201,200 +243,23 @@ const PeriodTracker = () => {
     setShowModal(true);
   };
 
-  const generatePDF = async () => {
-    // Dynamically import jsPDF
-    const { jsPDF } = await import('jspdf');
-    
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
-    const margin = 20;
-    let yPosition = 30;
-
-    // Title
-    doc.setFontSize(24);
-    doc.setTextColor(59, 164, 160); // #3BA4A0
-    doc.text('Period Tracker Report', pageWidth / 2, yPosition, { align: 'center' });
-    
-    yPosition += 20;
-    
-    // Generate date
-    doc.setFontSize(12);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth / 2, yPosition, { align: 'center' });
-    
-    yPosition += 30;
-
-    // Summary Statistics
-    doc.setFontSize(18);
-    doc.setTextColor(182, 92, 75); // #B65C4B
-    doc.text('Summary', margin, yPosition);
-    yPosition += 15;
-
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    
-    const totalEntries = loggedDates.length;
-    const uniqueDates = [...new Set(loggedDates.map(entry => 
-      new Date(entry.date_logged).toDateString()
-    ))].length;
-    
-    const categoryStats = loggedDates.reduce((acc, entry) => {
-      acc[entry.symptoms] = (acc[entry.symptoms] || 0) + 1;
-      return acc;
-    }, {});
-
-    doc.text(`Total Entries: ${totalEntries}`, margin, yPosition);
-    yPosition += 10;
-    doc.text(`Days Tracked: ${uniqueDates}`, margin, yPosition);
-    yPosition += 10;
-    doc.text(`Most Tracked Category: ${Object.keys(categoryStats).reduce((a, b) => 
-      categoryStats[a] > categoryStats[b] ? a : b, 'None')}`, margin, yPosition);
-    
-    yPosition += 30;
-
-    // Category Breakdown
-    doc.setFontSize(18);
-    doc.setTextColor(182, 92, 75);
-    doc.text('Category Breakdown', margin, yPosition);
-    yPosition += 15;
-
-    Object.entries(categoryStats).forEach(([category, count]) => {
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`${category}: ${count} entries`, margin, yPosition);
-      yPosition += 10;
-    });
-
-    yPosition += 20;
-
-    // Recent Entries
-    doc.setFontSize(18);
-    doc.setTextColor(182, 92, 75);
-    doc.text('Recent Entries', margin, yPosition);
-    yPosition += 15;
-
-    // Sort by date (most recent first)
-    const sortedEntries = [...loggedDates]
-      .sort((a, b) => new Date(b.date_logged) - new Date(a.date_logged))
-      .slice(0, 20); // Last 20 entries
-
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-
-    // Table headers
-    const headers = ['Date', 'Category', 'Value'];
-    const colWidths = [50, 50, 80];
-    let xPosition = margin;
-
-    doc.setFont(undefined, 'bold');
-    headers.forEach((header, i) => {
-      doc.text(header, xPosition, yPosition);
-      xPosition += colWidths[i];
-    });
-    yPosition += 10;
-
-    // Table content
-    doc.setFont(undefined, 'normal');
-    sortedEntries.forEach(entry => {
-      // Check if we need a new page
-      if (yPosition > 270) {
-        doc.addPage();
-        yPosition = 30;
-      }
-
-      xPosition = margin;
-      const dateStr = new Date(entry.date_logged).toLocaleDateString();
-      const values = [dateStr, entry.symptoms, entry.severity];
-      
-      values.forEach((value, i) => {
-        const text = String(value).length > 25 ? String(value).substring(0, 25) + '...' : String(value);
-        doc.text(text, xPosition, yPosition);
-        xPosition += colWidths[i];
+  const handleDownload = async () => {
+    if (!userInfo.name) {
+      setModalContent({
+        title: 'Please wait',
+        message: 'Patient information is still loading. Try again in a moment.',
+        isError: true
       });
-      yPosition += 8;
-    });
-
-    // Add new page for monthly view if needed
-    if (yPosition > 200) {
-      doc.addPage();
-      yPosition = 30;
-    } else {
-      yPosition += 30;
+      setShowModal(true);
+      return;
     }
-
-    // Monthly Overview
-    doc.setFontSize(18);
-    doc.setTextColor(182, 92, 75);
-    doc.text('Monthly Overview', margin, yPosition);
-    yPosition += 15;
-
-    // Group entries by month
-    const monthlyData = loggedDates.reduce((acc, entry) => {
-      const date = new Date(entry.date_logged);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!acc[monthKey]) acc[monthKey] = [];
-      acc[monthKey].push(entry);
-      return acc;
-    }, {});
-
-    Object.entries(monthlyData)
-      .sort(([a], [b]) => b.localeCompare(a))
-      .slice(0, 6) // Last 6 months
-      .forEach(([month, entries]) => {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = 30;
-        }
-
-        doc.setFontSize(14);
-        doc.setTextColor(59, 164, 160);
-        const [year, monthNum] = month.split('-');
-        const monthName = new Date(year, monthNum - 1).toLocaleDateString('en', { month: 'long', year: 'numeric' });
-        doc.text(monthName, margin, yPosition);
-        yPosition += 10;
-
-        doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Total entries: ${entries.length}`, margin + 10, yPosition);
-        yPosition += 8;
-
-        const monthlyCategoryStats = entries.reduce((acc, entry) => {
-          acc[entry.symptoms] = (acc[entry.symptoms] || 0) + 1;
-          return acc;
-        }, {});
-
-        Object.entries(monthlyCategoryStats).forEach(([category, count]) => {
-          doc.text(`${category}: ${count}`, margin + 10, yPosition);
-          yPosition += 6;
-        });
-
-        yPosition += 10;
-      });
-
-    // Footer
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, doc.internal.pageSize.height - 10, { align: 'right' });
-      doc.text('Generated by Period Tracker App', margin, doc.internal.pageSize.height - 10);
-    }
-
-    // Save the PDF
-    const fileName = `period-tracker-report-${new Date().toISOString().slice(0, 10)}.pdf`;
-    doc.save(fileName);
-
-    setModalContent({ 
-      title: 'PDF Generated!', 
-      message: `Your period tracker report has been downloaded as "${fileName}"`, 
-      isError: false 
+    const fileName = await generatePDF(loggedDates, userInfo);
+    setModalContent({
+      title: 'PDF Generated!',
+      message: `Your symptom tracker report has been downloaded as "${fileName}"`,
+      isError: false
     });
     setShowModal(true);
-  };
-
-  const handleDownload = () => {
-    generatePDF();
   };
 
   const handleShare = () => setShowShareSymptom(true);
@@ -402,54 +267,62 @@ const PeriodTracker = () => {
   const tabConfigs = {
     'Period Flow': {
       options: [
-        { name: 'Light', icon: Droplet, size: 35 },
-        { name: 'Moderate', icon: Droplet, size: 45 },
-        { name: 'Heavy', icon: Droplet, size: 55 },
-        { name: 'Extremely Heavy', icon: Droplets, size: 55 },
+        { name: 'Light', icon: Droplet, size: 25 },
+        { name: 'Moderate', icon: Droplet, size: 35 },
+        { name: 'Heavy', icon: Droplet, size: 40 },
+        { name: 'Extremely Heavy', icon: Droplets, size: 40 },
       ]
     },
     'Symptoms': {
       options: [
         { name: 'Tender Breasts', icon: Heart, size: 36 },
-        { name: 'Headache', icon: Brain, size: 40 },
-        { name: 'Cramps', icon: Activity, size: 40 },
-        { name: 'Low Appetite', icon: Target, size: 40 },
-        { name: 'Increased Appetite', icon: Plus, size: 40 },
-        { name: 'Acne', icon: Circle, size: 40 },
-        { name: 'Migraine', icon: AlertCircle, size: 40 },
-        { name: 'Back Pain', icon: Activity, size: 40 },
-        { name: 'Nausea', icon: CircleAlert, size: 40 },
-        { name: 'Insomnia', icon: Eye, size: 40 },
-        { name: 'Fatigue', icon: Bed, size: 40 },
+        { name: 'Headache', icon: Brain, size: 36 },
+        { name: 'Cramps', icon: Activity, size: 36 },
+        { name: 'Low Appetite', icon: CircleArrowDown, size: 36 },
+        { name: 'Increased Appetite', icon: CircleArrowUp, size: 36 },
+        { name: 'Acne', icon: Circle, size: 36 },
+        { name: 'Migraine', icon: TriangleAlert, size: 36 },
+        { name: 'Back Pain', icon: Flame, size: 36 },
+        { name: 'Nausea', icon: CircleAlert, size: 36 },
+        { name: 'Insomnia', icon: Eye, size: 36 },
+        { name: 'Fatigue', icon: Bed, size: 36 },
       ]
     },
     Feelings: {
       options: [
-        { name: 'Energized', icon: Zap, size: 40 },
-        { name: 'Exhausted', icon: Battery, size: 40 },
-        { name: 'Anxiety', icon: AlertCircle, size: 40 },
-        { name: 'Calm', icon: Leaf, size: 40 },
-        { name: 'Happy', icon: Sun, size: 40 },
-        { name: 'Mood swings', icon: CloudSun, size: 40 },
-        { name: 'Sad', icon: Moon, size: 40 },
+        { name: 'Happy', icon: Laugh, size: 36 },
+        { name: 'Sad', icon: Frown, size: 36 },
+        { name: 'Anxiety', icon: MessageCircleWarning, size: 36 },
+        { name: 'Calm', icon: Leaf, size: 36 },
+        { name: 'Mood Swings', icon: CloudSun, size: 36 },
       ]
     },
     Cravings: {
       options: [
-        { name: 'Salty', icon: Circle, size: 40 },
-        { name: 'Sweet', icon: Cookie, size: 40 },
-        { name: 'Meat', icon: Beef, size: 40 },
-        { name: 'Fruit', icon: Apple, size: 40 },
-        { name: 'Fried things', icon: Drumstick, size: 40 },
-        { name: 'Chocolate', icon: Candy, size: 40 },
+        { name: 'Salty', icon: Popcorn, size: 36 },
+        { name: 'Sweet', icon: CakeSlice, size: 36 },
+        { name: 'Meat', icon: Beef, size: 36 },
+        { name: 'Fruit', icon: Apple, size: 36 },
+        { name: 'Fried Foods', icon: Drumstick, size: 36 },
+        { name: 'Chocolate', icon: Candy, size: 36 },
       ]
     },
     Energy: {
       options: [
-        { name: 'exhausted', icon: Battery, size: 40 },
-        { name: 'tired', icon: Moon, size: 40 },
-        { name: 'ok', icon: Check, size: 40 },
-        { name: 'energetic', icon: Zap, size: 40 },
+        { name: 'Exhausted', icon: BatteryWarning, size: 36 },
+        { name: 'Tired', icon: BatteryLow, size: 36 },
+        { name: 'Okay', icon: BatteryMedium, size: 36 },
+        { name: 'Energetic', icon: BatteryFull, size: 36 },
+      ]
+    },
+    Weight: {
+      options: [
+        { name: 'Weight', icon: Gauge, size: 60, color: '#E67E22' }
+      ]
+    },
+    Custom: {
+      options: [
+        { name: 'Enter Custom Data', icon: NotebookPen, size: 60, color: '#E67E22' }
       ]
     }
   };
@@ -498,7 +371,7 @@ const PeriodTracker = () => {
       return (
         <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-6 rounded-2xl w-full">
           <div className="flex flex-col items-center space-y-4">
-            <Scale size={60} className="text-[#E67E22]" />
+            <Gauge size={60} color="#E67E22" />
             <label className="text-lg font-semibold text-[#B65C4B]">Enter your weight:</label>
             <input
               type="text"
@@ -521,7 +394,7 @@ const PeriodTracker = () => {
       return (
         <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-6 rounded-2xl w-full">
           <div className="flex flex-col items-center space-y-4">
-            <Type size={60} className="text-[#34495E]" />
+            <NotebookPen size={60} color="#E67E22" />
             <label className="text-lg font-semibold text-[#B65C4B]">Enter custom data:</label>
             <textarea
               value={customInput}
@@ -543,37 +416,35 @@ const PeriodTracker = () => {
     return (
       <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 rounded-2xl w-full">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {currentConfig.options.map(({ name, icon, size }) => {
+          {currentConfig.options.map(({ name, icon, size, color }) => {
             const IconComponent = icon;
             const isSelected = selectedValues[selectedTab] === name;
             const isFromPreviousLog = selectedValues[selectedTab] && selectedValues[selectedTab] === name;
-            
+
             return (
               <div
                 key={name}
-                onClick={() => setSelectedValues(prev => ({ 
-                  ...prev, 
-                  [selectedTab]: prev[selectedTab] === name ? '' : name 
+                onClick={() => setSelectedValues(prev => ({
+                  ...prev,
+                  [selectedTab]: prev[selectedTab] === name ? '' : name
                 }))}
                 className="flex flex-col items-center cursor-pointer py-3 px-2"
               >
                 <div
-                  className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full border-4 transition-all relative ${
-                    isSelected
-                      ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md' 
+                  className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full border-4 transition-all relative ${isSelected
+                      ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md'
                       : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6] hover:border-[#3BA4A0] hover:bg-[#F0F9F9]'
-                  }`}
+                    }`}
                 >
-                  <IconComponent size={size || 32} />
+                  <IconComponent size={size || 32} color={color} />
                   {isFromPreviousLog && (
                     <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#3BA4A0] rounded-full flex items-center justify-center">
                       <Check size={10} className="text-white" />
                     </div>
                   )}
                 </div>
-                <span className={`mt-2 text-sm md:text-base font-semibold text-center transition-all ${
-                  isSelected ? 'text-[#3BA4A0]' : 'text-[#F98679]'
-                }`}>
+                <span className={`mt-2 text-sm md:text-base font-semibold text-center transition-all ${isSelected ? 'text-[#3BA4A0]' : 'text-[#F98679]'
+                  }`}>
                   {name}
                 </span>
               </div>
@@ -584,24 +455,38 @@ const PeriodTracker = () => {
     );
   };
 
+  // Handler for calendar date select
+  const handleDateSelect = (date) => {
+    setDate(date);
+  };
+
+  // Handler for month navigation
+  const handleMonthNavigate = (direction) => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
+  const handleMonthYearChange = (month, year) => {
+    setCurrentDate(new Date(year, month, 1));
+  };
+
+  const now = new Date();
+
   return (
     <div className="calendar-container min-h-[100vh] w-full relative">
-      <div className="flex flex-col items-center px-4 md:px-8 py-4 space-y-6 w-full max-w-screen-md mx-auto">
-        <Calendar
-          onChange={setDate}
-          value={date}
-          className="!border-none !bg-[#FFD8C9] rounded-2xl p-4 text-base md:text-lg w-full shadow-lg"
-          tileContent={getTileContent}
-          tileClassName={({ date: d }) =>
-            d.toDateString() === date.toDateString()
-              ? '!bg-[#C2EDEA] !text-[#3BA4A0] rounded-full'
-              : ''
-          }
-          formatShortWeekday={(locale, date) =>
-            date.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase()
-          }
-          next2Label={null}
-          prev2Label={null}
+      <div className="flex flex-col items-center px-4 md:px-8 py-4 space-y-6 w-full max-w-4xl mx-auto">
+        <TrackingCalendar
+          currentDate={currentDate}
+          selectedDate={date}
+          appointments={loggedDates.map(entry => ({
+            date: new Date(entry.date_logged).toISOString().split('T')[0]
+          }))}
+          onDateSelect={handleDateSelect}
+          onMonthNavigate={handleMonthNavigate}
+          onMonthYearChange={handleMonthYearChange}
         />
 
         {/* Tab Navigation */}
@@ -610,11 +495,10 @@ const PeriodTracker = () => {
             <button
               key={tab}
               onClick={() => setSelectedTab(tab)}
-              className={`text-sm md:text-base px-4 py-2 rounded-full font-semibold transition-all relative ${
-                selectedTab === tab 
-                  ? 'bg-[#F98679] text-white shadow-lg scale-105' 
+              className={`text-sm md:text-base px-4 py-2 rounded-full font-semibold transition-all relative ${selectedTab === tab
+                  ? 'bg-[#F98679] text-white shadow-lg scale-105'
                   : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
-              }`}
+                }`}
             >
               {tab}
               {selectedValues[tab] && (
@@ -622,34 +506,7 @@ const PeriodTracker = () => {
               )}
             </button>
           ))}
-          <button
-            onClick={() => setSelectedTab('Weight')}
-            className={`text-sm md:text-base px-4 py-2 rounded-full font-semibold transition-all relative ${
-              selectedTab === 'Weight' 
-                ? 'bg-[#F98679] text-white shadow-lg scale-105' 
-                : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
-            }`}
-          >
-            Weight
-            {selectedValues.Weight && (
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#3BA4A0] rounded-full"></div>
-            )}
-          </button>
-          <button
-            onClick={() => setSelectedTab('Custom')}
-            className={`text-sm md:text-base px-4 py-2 rounded-full font-semibold transition-all relative ${
-              selectedTab === 'Custom' 
-                ? 'bg-[#F98679] text-white shadow-lg scale-105' 
-                : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
-            }`}
-          >
-            Custom
-            {selectedValues.Custom && (
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#3BA4A0] rounded-full"></div>
-            )}
-          </button>
         </div>
-
         {/* Content Area */}
         {renderContent()}
 
@@ -681,16 +538,25 @@ const PeriodTracker = () => {
       )}
 
       {/* Download and Share Buttons */}
-      <div className="fixed bottom-6 right-6 flex flex-row gap-5">
-        <button onClick={handleDownload} className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg">
-          <FileDown size={30} />
-          <span className="mt-1 font-bold">Download PDF</span>
-        </button>
-        <button onClick={handleShare} className="flex flex-col items-center text-[#B65C4B] hover:text-[#3BA4A0] transition text-lg">
-          <FileUp size={30} />
-          <span className="mt-1 font-bold">Share</span>
-        </button>
-        <ShareSymptom isOpen={showShareSymptom} onClose={() => setShowShareSymptom(false)} />
+      <div className="w-full flex justify-end">
+        <div className="bg-[#FFE0D3] rounded-2xl px-6 py-4 flex flex-row gap-10 shadow-sm items-center">
+          <button
+            onClick={handleDownload}
+            className="flex flex-col items-center text-[#F98679] hover:text-[#B65C4B] transition text-sm focus:outline-none"
+            disabled={!userInfo.name} // disable if not loaded
+          >
+            <FileDown size={24} />
+            <span className="mt-1 font-semibold">Download Report</span>
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex flex-col items-center text-[#F98679] hover:text-[#B65C4B] transition text-sm focus:outline-none"
+          >
+            <FileUp size={24} />
+            <span className="mt-1 font-semibold">Share Report</span>
+          </button>
+          <ShareSymptom isOpen={showShareSymptom} onClose={() => setShowShareSymptom(false)} />
+        </div>
       </div>
     </div>
   );

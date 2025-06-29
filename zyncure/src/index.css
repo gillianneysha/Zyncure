@@ -22,4 +22,85 @@ body {
   font-family: 'Kumbh Sans', sans-serif;
 }
 
+/* Calendar container */
+.react-calendar {
+  background: #FFD8C9 !important;
+  border: none !important;
+  border-radius: 2rem !important;
+  box-shadow: 0 6px 24px 0 rgba(249,134,121,0.13) !important;
+  padding: 2rem 1.5rem !important;
+  font-family: 'Kumbh Sans', sans-serif !important;
+}
+
+/* Month/year header */
+.react-calendar__navigation {
+  background: transparent !important;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+}
+.react-calendar__navigation button {
+  color: #B65C4B !important;
+  font-weight: bold;
+  font-size: 2rem;
+  background: transparent !important;
+  border-radius: 50% !important;
+}
+
+/* Weekdays */
+.react-calendar__month-view__weekdays {
+  background: transparent !important;
+  margin-bottom: 0.5rem;
+}
+.react-calendar__month-view__weekdays abbr {
+  color: #B65C4B !important;
+  font-weight: bold;
+  text-decoration: none !important;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+}
+
+/* Days */
+.react-calendar__tile {
+  background: transparent !important;
+  color: #B65C4B !important;
+  font-weight: 500;
+  border-radius: 2rem !important;
+  transition: background 0.2s, color 0.2s;
+  height: 2.5rem !important;
+  aspect-ratio: 1/1 !important;
+  margin: 0.1rem !important;
+}
+.react-calendar__tile--active,
+.react-calendar__tile--rangeStart,
+.react-calendar__tile--rangeEnd,
+.react-calendar__tile--rangeBothEnds {
+  background: #F98679 !important;
+  color: #fff !important;
+  border-radius: 2rem !important;
+}
+.react-calendar__tile--now {
+  background: #FFEFE9 !important;
+  color: #F98679 !important;
+  border-radius: 2rem !important;
+}
+.react-calendar__tile:enabled:hover,
+.react-calendar__tile:enabled:focus {
+  background: #F98679 !important;
+  color: #fff !important;
+}
+
+/* Disabled/future dates */
+.react-calendar__tile:disabled {
+  color: #e0a899 !important;
+  background: transparent !important;
+  opacity: 0.5 !important;
+  pointer-events: none !important;
+}
+
+/* Remove double arrows */
+.react-calendar__navigation__label,
+.react-calendar__navigation__arrow {
+  color: #F98679 !important;
+}
+
 
