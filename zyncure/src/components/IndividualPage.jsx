@@ -230,21 +230,45 @@ export function PersonalInfoForm() {
         <h2 className="text-4xl text-profileHeader font-bold">
           Personal Information
         </h2>
-        <button
-          className={`
-            transition-all duration-300
-            p-2 rounded-xl
-            ${isEditing
-              ? "bg-[#55A1A4]/10 border border-[#55A1A4] text-[#55A1A4] scale-110 shadow"
-              : "hover:bg-[#55A1A4]/10 hover:border hover:border-[#55A1A4] hover:text-[#55A1A4] text-mySidebar"
-            }
-          `}
-          type="button"
-          onClick={() => setIsEditing(true)}
-          aria-label="Edit Personal Information"
-        >
-          <PencilIcon size={20} />
-        </button>
+        <div className="relative group">
+          <button
+            className={`
+              transition-all duration-300
+              p-2 rounded-xl
+              border
+              ${isEditing
+                ? "bg-[#55A1A4]/10 border-[#55A1A4] text-[#55A1A4] scale-110 rotate-12 shadow"
+                : "border-transparent hover:bg-[#55A1A4]/10 hover:border-[#55A1A4] hover:text-[#55A1A4] text-mySidebar"
+              }
+            `}
+            type="button"
+            onClick={() => {
+              if (isEditing) {
+                setFormData(originalData);
+                setIsEditing(false);
+              } else {
+                setIsEditing(true);
+              }
+            }}
+            aria-label={isEditing ? "Cancel Editing" : "Edit Personal Information"}
+            title={isEditing ? "Cancel Editing" : "Edit Personal Information"}
+          >
+            <PencilIcon size={20} />
+          </button>
+          <div
+            className={`
+              absolute z-10 left-1/2 -translate-x-1/2 mt-2 px-3 py-1 rounded
+              text-white text-xs opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity
+              ${isEditing ? "" : ""}
+            `}
+            style={{
+              whiteSpace: "nowrap",
+              background: "#55A1A4"
+            }}
+          >
+            {isEditing ? "Cancel Editing" : "Edit Personal Information"}
+          </div>
+        </div>
       </div>
       {error && <div className="text-red-500 mb-2">{error}</div>}
       {success && <div className="text-green-600 mb-2">{success}</div>}
