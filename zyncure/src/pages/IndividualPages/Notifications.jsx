@@ -200,57 +200,66 @@ const handleReminderNotificationsToggle = (value) => {
     return (
       <div className="mb-8">
         <div className="text-profileHeader font-bold text-lg mb-2">{title}</div>
-        <div className="text-zyncureOrange text-sm mb-4">
+        <div className="text-mySidebar text-sm mb-4">
           {description}
         </div>
 
         <div className="bg-profileBg rounded-xl p-6 border border-mySidebar shadow-sm">
+          {/* Enable all notifications */}
           <div className="flex justify-between items-center py-3 border-b border-mySidebar border-opacity-30">
             <div>
-              <span className="text-profileHeader font-medium">
-                Enable {title.toLowerCase()}
+              <span className="text-profileHeader font-bold">
+                Enable all notifications
               </span>
-              <p className="text-sm text-zyncureOrange mt-1">
-                Turn on to receive {description.toLowerCase()} notifications
+              <p className="text-mySidebar text-sm mt-1">
+                Turn on to receive control all types of notifications including connection requests, appointments, and announcements notifications
               </p>
             </div>
-            <Toggle 
-              enabled={mainEnabled} 
-              onChange={setMainEnabled}
-              disabled={loading}
-            />
+            <div className="flex justify-end items-center">
+              <Toggle 
+                enabled={mainEnabled} 
+                onChange={setMainEnabled}
+                disabled={loading}
+              />
+            </div>
           </div>
 
+          {/* Push notifications */}
           <div className="flex justify-between items-center py-3 border-b border-mySidebar border-opacity-30">
             <div>
-              <span className={`text-profileHeader ${!mainEnabled ? 'opacity-50' : ''}`}>
+              <span className={`text-profileHeader font-bold ${!mainEnabled ? 'opacity-50' : ''}`}>
                 Push notifications
               </span>
-              <p className="text-sm text-zyncureOrange mt-1">
+              <p className="text-mySidebar text-sm mt-1">
                 Receive push notifications on your device
               </p>
             </div>
-            <Toggle
-              enabled={pushEnabled}
-              onChange={setPushEnabled}
-              disabled={loading || !mainEnabled}
-            />
+            <div className="flex justify-end items-center">
+              <Toggle
+                enabled={pushEnabled}
+                onChange={setPushEnabled}
+                disabled={loading || !mainEnabled}
+              />
+            </div>
           </div>
 
+          {/* Email notifications */}
           <div className="flex justify-between items-center py-3">
             <div>
-              <span className={`text-profileHeader ${!mainEnabled ? 'opacity-50' : ''}`}>
+              <span className={`text-profileHeader font-bold ${!mainEnabled ? 'opacity-50' : ''}`}>
                 Email notifications
               </span>
-              <p className="text-sm text-zyncureOrange mt-1">
+              <p className="text-mySidebar text-sm mt-1">
                 Receive notifications via email
               </p>
             </div>
-            <Toggle
-              enabled={emailEnabled}
-              onChange={setEmailEnabled}
-              disabled={loading || !mainEnabled}
-            />
+            <div className="flex justify-end items-center">
+              <Toggle
+                enabled={emailEnabled}
+                onChange={setEmailEnabled}
+                disabled={loading || !mainEnabled}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -259,7 +268,7 @@ const handleReminderNotificationsToggle = (value) => {
 
   if (loading) {
     return (
-      <div className="bg-profileBg rounded-xl p-8 h-[700px] flex items-center justify-center">
+      <div className="bg-profileBg rounded-xl p-8 h-[700px] flex items-center justify-center w-full">
         <div className="flex items-center gap-3">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-profileHeader"></div>
           <span className="text-mySidebar">Loading notification settings...</span>
@@ -269,13 +278,12 @@ const handleReminderNotificationsToggle = (value) => {
   }
 
   return (
-    <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
+    <div className="bg-profileBg rounded-xl p-8 min-h-screen w-full max-w-none mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Bell className="w-8 h-8 text-profileHeader" />
           <h2 className="text-4xl text-profileHeader font-bold">Notification Settings</h2>
         </div>
-        
         {/* Status indicator */}
         {saving && (
           <div className="flex items-center gap-2 text-sm text-mySidebar">
@@ -283,14 +291,12 @@ const handleReminderNotificationsToggle = (value) => {
             Saving...
           </div>
         )}
-        
         {saveStatus === 'success' && (
           <div className="flex items-center gap-2 text-sm text-green-600">
             <Check className="w-4 h-4" />
             Settings saved
           </div>
         )}
-        
         {saveStatus === 'error' && (
           <div className="flex items-center gap-2 text-sm text-red-600">
             <X className="w-4 h-4" />
@@ -299,7 +305,7 @@ const handleReminderNotificationsToggle = (value) => {
         )}
       </div>
 
-      <p className="text-zyncureOrange text-left mb-6">
+      <p className="text-mySidebar text-left mb-6 font-medium">
         Manage account notifications and communication preferences.
       </p>
 
@@ -309,7 +315,7 @@ const handleReminderNotificationsToggle = (value) => {
           <Info className="w-5 h-5 text-profileHeader mt-0.5 flex-shrink-0" />
           <div>
             <h3 className="font-medium text-profileHeader mb-1">How notification preferences work</h3>
-            <p className="text-sm text-zyncureOrange">
+            <p className="text-mySidebar text-sm">
               These settings control all notifications including connection requests, appointment updates, 
               and system announcements. Changes are automatically saved and take effect immediately.
             </p>
@@ -330,7 +336,7 @@ const handleReminderNotificationsToggle = (value) => {
 
       {/* Status section */}
       <div className="mt-6 pt-4 border-t border-mySidebar border-opacity-30">
-        <p className="text-xs text-zyncureOrange mt-3">
+        <p className="text-mySidebar text-xs mt-3">
           Changes are automatically saved as you make them. Your preferences will be respected 
           for all future notifications.
         </p>
