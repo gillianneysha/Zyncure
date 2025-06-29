@@ -130,7 +130,7 @@ const PrivacyModal = ({ isOpen, onClose, onAccept }) => {
                                     <span className="text-gray-600"> You can opt-out of receiving non-essential communications (e.g., newsletters, promotional emails).</span>
                                 </div>
                                 <p className="text-gray-600 mt-2">
-                                    To exercise these rights, please contact us at <span className="font-medium text-[#55A1A4]">ZynCure@gmail.com</span>.
+                                    To exercise these rights, please contact us at <span className="font-medium text-[#55A1A4]">zyncure2025@gmail.com</span>.
                                 </p>
                             </div>
                         </div>
@@ -159,8 +159,8 @@ const PrivacyModal = ({ isOpen, onClose, onAccept }) => {
                                 If you have any questions, concerns, or requests regarding this Privacy Agreement or your data, please contact us at:
                             </p>
                             <div className="ml-4 text-sm text-gray-600">
-                                <p><span className="font-medium">Email:</span> ZynCure@gmail.com</p>
-                                <p><span className="font-medium">Phone:</span> +63 (2) 1234-5678</p>
+                                <p><span className="font-medium">Email:</span> zyncure2025@gmail.com</p>
+                                <p><span className="font-medium">Phone:</span> +63 921 642 4770</p>
                             </div>
                         </div>
 
@@ -215,62 +215,4 @@ const PrivacyModal = ({ isOpen, onClose, onAccept }) => {
     );
 };
 
-// Demo component to show how to use the modal
-const PrivacyModalDemo = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [hasAccepted, setHasAccepted] = useState(false);
-
-    const handleOpenModal = () => {
-        setIsModalOpen(true);
-    };
-
-    const handleCloseModal = () => {
-        setIsModalOpen(false);
-    };
-
-    const handleAcceptPrivacy = () => {
-        setHasAccepted(true);
-        console.log('Privacy agreement accepted!');
-    };
-
-    return (
-        <div className="p-8 bg-gray-100 min-h-screen">
-            <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-xl font-bold mb-4 text-center">Registration Demo</h2>
-
-                <div className="mb-4 text-sm text-gray-600">
-                    By creating an account, you agree to our{" "}
-                    <span className="underline cursor-pointer text-[#55A1A4]">Terms</span> and have read and acknowledge
-                    the{" "}
-                    <span
-                        className="underline cursor-pointer text-[#55A1A4] hover:text-[#368487]"
-                        onClick={handleOpenModal}
-                    >
-                        Privacy Agreement
-                    </span>.
-                </div>
-
-                {hasAccepted && (
-                    <div className="mb-4 p-3 bg-green-100 border border-green-300 text-green-700 rounded text-sm">
-                        ✓ Privacy Agreement accepted
-                    </div>
-                )}
-
-                <button
-                    onClick={handleOpenModal}
-                    className="w-full py-2 bg-[#55A1A4] text-white rounded-lg hover:bg-[#368487] transition-colors"
-                >
-                    View Privacy Agreement
-                </button>
-            </div>
-
-            <PrivacyModal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                onAccept={handleAcceptPrivacy}
-            />
-        </div>
-    );
-};
-
-export default PrivacyModalDemo;
+export default PrivacyModal;
