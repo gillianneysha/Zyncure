@@ -3,6 +3,7 @@ import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
 import TermsModal from "../components/TermsModal";
+import PrivacyModal from "../components/PrivacyModal";
 
 const FormField = memo(({
   label,
@@ -171,6 +172,10 @@ export default function RegistrationForm() {
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
 
+  // Privacy Agreement state
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState(false);
+
   // Doctor verification state
   const [doctorVerification, setDoctorVerification] = useState(null);
   const [showDoctorModal, setShowDoctorModal] = useState(false);
@@ -195,8 +200,8 @@ export default function RegistrationForm() {
     if (!formData.birthdate) newErrors.birthdate = "Birthdate is required";
 
     // Terms acceptance validation
-    if (!hasAcceptedTerms) {
-      newErrors.terms = "You must accept the Terms and Conditions to proceed";
+    if (!hasAcceptedTerms || !hasAcceptedPrivacy) {
+      newErrors.terms = "You must accept the Terms and Privacy Agreement to proceed";
     }
 
     // Email validation
@@ -238,7 +243,7 @@ export default function RegistrationForm() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, hasAcceptedTerms]);
+  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy]);
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -252,6 +257,7 @@ export default function RegistrationForm() {
       confirmPassword: "",
     });
     setHasAcceptedTerms(false);
+    setHasAcceptedPrivacy(false);
     setDoctorVerification(null);
   }, []);
 
@@ -398,7 +404,7 @@ export default function RegistrationForm() {
     } finally {
       setIsLoading(false);
     }
-  }, [formData, hasAcceptedTerms, doctorVerification, validateForm, resetForm]);
+  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy, doctorVerification, validateForm, resetForm]);
 
   const handleGoogleSignUp = useCallback(async () => {
     if (!hasAcceptedTerms) {
@@ -438,7 +444,23 @@ export default function RegistrationForm() {
   }, []);
 
   const handleAcceptTerms = useCallback(() => {
-    setHasAcceptedTerms(true);
+    setIsTermsModalOpen(false);
+    setIsPrivacyModalOpen(true);
+  }, []);
+
+  // Privacy modal handlers
+  const handleOpenPrivacyModal = useCallback(() => {
+    setIsPrivacyModalOpen(true);
+  }, []);
+
+  const handleClosePrivacyModal = useCallback(() => {
+    setIsPrivacyModalOpen(false);
+  }, []);
+
+  const handleAcceptPrivacy = useCallback(() => {
+    setHasAcceptedPrivacy(true);
+    setIsPrivacyModalOpen(false);
+    setHasAcceptedTerms(true); // This is your original flag for form validation
     setErrors(prev => {
       const newErrors = { ...prev };
       delete newErrors.terms;
@@ -610,14 +632,14 @@ export default function RegistrationForm() {
             <input
               type="checkbox"
               id="acceptTerms"
-              checked={hasAcceptedTerms}
+              checked={hasAcceptedTerms && hasAcceptedPrivacy}
               onChange={(e) => {
                 if (!e.target.checked) {
                   setHasAcceptedTerms(false);
+                  setHasAcceptedPrivacy(false);
                 } else {
-                  // Don't allow checking without reading terms
                   e.target.checked = false;
-                  handleOpenTermsModal();
+                  setIsTermsModalOpen(true);
                 }
               }}
               className="mt-1 w-4 h-4 text-[#55A1A4] bg-[#FFEDE7] border-gray-300 rounded focus:ring-[#55A1A4] focus:ring-2"
@@ -635,7 +657,14 @@ export default function RegistrationForm() {
                   Terms and Conditions
                 </button>{" "}
                 and have read and acknowledge the{" "}
-                <span className="underline cursor-pointer">Privacy Agreement</span>.
+                <button
+                  type="button"
+                  onClick={handleOpenPrivacyModal}
+                  className="underline hover:text-white transition-colors duration-200"
+                  disabled={isLoading}
+                >
+                  Privacy Agreement
+                </button>.
               </label>
             </div>
           </div>
@@ -679,8 +708,15 @@ export default function RegistrationForm() {
       {/* Terms and Conditions Modal */}
       <TermsModal
         isOpen={isTermsModalOpen}
-        onClose={handleCloseTermsModal}
+        onClose={() => setIsTermsModalOpen(false)}
         onAccept={handleAcceptTerms}
+      />
+
+      {/* Privacy Agreement Modal */}
+      <PrivacyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+        onAccept={handleAcceptPrivacy}
       />
     </>
   );
