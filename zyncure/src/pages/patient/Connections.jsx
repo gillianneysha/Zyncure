@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X, Clock, Send } from 'lucide-react';
 import { supabase } from '../../client'; 
+import { useNotifications } from '../../hooks/useNotifications'; 
 
 const PatientConnectionsPage = () => {
   // ========================================
@@ -14,6 +15,7 @@ const PatientConnectionsPage = () => {
   const [showDropdown, setShowDropdown] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const { refetch: refetchNotifications } = useNotifications();
 
   // ========================================
   // USER AUTHENTICATION & INITIALIZATION
@@ -164,6 +166,7 @@ const PatientConnectionsPage = () => {
 // ========================================
 // FIXED CONNECTION REQUEST MANAGEMENT
 // ========================================
+// Update your handleConnectionRequest function
 const handleConnectionRequest = async (connectionId, action) => {
   try {
     let error;
@@ -188,13 +191,13 @@ const handleConnectionRequest = async (connectionId, action) => {
     }
 
     await loadConnections();
+    refetchNotifications(); // Add this line
     
     alert(`Connection request ${action}ed successfully!`);
     
   } catch (error) {
     console.error(`Error ${action}ing connection:`, error);
     
-
     if (error.message.includes('Only the recipient can')) {
       alert(`You can only ${action} connection requests sent to you.`);
     } else if (error.message.includes('not found or not pending')) {
