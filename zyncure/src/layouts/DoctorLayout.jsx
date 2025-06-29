@@ -11,7 +11,7 @@ export default function DoctorLayout() {
   const isHealthActive = location.pathname.includes('/doctor/patients');
 
   return (
-    <div className="flex h-screen">
+    <div className="flex min-h-screen">
       <Sidebar>
         <SidebarItem 
           icon={<House size={20} />} 
@@ -57,7 +57,6 @@ export default function DoctorLayout() {
           alert 
         />
       </Sidebar>
-
       <div className="flex flex-col flex-1">
         <Navbar />
 
