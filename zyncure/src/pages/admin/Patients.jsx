@@ -8,39 +8,120 @@ export default function AdminPatients() {
   const [search, setSearch] = useState("");
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [error, setError] = useState(null); // Add error state for debugging
 
   useEffect(() => {
     const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      console.log("Logged-in user id:", user?.id);
+      try {
+        const {
+          data: { user },
+          error: userError
+        } = await supabase.auth.getUser();
+        
+        if (userError) {
+          console.error("Auth error:", userError);
+          setError(`Authentication error: ${userError.message}`);
+          return;
+        }
+        
+        console.log("Logged-in user id:", user?.id);
+        console.log("Full user object:", user);
+        
+        if (!user) {
+          setError("No authenticated user found");
+          return;
+        }
+      } catch (err) {
+        console.error("Error getting user:", err);
+        setError(`Error getting user: ${err.message}`);
+      }
     };
+    
     getUser();
     fetchPatients();
   }, []);
 
   const fetchPatients = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from("patients").select("*");
-    setPatients(data || []);
-    setLoading(false);
-    if (error) console.error("Supabase error:", error);
-    console.log("Fetched patients:", data);
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("Attempting to fetch patients...");
+      
+      // Test basic connection
+      const { error: testError } = await supabase
+        .from("patients")
+        .select("count")
+        .limit(1);
+      
+      if (testError) {
+        console.error("Connection test failed:", testError);
+        setError(`Database connection error: ${testError.message}`);
+        setLoading(false);
+        return;
+      }
+      
+      console.log("Connection test successful");
+      
+      // Fetch all patients
+      const { data, error, count } = await supabase
+        .from("patients")
+        .select("*", { count: 'exact' });
+      
+      console.log("Query result:", { data, error, count });
+      console.log("Raw data length:", data?.length);
+      console.log("First patient:", data?.[0]);
+      
+      if (error) {
+        console.error("Supabase fetch error:", error);
+        setError(`Fetch error: ${error.message}`);
+      } else {
+        setPatients(data || []);
+        console.log("Successfully set patients:", data?.length || 0);
+      }
+      
+      setLoading(false);
+    } catch (err) {
+      console.error("Unexpected error in fetchPatients:", err);
+      setError(`Unexpected error: ${err.message}`);
+      setLoading(false);
+    }
   };
 
+  // Debug: Log current state
+  console.log("Current component state:", {
+    patientsLength: patients.length,
+    loading,
+    error,
+    search,
+    currentPage,
+    entriesPerPage
+  });
+
   const filteredPatients = patients.filter(
-    (p) =>
-      (p.first_name || "").trim().toLowerCase().includes(search.toLowerCase()) ||
-      (p.last_name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.email || "").toLowerCase().includes(search.toLowerCase())
+    (p) => {
+      const searchLower = search.toLowerCase();
+      const firstName = (p.first_name || "").trim().toLowerCase();
+      const lastName = (p.last_name || "").toLowerCase();
+      const email = (p.email || "").toLowerCase();
+      
+      console.log("Filtering patient:", { firstName, lastName, email, searchLower });
+      
+      return firstName.includes(searchLower) ||
+             lastName.includes(searchLower) ||
+             email.includes(searchLower);
+    }
   );
+
+  console.log("Filtered patients:", filteredPatients.length);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredPatients.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
   const endIndex = startIndex + entriesPerPage;
   const currentPatients = filteredPatients.slice(startIndex, endIndex);
+
+  console.log("Pagination:", { totalPages, startIndex, endIndex, currentPatientsLength: currentPatients.length });
 
   // Reset to first page when entries per page changes
   const handleEntriesChange = (newEntries) => {
@@ -59,6 +140,21 @@ export default function AdminPatients() {
       <h1 className="text-[#3BA4A0] font-bold text-4xl mt-1 mb-2 ml-4 relative z-10">
         Patients
       </h1>
+      
+      {/* Debug information - remove this in production */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <strong>Error:</strong> {error}
+          <button 
+            onClick={fetchPatients}
+            className="ml-4 bg-red-500 text-white px-3 py-1 rounded text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      
       {/* Outer box with MORE rounded corners */}
       <div className="bg-[#FEDCD2] rounded-[24px] p-6 mb-6 mt-2">
         <div className="flex justify-between items-center mb-4">
@@ -114,10 +210,19 @@ export default function AdminPatients() {
                     Loading...
                   </td>
                 </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-red-600">
+                    Error loading patients: {error}
+                  </td>
+                </tr>
               ) : currentPatients.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-8">
-                    No patients found.
+                    {patients.length === 0 ? 
+                      "No patients found in database." : 
+                      `No patients match search "${search}".`
+                    }
                   </td>
                 </tr>
               ) : (
@@ -130,9 +235,9 @@ export default function AdminPatients() {
                     <td className="py-2 text-[#F15629]">
                       {p.created_at
                         ? new Date(p.created_at).toLocaleDateString("en-US")
-                        : ""}
+                        : "N/A"}
                     </td>
-                    <td className="py-2 text-[#F15629]">{p.email}</td>
+                    <td className="py-2 text-[#F15629]">{p.email || "N/A"}</td>
                     <td className="py-2">
                       <span
                         className={`px-4 py-1 rounded-full text-white text-sm font-semibold ${
