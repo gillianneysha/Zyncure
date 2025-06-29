@@ -653,3 +653,68 @@ export const userService = {
     }
   }
 };
+
+
+// =============================================================================
+// APPOINTMENT NOTIFICATION SERVICE
+// =============================================================================
+
+export const appointmentNotificationService = {
+  /**
+   * Get appointment notifications for current user
+   * @returns {object}
+   */
+  async getAppointmentNotifications() {
+    try {
+      const user = await getCurrentUser();
+      
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('type', ['appointment_created', 'appointment_updated', 'appointment_cancelled'])
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching appointment notifications:', error);
+        throw error;
+      }
+
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('Error in getAppointmentNotifications:', error);
+      return { data: [], error: error.message };
+    }
+  },
+
+  /**
+   * Create manual appointment notification (for edge cases)
+   * @param {string} targetUserId 
+   * @param {string} type 
+   * @param {string} title 
+   * @param {string} message 
+   * @param {object} metadata 
+   * @returns {object}
+   */
+  async createAppointmentNotification(targetUserId, type, title, message, metadata) {
+    try {
+      const { data, error } = await supabase.rpc('create_notification', {
+        target_user_id: targetUserId,
+        notification_type: type,
+        notification_title: title,
+        notification_message: message,
+        notification_metadata: metadata || {}
+      });
+
+      if (error) {
+        console.error('Error creating appointment notification:', error);
+        throw error;
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error in createAppointmentNotification:', error);
+      return { data: null, error: error.message };
+    }
+  }
+};
