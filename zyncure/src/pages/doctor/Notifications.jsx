@@ -20,93 +20,110 @@ export default function Notifications() {
     initializeNotifications();
   }, []);
 
- // Update your initializeNotifications function
-async function initializeNotifications() {
-  // Get current user first
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    setLoading(false);
-    return;
-  }
-  
-  // Determine user type
-  const userType = await getUserType(user.id);
-  if (!userType) {
-    setLoading(false);
-    return;
-  }
-  
-  await fetchNotifications(user.id);
-  
-  // Set up real-time subscription with the correct user ID
-  const subscription = supabase
-    .channel("notifications")
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "notifications",
-        filter: `user_id=eq.${user.id}`,
-      },
-      (payload) => {
-        setNotifications((prev) => [payload.new, ...prev]);
-        setUnreadCount((prev) => prev + 1);
-      }
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "notifications",
-        filter: `user_id=eq.${user.id}`,
-      },
-      (payload) => {
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === payload.new.id ? payload.new : n))
-        );
-        // Recalculate unread count
-        setUnreadCount((prev) => {
-          const wasRead = payload.old.is_read;
-          const isRead = payload.new.is_read;
-          if (!wasRead && isRead) {
-            return Math.max(0, prev - 1);
-          } else if (wasRead && !isRead) {
-            return prev + 1;
+  // Update your initializeNotifications function
+  async function initializeNotifications() {
+    // Get current user first
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    
+    // Determine user type
+    const userType = await getUserType(user.id);
+    if (!userType) {
+      setLoading(false);
+      return;
+    }
+    
+    await fetchNotifications(user.id);
+    
+    // Set up real-time subscription with the correct user ID
+    const subscription = supabase
+      .channel("notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new, ...prev]);
+          setUnreadCount((prev) => prev + 1);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === payload.new.id ? payload.new : n))
+          );
+          // Recalculate unread count
+          setUnreadCount((prev) => {
+            const wasRead = payload.old.is_read;
+            const isRead = payload.new.is_read;
+            if (!wasRead && isRead) {
+              return Math.max(0, prev - 1);
+            } else if (wasRead && !isRead) {
+              return prev + 1;
+            }
+            return prev;
+          });
+        }
+      )
+      // Add DELETE event listener
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
+          // Update unread count if the deleted notification was unread
+          if (!payload.old.is_read) {
+            setUnreadCount((prev) => Math.max(0, prev - 1));
           }
-          return prev;
-        });
-      }
-    )
-    .subscribe();
+        }
+      )
+      .subscribe();
 
-  return () => {
-    subscription.unsubscribe();
-  };
-}
+    return () => {
+      subscription.unsubscribe();
+    };
+  }
 
   const getUserType = async (userId) => {
-  // Check if user is a doctor
-  const { data: doctorData } = await supabase
-    .from('medicalprofessionals')
-    .select('med_id')
-    .eq('med_id', userId)
-    .single();
-  
-  if (doctorData) return 'doctor';
-  
-  // Check if user is a patient
-  const { data: patientData } = await supabase
-    .from('patients')
-    .select('patient_id')
-    .eq('patient_id', userId)
-    .single();
-  
-  if (patientData) return 'patient';
-  
-  return null;
-};
+    // Check if user is a doctor
+    const { data: doctorData } = await supabase
+      .from('medicalprofessionals')
+      .select('med_id')
+      .eq('med_id', userId)
+      .single();
+    
+    if (doctorData) return 'doctor';
+    
+    // Check if user is a patient
+    const { data: patientData } = await supabase
+      .from('patients')
+      .select('patient_id')
+      .eq('patient_id', userId)
+      .single();
+    
+    if (patientData) return 'patient';
+    
+    return null;
+  };
 
   async function fetchNotifications(userId) {
     setLoading(true);
@@ -152,15 +169,22 @@ async function initializeNotifications() {
       .delete()
       .eq("id", notificationId);
 
-    if (!error) {
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-      // Update unread count if the deleted notification was unread
-      const deletedNotification = notifications.find(
-        (n) => n.id === notificationId
-      );
-      if (deletedNotification && !deletedNotification.is_read) {
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      }
+    if (error) {
+      console.error("Error deleting notification:", error);
+      // You might want to show a user-friendly error message here
+      alert("Failed to delete notification. Please try again.");
+      return;
+    }
+
+    // Only update local state if the database operation succeeded
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    
+    // Update unread count if the deleted notification was unread
+    const deletedNotification = notifications.find(
+      (n) => n.id === notificationId
+    );
+    if (deletedNotification && !deletedNotification.is_read) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     }
   }
 
