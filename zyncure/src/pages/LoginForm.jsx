@@ -89,75 +89,86 @@ export default function LoginForm({ setToken }) {
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
- // Fix for LoginForm.jsx - handleSubmit function
-const handleSubmit = useCallback(async (event) => {
-  event.preventDefault();
-
-  if (!validateForm()) return;
-
-  setIsLoading(true);
-  setErrors({});
-  setMfaError("");
-
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: formData.email,
-      password: formData.password,
-    });
-
-    if (error) {
-      throw error;
+  // Simple redirect based on user metadata - useUser hook will handle role detection
+  const getRedirectPath = (user) => {
+    // Check user metadata for medical professional
+    const userRole = user.user_metadata?.user_type;
+    
+    if (userRole === "doctor") {
+      return "/doctor";
     }
 
-    // Check if user has MFA factors
-    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
-    
-    if (factorsError) {
-      console.error("Error checking MFA factors:", factorsError);
-      // If we can't check factors, proceed without MFA
-      setToken(data);
-      const userRole = data.user.user_metadata.user_type;
-      const redirectPath = userRole === "medical_professional" ? "/doctor" : "/home";
-      navigate(redirectPath);
-      return;
-    }
+    // Default to home - the router will redirect admins appropriately
+    return "/home";
+  };
 
-    // Find verified TOTP factor
-    const totpFactor = factors.factors?.find(f => f.factor_type === "totp" && f.status === "verified");
-    
-    if (totpFactor) {
-      // User has MFA enabled, initiate challenge
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId: totpFactor.id
+  const handleSubmit = useCallback(async (event) => {
+    event.preventDefault();
+
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    setErrors({});
+    setMfaError("");
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
       });
-      
-      if (challengeError) {
-        console.error("MFA challenge error:", challengeError);
-        throw challengeError;
+
+      if (error) {
+        throw error;
       }
+
+      // Check if user has MFA factors
+      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
       
-      setMfaChallenge({
-        challengeId: challengeData.id,
-        factorId: totpFactor.id
+      if (factorsError) {
+        console.error("Error checking MFA factors:", factorsError);
+        // If we can't check factors, proceed without MFA
+        setToken(data);
+        const redirectPath = getRedirectPath(data.user);
+        navigate(redirectPath);
+        return;
+      }
+
+      // Find verified TOTP factor
+      const totpFactor = factors.factors?.find(f => f.factor_type === "totp" && f.status === "verified");
+      
+      if (totpFactor) {
+        // User has MFA enabled, initiate challenge
+        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+          factorId: totpFactor.id
+        });
+        
+        if (challengeError) {
+          console.error("MFA challenge error:", challengeError);
+          throw challengeError;
+        }
+        
+        setMfaChallenge({
+          challengeId: challengeData.id,
+          factorId: totpFactor.id,
+          userData: data // Store user data for after MFA verification
+        });
+        return;
+      }
+
+      // No MFA enabled, proceed with normal login
+      setToken(data);
+      const redirectPath = getRedirectPath(data.user);
+      navigate(redirectPath);
+
+    } catch (error) {
+      console.error("Login error:", error);
+      setErrors({
+        submit: error.message || "Login failed. Please check your credentials and try again."
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    // No MFA enabled, proceed with normal login
-    setToken(data);
-    const userRole = data.user.user_metadata.user_type;
-    const redirectPath = userRole === "medical_professional" ? "/doctor" : "/home";
-    navigate(redirectPath);
-
-  } catch (error) {
-    console.error("Login error:", error);
-    setErrors({
-      submit: error.message || "Login failed. Please check your credentials and try again."
-    });
-  } finally {
-    setIsLoading(false);
-  }
-}, [formData, validateForm, setToken, navigate]);
+  }, [formData, validateForm, setToken, navigate]);
 
   const handleGoogleSignIn = useCallback(async () => {
     try {
@@ -227,8 +238,7 @@ const handleSubmit = useCallback(async (event) => {
 
       // MFA verification successful
       setToken(data);
-      const userRole = data.user.user_metadata.user_type;
-      const redirectPath = userRole === "medical_professional" ? "/doctor" : "/home";
+      const redirectPath = getRedirectPath(data.user);
       navigate(redirectPath);
 
     } catch (error) {
