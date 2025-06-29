@@ -1,7 +1,9 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
 import Sidebar, { SidebarItem, SidebarSubItem } from '../components/Sidebar';
 import Navbar from '../components/Navbar';
-import { CalendarDays, Users, Bell, Heart, House, User, ChartPie, Folders } from 'lucide-react';
+import { CalendarDays, Users, Bell, Heart, House, User, ChartPie, Folders, MessageSquare } from 'lucide-react';
+import { ReportModal } from '../components/ReportModal';
 
 export default function PatientLayout() {
   const navigate = useNavigate();
@@ -9,6 +11,7 @@ export default function PatientLayout() {
 
   const isActive = (path) => location.pathname === `/home${path}`;
   const isHealthActive = location.pathname.includes('/home/health');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
 
   return (
     <div className="flex min-h-screen">
@@ -63,6 +66,12 @@ export default function PatientLayout() {
           onClick={() => navigate('/home/appointments')} 
           alert 
         />
+        
+<SidebarItem 
+  icon={<MessageSquare size={20} />} 
+  text="Need Help?" 
+  onClick={() => setIsReportModalOpen(true)}
+/>
       </Sidebar>
       <div className="flex flex-col flex-1">
         <Navbar />
@@ -70,6 +79,10 @@ export default function PatientLayout() {
           <Outlet />
         </main>
       </div>
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+      />
     </div>
   );
 }
