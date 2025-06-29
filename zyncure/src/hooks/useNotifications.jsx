@@ -1,4 +1,4 @@
-// hooks/useNotifications.js
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../client';
 

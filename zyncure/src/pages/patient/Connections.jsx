@@ -191,7 +191,7 @@ const handleConnectionRequest = async (connectionId, action) => {
     }
 
     await loadConnections();
-    refetchNotifications(); // Add this line
+    refetchNotifications(); 
     
     alert(`Connection request ${action}ed successfully!`);
     

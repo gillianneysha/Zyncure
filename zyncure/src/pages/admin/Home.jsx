@@ -11,6 +11,15 @@ export default function AdminHome() {
   const [newAnnouncement, setNewAnnouncement] = useState({ title: "", content: "", type: "" });
   const [loading, setLoading] = useState(false);
 
+  async function fetchMessages() {
+    const { data, error } = await supabase
+      .from("announcements")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(3);
+    if (!error) setMessages(data || []);
+  }
+
   useEffect(() => {
     async function fetchTotalUsers() {
       const { count, error } = await supabase
@@ -32,14 +41,6 @@ export default function AdminHome() {
         .eq("status", "pending");
       if (!error) setReportsForReview(count || 0);
     }
-    async function fetchMessages() {
-      const { data, error } = await supabase
-        .from("announcements")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      if (!error) setMessages(data || []);
-    }
     fetchTotalUsers();
     fetchPendingVerification();
     fetchReportsForReview();
@@ -47,22 +48,37 @@ export default function AdminHome() {
   }, []);
 
   async function handleAddAnnouncement(e) {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.from("announcements").insert([{
-      title: newAnnouncement.title,
-      content: newAnnouncement.content,
-      type: newAnnouncement.type
-    }]);
-    setLoading(false);
-    if (!error) {
-      setShowModal(false);
-      setNewAnnouncement({ title: "", content: "", type: "" });
-      fetchMessages();
-    } else {
-      alert("Failed to add announcement: " + error.message);
+  e.preventDefault();
+  setLoading(true);
+  
+  const { error } = await supabase.from("announcements").insert([{
+    title: newAnnouncement.title,
+    content: newAnnouncement.content,
+    type: newAnnouncement.type
+  }]);
+  
+  if (!error) {
+    // Notify all users about the new announcement
+    const { error: notifyError } = await supabase.rpc('notify_all_users_announcement', {
+      announcement_title: newAnnouncement.title,
+      announcement_content: newAnnouncement.content,
+      announcement_type: newAnnouncement.type || 'info'
+    });
+    
+    if (notifyError) {
+      console.error('Failed to send notifications:', notifyError);
+      // You might want to show a warning that the announcement was created but notifications failed
     }
+    
+    setShowModal(false);
+    setNewAnnouncement({ title: "", content: "", type: "" });
+    fetchMessages();
+  } else {
+    alert("Failed to add announcement: " + error.message);
   }
+  
+  setLoading(false);
+}
 
   return (
     <div className="p-8">

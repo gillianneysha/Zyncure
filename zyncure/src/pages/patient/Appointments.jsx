@@ -5,6 +5,8 @@ import AppointmentModal from '../../components/AppointmentModal';
 import AppointmentList from '../../components/AppointmentList';
 import { appointmentService, userService } from '../../services/AppointmentService';
 import RescheduleModal from '../../components/RescheduleModal'; 
+import { supabase } from "../../client";
+
 
 const PersonalAppointmentTracker = () => {
   const [userData, setUserData] = useState({
@@ -28,44 +30,96 @@ const PersonalAppointmentTracker = () => {
     type: 'Consultation'
   });
 
-  useEffect(() => {
-    const initializeData = async () => {
-      setLoading(true);
-      try {
-        const user = await userService.getUserData();
-        if (user) {
-          setUserData(user);
-          
-          const { data: userAppointments, error: appointmentsError } = 
-            await appointmentService.getUserAppointments(user.id);
-          
-          if (appointmentsError) {
-            console.error('Error loading appointments:', appointmentsError);
-            setError('Failed to load your appointments');
-          } else if (userAppointments) {
-            setAppointments(userAppointments);
-          }
-        }
-
-        const { data: connectedDoctors, error: doctorsError } = 
-          await appointmentService.getConnectedDoctors();
+ useEffect(() => {
+  const initializeData = async () => {
+    setLoading(true);
+    try {
+      const user = await userService.getUserData();
+      if (user) {
+        setUserData(user);
         
-        if (doctorsError) {
-          console.error('Error loading doctors:', doctorsError);
-          setError('Failed to load connected doctors');
-        } else if (connectedDoctors) {
-          setDoctors(connectedDoctors);
+        const { data: userAppointments, error: appointmentsError } = 
+          await appointmentService.getUserAppointments(user.id);
+        
+        if (appointmentsError) {
+          console.error('Error loading appointments:', appointmentsError);
+          setError('Failed to load your appointments');
+        } else if (userAppointments) {
+          setAppointments(userAppointments);
         }
-      } catch (err) {
-        console.error('Initialization error:', err);
-        setError('Failed to initialize appointment system');
-      } finally {
-        setLoading(false);
       }
-    };
 
-    initializeData();
-  }, []);
+      const { data: connectedDoctors, error: doctorsError } = 
+        await appointmentService.getConnectedDoctors();
+      
+      if (doctorsError) {
+        console.error('Error loading doctors:', doctorsError);
+        setError('Failed to load connected doctors');
+      } else if (connectedDoctors) {
+        setDoctors(connectedDoctors);
+      }
+    } catch (err) {
+      console.error('Initialization error:', err);
+      setError('Failed to initialize appointment system');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Set up real-time notification subscription
+  const setupNotificationSubscription = async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Error getting user:', error);
+        return null;
+      }
+      
+      if (user?.id) {
+        const notificationSubscription = supabase
+          .channel('appointment_notifications')
+          .on('postgres_changes', 
+            { 
+              event: 'INSERT', 
+              schema: 'public', 
+              table: 'notifications',
+              filter: `user_id=eq.${user.id}`
+            }, 
+            (payload) => {
+              // Show a toast notification or update UI when new notification arrives
+              if (payload.new.type.includes('appointment')) {
+                console.log('New appointment notification:', payload.new);
+                // You can add a toast notification here
+              }
+            }
+          )
+          .subscribe();
+
+        return notificationSubscription;
+      }
+    } catch (err) {
+      console.error('Error setting up notification subscription:', err);
+      return null;
+    }
+    return null;
+  };
+
+  // Initialize data and set up subscription
+  initializeData();
+  
+  let notificationSubscription = null;
+  setupNotificationSubscription().then((subscription) => {
+    notificationSubscription = subscription;
+  });
+
+  // Cleanup function
+  return () => {
+    if (notificationSubscription) {
+      notificationSubscription.unsubscribe();
+    }
+  };
+}, []);
 
 const formatDateForStorage = (date) => {
   // Create a new date object to avoid timezone issues
