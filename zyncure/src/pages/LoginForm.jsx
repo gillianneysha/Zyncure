@@ -5,7 +5,6 @@ import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
 
-
 const FormField = React.memo(({ 
   label, 
   name, 
@@ -15,10 +14,12 @@ const FormField = React.memo(({
   value,
   onChange,
   error,
-  disabled
+  disabled,
+  labelClassName = "text-[#F5E0D9]",
+  inputClassName = "bg-[#FFEDE7]"
 }) => (
   <div className="mb-3">
-    <label className="block w-4/5 mx-auto mb-1 text-[#F5E0D9] text-left">
+    <label className={`block w-4/5 mx-auto mb-1 ${labelClassName} text-left`}>
       {label}:
     </label>
     <input
@@ -27,7 +28,7 @@ const FormField = React.memo(({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className={`w-4/5 block mx-auto mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] ${
+      className={`w-4/5 block mx-auto mb-1 p-2 ${inputClassName} border-none rounded-[15.5px] ${
         error ? "ring-2 ring-red-400" : ""
       }`}
       required={required}
@@ -49,11 +50,9 @@ export default function LoginForm({ setToken }) {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [mfa, setMfa] = useState(null);
+  const [mfaChallenge, setMfaChallenge] = useState(null); 
   const [mfaCode, setMfaCode] = useState("");
   const [mfaError, setMfaError] = useState("");
-
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -62,7 +61,6 @@ export default function LoginForm({ setToken }) {
       [name]: value
     }));
 
-    
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -70,7 +68,6 @@ export default function LoginForm({ setToken }) {
       }));
     }
   }, [errors]);
-
 
   const validateForm = useCallback(() => {
     const newErrors = {};
@@ -92,46 +89,76 @@ export default function LoginForm({ setToken }) {
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
- 
-  const handleSubmit = useCallback(async (event) => {
-    event.preventDefault();
+ // Fix for LoginForm.jsx - handleSubmit function
+const handleSubmit = useCallback(async (event) => {
+  event.preventDefault();
 
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    setIsLoading(true);
-    setErrors({});
-    setMfaError("");
+  setIsLoading(true);
+  setErrors({});
+  setMfaError("");
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: formData.email,
+      password: formData.password,
+    });
 
-      if (error && error.status === 400 && error.message === "MFA required") {
-        setMfa(data.mfa); // Save the mfa object for the next step
-        return;
-      }
+    if (error) {
+      throw error;
+    }
 
-      if (error) throw error;
-
+    // Check if user has MFA factors
+    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+    
+    if (factorsError) {
+      console.error("Error checking MFA factors:", factorsError);
+      // If we can't check factors, proceed without MFA
       setToken(data);
-
       const userRole = data.user.user_metadata.user_type;
       const redirectPath = userRole === "medical_professional" ? "/doctor" : "/home";
       navigate(redirectPath);
-
-    } catch (error) {
-      console.error("Login error:", error);
-      setErrors({
-        submit: error.message || "Login failed. Please check your credentials and try again."
-      });
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  }, [formData, validateForm, setToken, navigate]);
 
-  
+    // Find verified TOTP factor
+    const totpFactor = factors.factors?.find(f => f.factor_type === "totp" && f.status === "verified");
+    
+    if (totpFactor) {
+      // User has MFA enabled, initiate challenge
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: totpFactor.id
+      });
+      
+      if (challengeError) {
+        console.error("MFA challenge error:", challengeError);
+        throw challengeError;
+      }
+      
+      setMfaChallenge({
+        challengeId: challengeData.id,
+        factorId: totpFactor.id
+      });
+      return;
+    }
+
+    // No MFA enabled, proceed with normal login
+    setToken(data);
+    const userRole = data.user.user_metadata.user_type;
+    const redirectPath = userRole === "medical_professional" ? "/doctor" : "/home";
+    navigate(redirectPath);
+
+  } catch (error) {
+    console.error("Login error:", error);
+    setErrors({
+      submit: error.message || "Login failed. Please check your credentials and try again."
+    });
+  } finally {
+    setIsLoading(false);
+  }
+}, [formData, validateForm, setToken, navigate]);
+
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -154,8 +181,6 @@ export default function LoginForm({ setToken }) {
       setIsLoading(false);
     }
   }, []);
-
-
 
   const handleForgotPassword = async () => {
     if (!formData.email) {
@@ -182,24 +207,40 @@ export default function LoginForm({ setToken }) {
     }
   };
 
-  // 4. Handle MFA code submission
+  // Handle MFA code submission
   const handleMfaSubmit = async (event) => {
     event.preventDefault();
     setMfaError("");
-    const { data, error } = await supabase.auth.mfa.verify({
-      factorId: mfa.factors[0].id,
-      code: mfaCode,
-    });
-    if (error) {
-      setMfaError("Invalid code. Please try again.");
-      return;
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.mfa.verify({
+        factorId: mfaChallenge.factorId,
+        challengeId: mfaChallenge.challengeId,
+        code: mfaCode,
+      });
+
+      if (error) {
+        setMfaError("Invalid code. Please try again.");
+        return;
+      }
+
+      // MFA verification successful
+      setToken(data);
+      const userRole = data.user.user_metadata.user_type;
+      const redirectPath = userRole === "medical_professional" ? "/doctor" : "/home";
+      navigate(redirectPath);
+
+    } catch (error) {
+      console.error("MFA verification error:", error);
+      setMfaError("Verification failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-    setToken(data.session);
-    // ...redirect logic...
   };
 
   return (
-    <form onSubmit={mfa ? handleMfaSubmit : handleSubmit}>
+    <form onSubmit={mfaChallenge ? handleMfaSubmit : handleSubmit}>
       {/* Error Message */}
       {errors.submit && (
         <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
@@ -207,7 +248,7 @@ export default function LoginForm({ setToken }) {
         </div>
       )}
 
-      {!mfa && (
+      {!mfaChallenge && (
         <>
           <FormField 
             label="Email" 
@@ -267,7 +308,7 @@ export default function LoginForm({ setToken }) {
 
           <div className="w-4/5 mx-auto mt-2 text-left">
             <span className="text-[#F5E0D9] text-sm">
-              Don’t have an account?{" "}
+              Don't have an account?{" "}
               <a
                 href="/register"
                 className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
@@ -292,14 +333,13 @@ export default function LoginForm({ setToken }) {
               disabled={isLoading}
             >
               <GoogleIcon className="w-10 h-10" />
-
             </button>
             <p className="mt-2">Log in using your Google account</p>
           </div>
         </>
       )}
 
-      {mfa && (
+      {mfaChallenge && (
         <div className="w-4/5 mx-auto mt-4 p-4 bg-[#FFEDE7] rounded-lg shadow-md">
           <p className="text-[#333] text-sm mb-2">
             Two-factor authentication is enabled. Please enter the code from your authenticator app.
@@ -322,6 +362,17 @@ export default function LoginForm({ setToken }) {
             disabled={isLoading}
           >
             {isLoading ? "Verifying..." : "Verify MFA Code"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMfaChallenge(null);
+              setMfaCode("");
+              setMfaError("");
+            }}
+            className="w-full py-2 mt-2 text-[#55A1A4] bg-transparent border border-[#55A1A4] rounded-lg font-semibold transition-colors duration-200 hover:bg-[#55A1A4] hover:text-white"
+          >
+            Back to Login
           </button>
         </div>
       )}
