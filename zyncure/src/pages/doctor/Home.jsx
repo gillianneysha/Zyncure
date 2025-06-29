@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, Share2, Bell, Calendar, FileText, Users } from 'lucide-react';
 import { supabase } from '../../client'; 
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   // State for backend data
@@ -18,6 +19,7 @@ const Dashboard = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPatients, setFilteredPatients] = useState([]);
+  const navigate = useNavigate();
 
   // Fetch unread notifications
   const fetchUnreadNotifications = async () => {
@@ -139,8 +141,7 @@ const Dashboard = () => {
   };
 
   const handleViewPatient = (patientId) => {
-    console.log(`View patient ${patientId}`);
-    // TODO: Navigate to patient detail page
+    navigate(`/doctor/patients/${patientId}`);
   };
 
   const handleSharePatient = (patientId) => {
@@ -230,7 +231,7 @@ const Dashboard = () => {
           {notifications.length > 0 && (
             <div className="mt-4 text-center">
               <button
-                onClick={() => {/* TODO: Navigate to full notifications page */}}
+                onClick={() => navigate('/doctor/notifications')}
                 className="text-teal-600 hover:text-teal-700 text-sm font-medium"
               >
                 View all notifications →
@@ -286,27 +287,23 @@ const Dashboard = () => {
         {!loading && !error && (
           <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-5 gap-4 p-4 bg-red-100 border-b border-red-200">
+            <div className="grid grid-cols-[110px_1.5fr_2fr_160px_210px] gap-x-4 p-4 bg-red-100 border-b border-red-200">
               <div className="font-medium text-red-700">Patient ID</div>
-              <div className="font-medium text-red-700 -ml-2">Patient Name</div>
+              <div className="font-medium text-red-700">Patient Name</div>
               <div className="font-medium text-red-700">Email</div>
-              <div className="font-medium text-red-700">Connected Since</div>
-              <div className="font-medium text-red-700">Actions</div>
+              <div className="font-medium text-red-700 whitespace-nowrap">Connected Since</div>
+              <div className="font-medium text-red-700 whitespace-nowrap pr-4">Actions</div>
             </div>
 
             {/* Table Body */}
             <div className="divide-y divide-red-100">
               {filteredPatients.map((patient) => (
-                <div key={patient.id} className="grid grid-cols-5 gap-4 p-4 hover:bg-red-25 transition-colors">
-                  <div className="text-red-700 font-mono font-medium">
-                    {patient.patient_short_id?.substring(0, 4)}
-                  </div>
-                  <div className="text-red-700 font-medium -ml-2">
-                    {patient.patient_first_name} {patient.patient_last_name}
-                  </div>
-                  <div className="text-gray-600">{patient.patient_email}</div>
-                  <div className="text-gray-600">{formatDate(patient.created_at)}</div>
-                  <div className="flex gap-2">
+                <div key={patient.id} className="grid grid-cols-[110px_1.5fr_2fr_160px_210px] gap-x-4 p-4 hover:bg-red-25 transition-colors">
+                  <div className="text-red-700 font-mono font-medium">{patient.patient_short_id?.substring(0, 4)}</div>
+                  <div className="text-red-700 font-medium">{patient.patient_first_name} {patient.patient_last_name}</div>
+                  <div className="text-gray-600 truncate">{patient.patient_email}</div>
+                  <div className="text-gray-600 whitespace-nowrap">{formatDate(patient.created_at)}</div>
+                  <div className="flex gap-2 whitespace-nowrap pr-4">
                     <button
                       onClick={() => handleViewPatient(patient.patient_id)}
                       className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"

@@ -165,6 +165,7 @@ export default function AppRouter() {
 
       <Route path="/auth/callback" element={<AuthCallbackHandler />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />
+      <Route path="/doctor/patients/:id" element={<PatientProfile />} />
 
       {/* Catch-all route */}
       <Route
