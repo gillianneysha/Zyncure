@@ -72,7 +72,7 @@ const PeriodTracker = () => {
       } else {
         const { data, error } = await supabase
           .from('symptomlog')
-          .select('date_logged, timestamp_logged, symptoms, severity')
+          .select('date_logged, symptoms, severity')
           .eq('patients_id', user.id);
 
         if (error) {
@@ -168,34 +168,38 @@ const PeriodTracker = () => {
       return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === selectedTab;
     });
 
+    // Get current timestamp with proper formatting
     const now = new Date();
+    const timestamp = now.toISOString(); // This preserves the full timestamp
 
     const dataToSave = {
       symptoms: selectedTab,
       severity: valueToSave,
-      date_logged: now.toISOString().split('T')[0], 
-      timestamp_logged: now.toISOString(),          
+      date_logged: timestamp, // Save full timestamp instead of just date
       patients_id: user.id,
     };
 
     let supabaseError;
 
     if (existingEntryIndex !== -1) {
-      // Update existing entry
+      // Update existing entry - also update the timestamp to reflect when it was last modified
       const { error } = await supabase
         .from('symptomlog')
-        .update({ severity: valueToSave })
+        .update({ 
+          severity: valueToSave,
+          date_logged: timestamp // Update timestamp on modification
+        })
         .eq('patients_id', user.id)
         .eq('symptoms', selectedTab)
-        .eq('date_logged', normalizedDate.toLocaleDateString('en-CA'));
+        .eq('date_logged', normalizedDate.toISOString().split('T')[0]); // Match by date only for the WHERE clause
 
       supabaseError = error;
 
       if (!error) {
-        // Instead of just updating local state, re-fetch from Supabase:
+        // Re-fetch from Supabase to ensure data consistency
         const { data, error: fetchError } = await supabase
           .from('symptomlog')
-          .select('date_logged, timestamp_logged, symptoms, severity')
+          .select('date_logged, symptoms, severity')
           .eq('patients_id', user.id);
 
         if (!fetchError) {
@@ -208,6 +212,7 @@ const PeriodTracker = () => {
         }
       }
     } else {
+      // Insert new entry with full timestamp
       const { error } = await supabase.from('symptomlog').insert([dataToSave]);
       supabaseError = error;
 
@@ -215,7 +220,7 @@ const PeriodTracker = () => {
         // Re-fetch from Supabase to ensure data consistency
         const { data, error: fetchError } = await supabase
           .from('symptomlog')
-          .select('date_logged, timestamp_logged, symptoms, severity')
+          .select('date_logged, symptoms, severity')
           .eq('patients_id', user.id);
 
         if (!fetchError) {
@@ -233,9 +238,10 @@ const PeriodTracker = () => {
       setModalContent({ title: 'Error', message: `Failed to save: ${supabaseError.message}`, isError: true });
     } else {
       const formattedDate = normalizedDate.toDateString();
+      const formattedTime = now.toLocaleTimeString();
       setModalContent({
         title: 'Success!',
-        message: `${selectedTab} saved as "${valueToSave}" on ${formattedDate}`,
+        message: `${selectedTab} saved as "${valueToSave}" on ${formattedDate} at ${formattedTime}`,
         isError: false
       });
     }
@@ -328,43 +334,6 @@ const PeriodTracker = () => {
   };
 
   const currentConfig = tabConfigs[selectedTab];
-
-  const getTileContent = ({ date }) => {
-    const normalized = new Date(date);
-    normalized.setHours(0, 0, 0, 0);
-
-    const matches = loggedDates.filter(entry => {
-      const entryDate = new Date(entry.date_logged);
-      entryDate.setHours(0, 0, 0, 0);
-      return entryDate.getTime() === normalized.getTime();
-    });
-
-    if (matches.length === 0) return null;
-
-    const colorMap = {
-      Feelings: '#3BA4A0',
-      Cravings: '#F98679',
-      'Period Flow': '#B65C4B',
-      'Symptoms': '#FFD800',
-      Energy: '#9B59B6',
-      Weight: '#E67E22',
-      Custom: '#34495E',
-    };
-
-    const uniqueSymptoms = [...new Set(matches.map(m => m.symptoms))];
-
-    return (
-      <div className="flex justify-center mt-1 space-x-0.5" title={uniqueSymptoms.join(', ')}>
-        {uniqueSymptoms.map((symptom, idx) => (
-          <span
-            key={idx}
-            className="block h-2 w-2 rounded-full"
-            style={{ backgroundColor: colorMap[symptom] || '#999' }}
-          />
-        ))}
-      </div>
-    );
-  };
 
   const renderContent = () => {
     if (selectedTab === 'Weight') {
@@ -472,8 +441,6 @@ const PeriodTracker = () => {
   const handleMonthYearChange = (month, year) => {
     setCurrentDate(new Date(year, month, 1));
   };
-
-  const now = new Date();
 
   return (
     <div className="calendar-container min-h-[100vh] w-full relative">
