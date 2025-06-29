@@ -2,29 +2,46 @@ import React, { useState, useEffect } from 'react';
 import { Search, Eye, Share2, Bell, Calendar, FileText, Users } from 'lucide-react';
 import { supabase } from '../../client'; 
 
-
-
 const Dashboard = () => {
   // State for backend data
   const [connectedPatients, setConnectedPatients] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Keep existing hardcoded data for other sections
+  // Keep existing hardcoded data for recent records
   const [recentRecords] = useState([
     { id: 1, patient: 'Jane Smith', type: 'Blood Test', date: '03/22/2025' },
     { id: 2, patient: 'Anne Doe', type: 'Blood Test', date: '03/22/2025' },
     { id: 3, patient: 'Maria Smith', type: 'Blood Test', date: '03/22/2025' }
   ]);
 
-  const [alerts] = useState([
-    { id: 1, message: 'Upcoming appointment with Jane Smith', time: 'Today 2:00PM' },
-    { id: 2, message: 'Upcoming appointment with Jane Smith', time: 'Today 3:30PM' },
-    { id: 3, message: 'Upcoming appointment with Jane Smith', time: 'Today 5:00PM' }
-  ]);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPatients, setFilteredPatients] = useState([]);
+
+  // Fetch unread notifications
+  const fetchUnreadNotifications = async () => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch top 4 unread notifications
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_read", false)
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+      if (!error) {
+        setNotifications(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+  };
 
   // Fetch doctor's connected patients from Supabase
   const fetchConnectedPatients = async () => {
@@ -47,29 +64,6 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Error fetching connected patients:', err);
       setError(err.message);
-      // Fallback to demo data for development
-      setConnectedPatients([
-        {
-          id: 1,
-          patient_id: 'demo-1',
-          patient_first_name: 'Maria',
-          patient_last_name: 'Santos',
-          patient_email: 'maria.santos@email.com',
-          patient_short_id: 'MS01',
-          created_at: '2025-03-25T10:00:00Z',
-          status: 'accepted'
-        },
-        {
-          id: 2,
-          patient_id: 'demo-2',
-          patient_first_name: 'Juan',
-          patient_last_name: 'Dela Cruz',
-          patient_email: 'juan.delacruz@email.com',
-          patient_short_id: 'JD02',
-          created_at: '2025-03-24T14:30:00Z',
-          status: 'accepted'
-        }
-      ]);
     } finally {
       setLoading(false);
     }
@@ -88,7 +82,28 @@ const Dashboard = () => {
   // Load data on component mount
   useEffect(() => {
     fetchConnectedPatients();
+    fetchUnreadNotifications();
   }, []);
+
+  // Helper function for notification icons
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case "connection_request":
+        return "👥";
+      case "connection_accepted":
+        return "✅";
+      case "connection_rejected":
+        return "❌";
+      case "appointment_created":
+      case "appointment_updated":
+      case "appointment_cancelled":
+        return "📅";
+      case "announcement":
+        return "📢";
+      default:
+        return "🔔";
+    }
+  };
 
   // Handle connection actions
   const handleRemoveConnection = async (connectionId) => {
@@ -118,9 +133,9 @@ const Dashboard = () => {
     // TODO: Navigate to record detail or open modal
   };
 
-  const handleViewAlert = (alertId) => {
-    console.log(`View alert ${alertId}`);
-    // TODO: Handle alert action
+  const handleViewAlert = (notificationId) => {
+    console.log(`View notification ${notificationId}`);
+    // TODO: Mark as read and navigate to notifications page
   };
 
   const handleViewPatient = (patientId) => {
@@ -148,7 +163,7 @@ const Dashboard = () => {
         <h1 className="text-3xl font-bold text-teal-600 mb-2">Doctor Dashboard</h1>
       </div>
 
-      {/* Top Section - Recently Shared Records and Alerts */}
+      {/* Top Section - Recently Shared Records and Notifications */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Recently Shared Records */}
         <div className="bg-red-50 rounded-lg p-6 border border-red-100">
@@ -176,29 +191,52 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Alerts */}
+        {/* Recent Notifications */}
         <div className="bg-red-50 rounded-lg p-6 border border-red-100">
           <h2 className="text-xl font-semibold text-teal-600 mb-4 flex items-center gap-2">
             <Bell className="w-5 h-5" />
-            Alerts
+            Recent Notifications
           </h2>
           <div className="space-y-3">
-            {alerts.map((alert) => (
-              <div key={alert.id} className="flex items-center justify-between p-3 bg-white rounded-md border border-red-200">
-                <div className="flex-1">
-                  <div className="text-sm text-gray-700">{alert.message}</div>
-                  <div className="text-xs text-gray-500 mt-1">{alert.time}</div>
-                </div>
-                <button
-                  onClick={() => handleViewAlert(alert.id)}
-                  className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"
-                >
-                  <Eye className="w-3 h-3" />
-                  View
-                </button>
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                <Bell className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                <p>No new notifications</p>
               </div>
-            ))}
+            ) : (
+              notifications.map((notification) => (
+                <div key={notification.id} className="flex items-center justify-between p-3 bg-white rounded-md border border-red-200">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm">{getNotificationIcon(notification.type)}</span>
+                      <span className="text-sm font-medium text-gray-800">{notification.title}</span>
+                    </div>
+                    <div className="text-sm text-gray-700">{notification.message}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {new Date(notification.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleViewAlert(notification.id)}
+                    className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"
+                  >
+                    <Eye className="w-3 h-3" />
+                    View
+                  </button>
+                </div>
+              ))
+            )}
           </div>
+          {notifications.length > 0 && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => {/* TODO: Navigate to full notifications page */}}
+                className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+              >
+                View all notifications →
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -250,7 +288,7 @@ const Dashboard = () => {
             {/* Table Header */}
             <div className="grid grid-cols-5 gap-4 p-4 bg-red-100 border-b border-red-200">
               <div className="font-medium text-red-700">Patient ID</div>
-              <div className="font-medium text-red-700">Patient Name</div>
+              <div className="font-medium text-red-700 -ml-2">Patient Name</div>
               <div className="font-medium text-red-700">Email</div>
               <div className="font-medium text-red-700">Connected Since</div>
               <div className="font-medium text-red-700">Actions</div>
@@ -260,8 +298,10 @@ const Dashboard = () => {
             <div className="divide-y divide-red-100">
               {filteredPatients.map((patient) => (
                 <div key={patient.id} className="grid grid-cols-5 gap-4 p-4 hover:bg-red-25 transition-colors">
-                  <div className="text-red-700 font-mono font-medium">{patient.patient_short_id}</div>
-                  <div className="text-red-700 font-medium">
+                  <div className="text-red-700 font-mono font-medium">
+                    {patient.patient_short_id?.substring(0, 4)}
+                  </div>
+                  <div className="text-red-700 font-medium -ml-2">
                     {patient.patient_first_name} {patient.patient_last_name}
                   </div>
                   <div className="text-gray-600">{patient.patient_email}</div>

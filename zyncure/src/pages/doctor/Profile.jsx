@@ -5,7 +5,7 @@ import LogoutModal from "../../components/LogoutModal";
 import { PersonalInfoForm } from "../../components/IndividualPage.jsx";
 import { SecurityPage } from "../../components/IndividualPage.jsx";
 import { NotificationPage } from "../../components/IndividualPage.jsx";
-import { BillingPage } from "../../components/IndividualPage.jsx";
+// import { BillingPage } from "../../components/IndividualPage.jsx";
 import { PoliciesPage } from "../../components/IndividualPage.jsx";
 import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
 import { supabase } from "../../client"; // adjust path if needed
@@ -36,7 +36,7 @@ export default function ProfilePage({ setIsAuthenticated }) {
     { id: "My Profile", component: <PersonalInfoForm /> },
     { id: "Security", component: <SecurityPage /> },
     { id: "Notification", component: <NotificationPage /> },
-    { id: "Billing", component: <BillingPage /> },
+    // { id: "Billing", component: <BillingPage /> },
     { id: "Policies and Standards", component: <PoliciesPage /> },
     { id: "Delete Account", component: <DeleteAccountPage /> }
   ];
