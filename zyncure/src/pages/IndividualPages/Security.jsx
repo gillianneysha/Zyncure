@@ -1,4 +1,4 @@
-import { ChevronRight, ArrowLeft } from "lucide-react";
+import { ChevronRight, ArrowLeft, LockKeyhole } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "../../client";
 import PasswordInput from "../../components/PasswordInput";
@@ -178,11 +178,11 @@ export default function SecurityPage() {
             label="Re-enter New Password"
             value={confirmPassword}
             onChange={e => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter New Password"
-              disabled={loading}
-              name="confirmPassword"
-              inputClassName="mb-0.5 w-full"
-            />
+            placeholder="Re-enter New Password"
+            disabled={loading}
+            name="confirmPassword"
+            inputClassName="mb-0.5 w-full"
+          />
           <div className="flex justify-center mt-4">
             <button
               type="submit"
@@ -273,7 +273,10 @@ export default function SecurityPage() {
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
-        <h2 className="text-4xl text-profileHeader font-bold">Security</h2>
+        <h2 className="text-4xl text-profileHeader font-bold flex items-center gap-3">
+          <LockKeyhole className="w-9 h-9 text-profileHeader" />
+          Security
+        </h2>
         <p className="text-zyncureOrange text-left mt-3">
           Manage account password and login preferences.
         </p>
