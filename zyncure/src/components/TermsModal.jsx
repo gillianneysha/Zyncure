@@ -32,13 +32,13 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-800">
+                <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-[#55A1A4] text-white rounded-t-lg">
+                    <h2 className="text-xl font-bold">
                         ZynCure Terms and Conditions
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="text-white hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center"
                         aria-label="Close modal"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
