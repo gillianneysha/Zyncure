@@ -1079,3 +1079,16 @@ export function DeleteAccountPage() {
     </div>
   );
 }
+
+export function LogoutButton() {
+  return (
+    <button
+      onClick={async () => {
+        await supabase.auth.signOut();
+        window.location.href = "/"; // or use navigate("/") if using react-router
+      }}
+    >
+      Logout
+    </button>
+  );
+}
