@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { useState, useEffect } from "react";
-import { supabase } from "../client"; // adjust path as needed
+import { supabase } from "../client"; 
+
 
 export default function Navbar() {
   const [userData, setUserData] = useState({
@@ -73,6 +74,7 @@ export default function Navbar() {
         />
         <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-mySidebar w-5 h-5" />
       </div>
+   
 
       
         <div className="flex items-center space-x-3 ml-6">
