@@ -1,15 +1,14 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../client";
-import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
 
-const FormField = React.memo(({ 
-  label, 
-  name, 
-  type = "text", 
-  placeholder, 
+const FormField = React.memo(({
+  label,
+  name,
+  type = "text",
+  placeholder,
   required = true,
   value,
   onChange,
@@ -28,9 +27,8 @@ const FormField = React.memo(({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className={`w-4/5 block mx-auto mb-1 p-2 ${inputClassName} border-none rounded-[15.5px] ${
-        error ? "ring-2 ring-red-400" : ""
-      }`}
+      className={`w-4/5 block mx-auto mb-1 p-2 ${inputClassName} border-none rounded-[15.5px] ${error ? "ring-2 ring-red-400" : ""
+        }`}
       required={required}
       disabled={disabled}
     />
@@ -50,7 +48,7 @@ export default function LoginForm({ setToken }) {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [mfaChallenge, setMfaChallenge] = useState(null); 
+  const [mfaChallenge, setMfaChallenge] = useState(null);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaError, setMfaError] = useState("");
 
@@ -93,7 +91,7 @@ export default function LoginForm({ setToken }) {
   const getRedirectPath = (user) => {
     // Check user metadata for medical professional
     const userRole = user.user_metadata?.user_type;
-    
+
     if (userRole === "doctor") {
       return "/doctor";
     }
@@ -123,7 +121,7 @@ export default function LoginForm({ setToken }) {
 
       // Check if user has MFA factors
       const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
-      
+
       if (factorsError) {
         console.error("Error checking MFA factors:", factorsError);
         // If we can't check factors, proceed without MFA
@@ -135,18 +133,18 @@ export default function LoginForm({ setToken }) {
 
       // Find verified TOTP factor
       const totpFactor = factors.factors?.find(f => f.factor_type === "totp" && f.status === "verified");
-      
+
       if (totpFactor) {
         // User has MFA enabled, initiate challenge
         const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
           factorId: totpFactor.id
         });
-        
+
         if (challengeError) {
           console.error("MFA challenge error:", challengeError);
           throw challengeError;
         }
-        
+
         setMfaChallenge({
           challengeId: challengeData.id,
           factorId: totpFactor.id,
@@ -181,7 +179,7 @@ export default function LoginForm({ setToken }) {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       });
-      
+
       if (error) throw error;
     } catch (error) {
       console.error("Google sign in error:", error);
@@ -260,11 +258,11 @@ export default function LoginForm({ setToken }) {
 
       {!mfaChallenge && (
         <>
-          <FormField 
-            label="Email" 
-            name="email" 
-            type="email" 
-            placeholder="Email" 
+          <FormField
+            label="Email"
+            name="email"
+            type="email"
+            placeholder="Email"
             value={formData.email}
             onChange={handleChange}
             error={errors.email}
@@ -280,20 +278,11 @@ export default function LoginForm({ setToken }) {
               placeholder="Password"
               error={errors.password}
               disabled={isLoading}
+              labelClassName = "text-[#F5E0D9]"
             />
           </div>
 
-          <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                type="checkbox"
-                className="mr-2 accent-[#55A1A4] w-4 h-4 rounded"
-              />
-              <label htmlFor="rememberMe" className="text-[#F5E0D9] text-sm select-none">
-                Remember me
-              </label>
-            </div>
+          <div className="w-4/5 mx-auto flex items-center justify-end mb-4">
             <button
               type="button"
               onClick={handleForgotPassword}
@@ -307,11 +296,10 @@ export default function LoginForm({ setToken }) {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-4/5 block mx-auto py-2 mt-4 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
-              isLoading
+            className={`w-4/5 block mx-auto py-2 mt-4 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${isLoading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-[#55A1A4] hover:bg-[#368487]"
-            }`}
+              }`}
           >
             {isLoading ? "Logging In..." : "Log In"}
           </button>

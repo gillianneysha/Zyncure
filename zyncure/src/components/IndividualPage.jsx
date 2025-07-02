@@ -1,4 +1,4 @@
-import { PencilIcon, ChevronRight, ArrowLeft, Eye, EyeClosed, Smartphone, CreditCard, SquareUser, LockKeyhole, BookOpenText, Trash } from "lucide-react";
+import { PencilIcon, ChevronRight, ArrowLeft, Eye, EyeClosed, PhilippinePeso, Smartphone, CreditCard, SquareUser, LockKeyhole, BookOpenText, Trash, PhilippinePesoIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "../client";
 import PasswordInput from "./PasswordInput";
@@ -643,7 +643,10 @@ export function BillingPage() {
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
-        <h2 className="text-4xl text-profileHeader font-bold">Billing</h2>
+        <h2 className="text-4xl text-profileHeader font-bold flex items-center gap-3">
+          <PhilippinePesoIcon className="w-9 h-9 text-profileHeader" />
+          Billing
+        </h2>
         <p className="text-zyncureOrange text-left mt-3">
           Manage your subscriptions and billing information
         </p>
