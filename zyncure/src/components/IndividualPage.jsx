@@ -1018,9 +1018,8 @@ export function DeleteAccountPage() {
     setSuccess("Account deleted successfully.");
     setLoading(false);
     // Optionally: redirect or log out
-    setTimeout(() => {
-      window.location.href = "/register";
-    }, 2000);
+    await supabase.auth.signOut();
+    window.location.href = "/register";
   };
 
   return (
@@ -1093,7 +1092,7 @@ export function LogoutButton() {
     <button
       onClick={async () => {
         await supabase.auth.signOut();
-        window.location.href = "/"; // or use navigate("/") if using react-router
+        window.location.href = "/register";
       }}
     >
       Logout
