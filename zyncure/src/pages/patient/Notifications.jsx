@@ -14,24 +14,23 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
-  // Removed unused currentUser state
+  
 
   useEffect(() => {
     initializeNotifications();
   }, []);
 
   async function initializeNotifications() {
-    // Get current user first
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setLoading(false);
       return;
     }
     
-    // setCurrentUser(user); // Removed unused currentUser state
+   
     await fetchNotifications(user.id);
     
-    // Set up real-time subscription with the correct user ID
+    
     const subscription = supabase
   .channel("notifications")
   .on(
@@ -59,7 +58,7 @@ export default function Notifications() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === payload.new.id ? payload.new : n))
       );
-      // Recalculate unread count
+      
       setUnreadCount((prev) => {
         const wasRead = payload.old.is_read;
         const isRead = payload.new.is_read;
@@ -72,7 +71,7 @@ export default function Notifications() {
       });
     }
   )
-  // Add DELETE event listener
+ 
   .on(
     "postgres_changes",
     {
@@ -83,7 +82,7 @@ export default function Notifications() {
     },
     (payload) => {
       setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
-      // Update unread count if the deleted notification was unread
+      
       if (!payload.old.is_read) {
         setUnreadCount((prev) => Math.max(0, prev - 1));
       }
@@ -142,15 +141,15 @@ async function deleteNotification(notificationId) {
 
   if (error) {
     console.error("Error deleting notification:", error);
-    // You might want to show a user-friendly error message here
+   
     alert("Failed to delete notification. Please try again.");
     return;
   }
 
-  // Only update local state if the database operation succeeded
+ 
   setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
   
-  // Update unread count if the deleted notification was unread
+  
   const deletedNotification = notifications.find(
     (n) => n.id === notificationId
   );
@@ -208,11 +207,10 @@ async function deleteNotification(notificationId) {
       notification.type.includes("appointment") &&
       notification.metadata.appointment_id
     ) {
-      // You can add navigation to appointment details here
-      // For example: navigate to appointment page or show appointment details
+
       console.log("Appointment notification clicked:", notification.metadata);
 
-      // Mark as read when user interacts with appointment notification
+
       if (!notification.is_read) {
         await markAsRead(notification.id);
       }

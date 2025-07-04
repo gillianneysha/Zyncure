@@ -36,36 +36,48 @@ const DoctorConnectionsPage = () => {
   // DATA LOADING FUNCTIONS
   // ========================================
   const loadConnections = async () => {
-    try {
-      setIsLoading(true);
-      
-      const { data, error } = await supabase
-        .from('doctor_connection_details')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const allConnections = data || [];
-      
-      // Separate pending incoming requests from other connections
-      const pendingIncoming = allConnections.filter(
-        conn => conn.status === 'pending' 
-      );
-      
-      const otherConnections = allConnections.filter(
-        conn => !(conn.status === 'pending' )
-      );
-      
-      setConnections(otherConnections);
-      setPendingRequests(pendingIncoming);
-      
-    } catch (error) {
-      console.error('Error loading connections:', error);
-    } finally {
-      setIsLoading(false);
+  try {
+    setIsLoading(true);
+    
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      throw userError;
     }
-  };
+
+    if (!user) {
+      throw new Error('No authenticated user found');
+    }
+
+    const { data, error } = await supabase
+      .from('doctor_connection_details')
+      .select('*')
+      .eq('med_id', user.id) // Filter for the logged-in doctor
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const allConnections = data || [];
+    
+    // Separate pending incoming requests from other connections
+    const pendingIncoming = allConnections.filter(
+      conn => conn.status === 'pending' 
+    );
+    
+    const otherConnections = allConnections.filter(
+      conn => !(conn.status === 'pending')
+    );
+    
+    setConnections(otherConnections);
+    setPendingRequests(pendingIncoming);
+    
+  } catch (error) {
+    console.error('Error loading connections:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // ========================================
   // SEARCH FUNCTIONALITY (FOR PATIENTS)

@@ -8,9 +8,15 @@ export function useUser() {
   useEffect(() => {
     let mounted = true;
 
-    const fetchUserRole = async (userId) => {
+    const fetchUserRole = async (userId, userMetadata) => {
       try {
-        // First check if user is an admin
+        // First check user metadata for user_type (from registration form)
+        if (userMetadata?.user_type) {
+          console.log('User type from metadata:', userMetadata.user_type);
+          return userMetadata.user_type; // This will be 'patient' or 'doctor'
+        }
+
+        // Fallback: Check if user is an admin
         const { data: adminData, error: adminError } = await supabase
           .from('admin')
           .select('*')
@@ -63,9 +69,10 @@ export function useUser() {
         if (session?.user && mounted) {
           const { user } = session;
           console.log('Initializing user:', user.id, user.email);
+          console.log('User metadata:', user.user_metadata);
           
-          // Fetch role from admin, medicalprofessionals, then patients tables
-          const userRole = await fetchUserRole(user.id);
+          // Fetch role from metadata first, then database tables as fallback
+          const userRole = await fetchUserRole(user.id, user.user_metadata);
           console.log('Determined user role:', userRole);
           
           setUser({
@@ -90,7 +97,9 @@ export function useUser() {
 
         if (session?.user) {
           const { user } = session;
-          const userRole = await fetchUserRole(user.id);
+          console.log('User metadata on auth change:', user.user_metadata);
+          
+          const userRole = await fetchUserRole(user.id, user.user_metadata);
           const newUser = {
             ...user,
             role: userRole
