@@ -38,7 +38,7 @@ const FormField = React.memo(({
       disabled={disabled}
     />
     {error && (
-      <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
+      <p className="w-4/5 mx-auto mb-2 text-sm" style={{ color: "#F5E0D9" }}>
         {error}
       </p>
     )}
@@ -196,7 +196,7 @@ export default function LoginForm({ setToken }) {
 
   const handleForgotPassword = async () => {
     if (!formData.email) {
-      setErrors({ email: "Please enter your email address first" });
+      setErrors({ email: "Please enter your email address first." });
       return;
     }
 
@@ -291,6 +291,8 @@ export default function LoginForm({ setToken }) {
           onChange={handleChange}
           error={errors.email}
           disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
         />
 
         <div className="w-4/5 mx-auto">
@@ -302,12 +304,12 @@ export default function LoginForm({ setToken }) {
             placeholder="Password"
             error={errors.password}
             disabled={isLoading}
+            labelClassName="text-[#F5E0D9]"
+            inputClassName="bg-[#FFEDE7]"
           />
         </div>
 
-        {/* Remove the checkbox and remember me text */}
         <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
-          {/* Removed: Remember me checkbox and label */}
           <div />
           <button
             type="button"

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../client';
+import { useLocation } from "react-router-dom";
 
 export function useUser() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     let mounted = true;
@@ -62,19 +64,17 @@ export function useUser() {
 
         if (session?.user && mounted) {
           const { user } = session;
-          console.log('Initializing user:', user.id, user.email);
-          
-          // Fetch role from admin, medicalprofessionals, then patients tables
           const userRole = await fetchUserRole(user.id);
-          console.log('Determined user role:', userRole);
-          
           setUser({
             ...user,
             role: userRole
           });
+        } else if (mounted) {
+          setUser(null);
         }
       } catch (error) {
         console.error('Error initializing user:', error);
+        if (mounted) setUser(null);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -86,29 +86,21 @@ export function useUser() {
       async (event, session) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event, session?.user?.email);
+        if (event === "USER_UPDATED" && location.pathname === "/reset-password") {
+          return;
+        }
 
         if (session?.user) {
           const { user } = session;
           const userRole = await fetchUserRole(user.id);
-          const newUser = {
+          setUser({
             ...user,
             role: userRole
-          };
-
-          console.log('Setting user with role:', newUser.role);
-
-          setUser(prevUser => {
-            if (!prevUser || prevUser.id !== newUser.id || prevUser.role !== newUser.role) {
-              return newUser;
-            }
-            return prevUser;
           });
         } else {
-          setUser(prevUser => prevUser ? null : prevUser);
+          setUser(null);
         }
-
-        setIsLoading(prevLoading => prevLoading ? false : prevLoading);
+        setIsLoading(false);
       }
     );
 

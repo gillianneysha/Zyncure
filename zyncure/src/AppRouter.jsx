@@ -33,6 +33,7 @@ import AdminReports from "./pages/admin/Reports";
 import AdminSupport from "./pages/admin/Support";
 import AdminBugs from "./pages/admin/Bugs";
 import AdminDoctorApprovals from "./pages/AdminDoctorApprovals";
+import ResetPassword from "./pages/ResetPassword";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { user, isLoading } = useUser();
@@ -166,6 +167,7 @@ export default function AppRouter() {
       <Route path="/auth/callback" element={<AuthCallbackHandler />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />
       <Route path="/doctor/patients/:id" element={<PatientProfile />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Catch-all route */}
       <Route
