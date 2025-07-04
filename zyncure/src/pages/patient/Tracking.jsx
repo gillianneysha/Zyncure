@@ -4,7 +4,7 @@ import {
   Rainbow, Flame, TriangleAlert, MessageCircleWarning,
   Heart, Brain, Activity, CircleArrowDown, CircleArrowUp, CircleAlert, Eye, Bed,
   Laugh, Frown, Popcorn, CakeSlice, Beef, Apple, Drumstick, Candy,
-  BatteryWarning, BatteryLow, BatteryMedium, BatteryFull, Gauge, NotebookPen, Check
+  BatteryWarning, BatteryLow, BatteryMedium, BatteryFull, Gauge, NotebookPen, Check, LineSquiggle
 } from 'lucide-react';
 import TrackingCalendar from '../../components/TrackingCalendar';
 import { supabase } from '../../client';
@@ -292,6 +292,7 @@ const PeriodTracker = () => {
         { name: 'Nausea', icon: CircleAlert, size: 36 },
         { name: 'Insomnia', icon: Eye, size: 36 },
         { name: 'Fatigue', icon: Bed, size: 36 },
+        { name: 'Hair Thinning', icon: LineSquiggle, size: 36 },
       ]
     },
     Feelings: {
