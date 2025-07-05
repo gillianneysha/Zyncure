@@ -235,14 +235,7 @@ export function useUser() {
 
         if (session?.user && mounted) {
           const { user } = session;
-
-          const userRole = await fetchUserRole(user.id);
-          setUser({
-            ...user,
-            role: userRole
-          });
-        } else if (mounted) {
-
+          
           console.log('Initializing user:', user.id, user.email);
           console.log('User metadata:', user.user_metadata);
           
@@ -268,11 +261,7 @@ export function useUser() {
         }
       } catch (error) {
         console.error('Error initializing user:', error);
-
         if (mounted) setUser(null);
-
-        setUser(null);
-
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -291,15 +280,6 @@ export function useUser() {
 
         if (session?.user) {
           const { user } = session;
-
-          const userRole = await fetchUserRole(user.id);
-          setUser({
-            ...user,
-            role: userRole
-          });
-        } else {
-          setUser(null);
-        }
 
           console.log('User metadata on auth change:', user.user_metadata);
           
@@ -333,7 +313,6 @@ export function useUser() {
           console.log('No user in session, clearing user state');
           setUser(null);
         }
-
 
         setIsLoading(false);
       }
