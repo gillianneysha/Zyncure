@@ -5,154 +5,53 @@ import GoogleIcon from "../components/GoogleIcon";
 import TermsModal from "../components/TermsModal";
 import PrivacyModal from "../components/PrivacyModal";
 
-const FormField = memo(({
-  label,
-  name,
-  type = "text",
-  placeholder,
-  required = true,
-  children,
-  value,
-  onChange,
-  error,
-  disabled,
-  labelClassName,
-  inputClassName
-}) => (
-  <div className="mb-3">
-    <label className={`block w-4/5 mx-auto mb-1 text-left ${labelClassName || "text-[#F5E0D9]"}`}>
-      {label}:
-    </label>
-    {children || (
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        className={`w-4/5 block mx-auto mb-1 p-2 border-none rounded-[15.5px] ${inputClassName || "bg-[#FFEDE7]"} ${
-          error ? "ring-2 ring-red-400" : ""
+const FormField = memo(
+  ({
+    label,
+    name,
+    type = "text",
+    placeholder,
+    required = true,
+    children,
+    value,
+    onChange,
+    error,
+    disabled,
+    labelClassName,
+    inputClassName,
+  }) => (
+    <div className="mb-3">
+      <label
+        className={`block w-4/5 mx-auto mb-1 text-left ${
+          labelClassName || "text-[#F5E0D9]"
         }`}
-        required={required}
-        disabled={disabled}
-      />
-    )}
-    {error && (
-      <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">
-        {error}
-      </p>
-    )}
-  </div>
-));
-
-// Doctor Verification Modal Component
-const DoctorVerificationModal = memo(({ isOpen, onClose, onSubmit, isLoading }) => {
-  const [licenseNumber, setLicenseNumber] = useState("");
-  const [licenseFile, setLicenseFile] = useState(null);
-  const [errors, setErrors] = useState({});
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const newErrors = {};
-
-    if (!licenseNumber.trim()) {
-      newErrors.licenseNumber = "License number is required";
-    }
-    if (!licenseFile) {
-      newErrors.licenseFile = "License file is required";
-    }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length === 0) {
-      onSubmit({ licenseNumber, licenseFile });
-      // Reset form
-      setLicenseNumber("");
-      setLicenseFile(null);
-      setErrors({});
-    }
-  };
-
-  const handleClose = () => {
-    setLicenseNumber("");
-    setLicenseFile(null);
-    setErrors({});
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">Doctor Verification</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              License Number:
-            </label>
-            <input
-              type="text"
-              value={licenseNumber}
-              onChange={(e) => setLicenseNumber(e.target.value)}
-              className={`w-full p-2 border rounded-lg ${
-                errors.licenseNumber ? "border-red-400" : "border-gray-300"
-              }`}
-              placeholder="Enter your medical license number"
-              disabled={isLoading}
-            />
-            {errors.licenseNumber && (
-              <p className="text-red-500 text-sm mt-1">{errors.licenseNumber}</p>
-            )}
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              License Document:
-            </label>
-            <input
-              type="file"
-              onChange={(e) => setLicenseFile(e.target.files[0])}
-              className={`w-full p-2 border rounded-lg ${
-                errors.licenseFile ? "border-red-400" : "border-gray-300"
-              }`}
-              accept=".pdf,.jpg,.jpeg,.png"
-              disabled={isLoading}
-            />
-            {errors.licenseFile && (
-              <p className="text-red-500 text-sm mt-1">{errors.licenseFile}</p>
-            )}
-            <p className="text-gray-500 text-xs mt-1">
-              Accepted formats: PDF, JPG, PNG (Max 10MB)
-            </p>
-          </div>
-
-          <div className="flex justify-end space-x-2">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-[#55A1A4] text-white rounded-lg hover:bg-[#368487] transition-colors disabled:opacity-50"
-              disabled={isLoading}
-            >
-              {isLoading ? "Processing..." : "Submit"}
-            </button>
-          </div>
-        </form>
-      </div>
+      >
+        {label}:
+      </label>
+      {children || (
+        <input
+          type={type}
+          name={name}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          className={`w-4/5 block mx-auto mb-1 p-2 border-none rounded-[15.5px] ${
+            inputClassName || "bg-[#FFEDE7]"
+          } ${error ? "ring-2 ring-red-400" : ""}`}
+          required={required}
+          disabled={disabled}
+        />
+      )}
+      {error && (
+        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">{error}</p>
+      )}
     </div>
-  );
-});
+  )
+);
 
 export default function RegistrationForm() {
-  console.log('RegistrationForm rendered');
-  
+  console.log("RegistrationForm rendered");
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -176,15 +75,11 @@ export default function RegistrationForm() {
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState(false);
 
-  // Doctor verification state
-  const [doctorVerification, setDoctorVerification] = useState(null);
-  const [showDoctorModal, setShowDoctorModal] = useState(false);
-
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   }, []);
 
@@ -192,16 +87,19 @@ export default function RegistrationForm() {
     const newErrors = {};
 
     // Required fields
-    if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
+    if (!formData.firstName.trim())
+      newErrors.firstName = "First name is required";
     if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
     if (!formData.email.trim()) newErrors.email = "Email is required";
     if (!formData.userType) newErrors.userType = "User type is required";
-    if (!formData.contactNumber.trim()) newErrors.contactNumber = "Contact number is required";
+    if (!formData.contactNumber.trim())
+      newErrors.contactNumber = "Contact number is required";
     if (!formData.birthdate) newErrors.birthdate = "Birthdate is required";
 
     // Terms acceptance validation
     if (!hasAcceptedTerms || !hasAcceptedPrivacy) {
-      newErrors.terms = "You must accept the Terms and Privacy Agreement to proceed";
+      newErrors.terms =
+        "You must accept the Terms and Privacy Agreement to proceed";
     }
 
     // Email validation
@@ -236,7 +134,10 @@ export default function RegistrationForm() {
       const monthDiff = today.getMonth() - birthDate.getMonth();
       const dayDiff = today.getDate() - birthDate.getDate();
 
-      if (age < 18 || (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)))) {
+      if (
+        age < 18 ||
+        (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)))
+      ) {
         newErrors.birthdate = "You must be at least 18 years old to register";
       }
     }
@@ -258,158 +159,107 @@ export default function RegistrationForm() {
     });
     setHasAcceptedTerms(false);
     setHasAcceptedPrivacy(false);
-    setDoctorVerification(null);
-  }, []);
-
-  // Handle doctor modal submission
-  const handleDoctorModalSubmit = useCallback(async (data) => {
-    setShowDoctorModal(false);
-    
-    // Store the doctor verification data including the actual file
-    setDoctorVerification({
-      licenseNumber: data.licenseNumber,
-      licenseFile: data.licenseFile,
-    });
-
-    // Continue with registration after a brief delay
-    setTimeout(() => {
-      // Trigger form submission programmatically
-      const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
-      const form = document.querySelector('form');
-      if (form) {
-        form.dispatchEvent(submitEvent);
-      }
-    }, 100);
-  }, []);
-
-  const handleDoctorModalClose = useCallback(() => {
-    setShowDoctorModal(false);
   }, []);
 
   // Main form submission handler
-  const handleSubmit = useCallback(async (event) => {
-    event.preventDefault();
+  // Updated handleSubmit function for your RegistrationForm component
 
-    if (!validateForm()) return;
+const handleSubmit = useCallback(async (event) => {
+  event.preventDefault();
 
-    // If Doctor and no verification data yet, show modal first
-    if (formData.userType === "doctor" && !doctorVerification) {
-      setShowDoctorModal(true);
-      return;
-    }
+  if (!validateForm()) return;
 
-    setIsLoading(true);
-    setErrors({});
-    setSuccessMessage("");
+  setIsLoading(true);
+  setErrors({});
+  setSuccessMessage("");
 
-    try {
-      // Create the user account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+  try {
+    // Step 1: Create the user account
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          contact_number: formData.contactNumber,
+          birthdate: formData.birthdate,
+          user_type: formData.userType,
+        },
+        emailRedirectTo: `${window.location.origin}/dashboard`
+      },
+    });
+
+    if (authError) throw authError;
+
+    // Step 2: Insert user data into appropriate table based on user type
+    if (authData.user) {
+      const userData = {
+        med_id: authData.user.id, // Use auth user ID as foreign key
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        user_type: formData.userType,
+        birthdate: formData.birthdate,
+        contact_no: formData.contactNumber,
         email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
+        status: 'active' // or whatever default status you want
+      };
+
+      let insertError;
+
+      if (formData.userType === 'patient') {
+        // Insert into patients table
+        const { error } = await supabase
+          .from('patients')
+          .insert([{
+            patient_id: authData.user.id, // Use auth user ID as patient_id
             first_name: formData.firstName,
             last_name: formData.lastName,
-            contact_number: formData.contactNumber,
-            birthdate: formData.birthdate,
             user_type: formData.userType,
-            // Add initial doctor data without file URL
-            ...(formData.userType === "doctor" && doctorVerification && {
-              license_number: doctorVerification.licenseNumber,
-              status: "pending"
-            })
-          },
-          emailRedirectTo: `${window.location.origin}/dashboard`
-        },
-      });
-
-      if (authError) throw authError;
-
-      // For doctors, handle file upload after user creation
-      if (formData.userType === "doctor" && doctorVerification?.licenseFile && authData.user) {
-        console.log('Uploading license file for user:', authData.user.id);
+            birthdate: formData.birthdate,
+            contact_no: formData.contactNumber,
+            email: formData.email,
+            status: 'active'
+          }]);
         
-        // Wait a moment to ensure user is fully created
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        insertError = error;
+      } else if (formData.userType === 'doctor') {
+        // Insert into medicalprofessionals table
+        const { error } = await supabase
+          .from('medicalprofessionals')
+          .insert([userData]);
         
-        // Check if user is authenticated
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          console.error('User not authenticated for file upload:', userError);
-          throw new Error('Authentication required for file upload');
-        }
-        
-        const fileExt = doctorVerification.licenseFile.name.split('.').pop();
-        const filePath = `${authData.user.id}/${Date.now()}_license.${fileExt}`;
-        
-        try {
-          const { error: uploadError } = await supabase.storage
-            .from("doctor-licenses")
-            .upload(filePath, doctorVerification.licenseFile, {
-              cacheControl: '3600',
-              upsert: false
-            });
-
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-            // If it's a policy error, provide helpful message
-            if (uploadError.message.includes('policy')) {
-              throw new Error('File upload permission denied. Please contact support.');
-            }
-            throw uploadError;
-          }
-
-          // Get public URL and update user metadata
-          const { data: publicUrlData } = supabase.storage
-            .from("doctor-licenses")
-            .getPublicUrl(filePath);
-            
-          // Update user metadata with the file URL
-          const { error: updateError } = await supabase.auth.updateUser({
-            data: { 
-              license_file_url: publicUrlData.publicUrl 
-            }
-          });
-          
-          if (updateError) {
-            console.error('Failed to update user with license file URL:', updateError);
-            // Don't throw here as the main registration was successful
-          }
-
-          console.log('License file uploaded successfully:', publicUrlData.publicUrl);
-          
-        } catch (uploadError) {
-          console.error('File upload failed:', uploadError);
-          // User account is created, but file upload failed
-          setErrors({
-            submit: `Account created successfully, but license file upload failed: ${uploadError.message}. Please contact support to complete your verification.`,
-          });
-          return;
-        }
+        insertError = error;
       }
 
-      setSuccessMessage(
-        formData.userType === "doctor" 
-          ? "Registration successful! Please check your email and click the confirmation link to activate your account. Your license will be reviewed once confirmed."
-          : "Registration successful! Please check your email and click the confirmation link to activate your account."
-      );
-      resetForm();
-
-    } catch (error) {
-      console.error("Registration error:", error);
-      setErrors({
-        submit: `Registration failed: ${error.message}`,
-      });
-    } finally {
-      setIsLoading(false);
+      if (insertError) {
+        console.error('Database insertion error:', insertError);
+        // If database insertion fails, we might want to clean up the auth user
+        // but for now, we'll just log the error and continue
+        throw new Error(`Failed to create user profile: ${insertError.message}`);
+      }
     }
-  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy, doctorVerification, validateForm, resetForm]);
+
+    setSuccessMessage(
+      "Registration successful! Please check your email and click the confirmation link to activate your account."
+    );
+    resetForm();
+
+  } catch (error) {
+    console.error("Registration error:", error);
+    setErrors({
+      submit: `Registration failed: ${error.message}`,
+    });
+  } finally {
+    setIsLoading(false);
+  }
+}, [formData, hasAcceptedTerms, hasAcceptedPrivacy, validateForm, resetForm]);
 
   const handleGoogleSignUp = useCallback(async () => {
     if (!hasAcceptedTerms) {
       setErrors({
-        terms: "You must accept the Terms and Conditions before signing up with Google"
+        terms:
+          "You must accept the Terms and Conditions before signing up with Google",
       });
       return;
     }
@@ -417,10 +267,10 @@ export default function RegistrationForm() {
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
       if (error) throw error;
@@ -439,10 +289,6 @@ export default function RegistrationForm() {
     setIsTermsModalOpen(true);
   }, []);
 
-  const handleCloseTermsModal = useCallback(() => {
-    setIsTermsModalOpen(false);
-  }, []);
-
   const handleAcceptTerms = useCallback(() => {
     setIsTermsModalOpen(false);
     setIsPrivacyModalOpen(true);
@@ -453,15 +299,11 @@ export default function RegistrationForm() {
     setIsPrivacyModalOpen(true);
   }, []);
 
-  const handleClosePrivacyModal = useCallback(() => {
-    setIsPrivacyModalOpen(false);
-  }, []);
-
   const handleAcceptPrivacy = useCallback(() => {
     setHasAcceptedPrivacy(true);
     setIsPrivacyModalOpen(false);
     setHasAcceptedTerms(true); // This is your original flag for form validation
-    setErrors(prev => {
+    setErrors((prev) => {
       const newErrors = { ...prev };
       delete newErrors.terms;
       return newErrors;
@@ -567,7 +409,13 @@ export default function RegistrationForm() {
             {/* Custom down arrow */}
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b0b0]">
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
-                <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M7 10l5 5 5-5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </span>
           </div>
@@ -664,14 +512,13 @@ export default function RegistrationForm() {
                   disabled={isLoading}
                 >
                   Privacy Agreement
-                </button>.
+                </button>
+                .
               </label>
             </div>
           </div>
           {errors.terms && (
-            <p className="mt-1 text-sm text-red-300">
-              {errors.terms}
-            </p>
+            <p className="mt-1 text-sm text-red-300">{errors.terms}</p>
           )}
         </div>
 
@@ -696,14 +543,6 @@ export default function RegistrationForm() {
           </span>
         </div>
       </form>
-
-      {/* Doctor Verification Modal */}
-      <DoctorVerificationModal
-        isOpen={showDoctorModal}
-        onClose={handleDoctorModalClose}
-        onSubmit={handleDoctorModalSubmit}
-        isLoading={isLoading}
-      />
 
       {/* Terms and Conditions Modal */}
       <TermsModal

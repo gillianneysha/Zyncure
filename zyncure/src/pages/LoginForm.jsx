@@ -280,8 +280,6 @@ export default function LoginForm({ setToken }) {
           </div>
         )}
 
-        {/* Remove the inline OTP form UI */}
-
         <FormField
           label="Email"
           name="email"

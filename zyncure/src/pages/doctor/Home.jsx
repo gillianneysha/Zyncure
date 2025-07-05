@@ -47,29 +47,41 @@ const Dashboard = () => {
 
   // Fetch doctor's connected patients from Supabase
   const fetchConnectedPatients = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  try {
+    setLoading(true);
+    setError(null);
 
-      // Use the doctor_connection_details view to get connected patients
-      const { data, error: supabaseError } = await supabase
-        .from('doctor_connection_details')
-        .select('*')
-        .eq('status', 'accepted'); // Only get accepted connections
-
-      if (supabaseError) {
-        throw supabaseError;
-      }
-
-      setConnectedPatients(data || []);
-
-    } catch (err) {
-      console.error('Error fetching connected patients:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      throw userError;
     }
-  };
+
+    if (!user) {
+      throw new Error('No authenticated user found');
+    }
+
+    // Use the doctor_connection_details view to get connected patients
+    const { data, error: supabaseError } = await supabase
+      .from('doctor_connection_details')
+      .select('*')
+      .eq('med_id', user.id) // Get current doctor's ID
+      .eq('status', 'accepted'); // Only get accepted connections
+
+    if (supabaseError) {
+      throw supabaseError;
+    }
+
+    setConnectedPatients(data || []);
+
+  } catch (err) {
+    console.error('Error fetching connected patients:', err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Filter patients based on search
   useEffect(() => {
