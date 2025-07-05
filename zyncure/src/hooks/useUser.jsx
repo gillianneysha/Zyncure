@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../client';
+import { useLocation } from "react-router-dom";
 
 export function useUser() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     let mounted = true;
@@ -233,6 +235,14 @@ export function useUser() {
 
         if (session?.user && mounted) {
           const { user } = session;
+
+          const userRole = await fetchUserRole(user.id);
+          setUser({
+            ...user,
+            role: userRole
+          });
+        } else if (mounted) {
+
           console.log('Initializing user:', user.id, user.email);
           console.log('User metadata:', user.user_metadata);
           
@@ -258,7 +268,11 @@ export function useUser() {
         }
       } catch (error) {
         console.error('Error initializing user:', error);
+
+        if (mounted) setUser(null);
+
         setUser(null);
+
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -271,10 +285,22 @@ export function useUser() {
       async (event, session) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event, session?.user?.email);
+        if (event === "USER_UPDATED" && location.pathname === "/reset-password") {
+          return;
+        }
 
         if (session?.user) {
           const { user } = session;
+
+          const userRole = await fetchUserRole(user.id);
+          setUser({
+            ...user,
+            role: userRole
+          });
+        } else {
+          setUser(null);
+        }
+
           console.log('User metadata on auth change:', user.user_metadata);
           
           const userRoleData = await fetchUserRole(user.id, user.user_metadata);
@@ -307,6 +333,7 @@ export function useUser() {
           console.log('No user in session, clearing user state');
           setUser(null);
         }
+
 
         setIsLoading(false);
       }
