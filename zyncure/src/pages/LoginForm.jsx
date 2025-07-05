@@ -280,8 +280,6 @@ export default function LoginForm({ setToken }) {
           </div>
         )}
 
-        {/* Remove the inline OTP form UI */}
-
         <FormField
           label="Email"
           name="email"
@@ -291,6 +289,8 @@ export default function LoginForm({ setToken }) {
           onChange={handleChange}
           error={errors.email}
           disabled={isLoading}
+          labelClassName="text-[#F5E0D9]"
+          inputClassName="bg-[#FFEDE7]"
         />
 
         <div className="w-4/5 mx-auto">
@@ -302,6 +302,8 @@ export default function LoginForm({ setToken }) {
             placeholder="Password"
             error={errors.password}
             disabled={isLoading}
+            labelClassName="text-[#F5E0D9]"
+            inputClassName="bg-[#FFEDE7]"
           />
         </div>
 
