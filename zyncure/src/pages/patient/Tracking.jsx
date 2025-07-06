@@ -4,7 +4,7 @@ import {
   Rainbow, Flame, TriangleAlert, MessageCircleWarning,
   Heart, Brain, Activity, CircleArrowDown, CircleArrowUp, CircleAlert, Eye, Bed,
   Laugh, Frown, Popcorn, CakeSlice, Beef, Apple, Drumstick, Candy,
-  BatteryWarning, BatteryLow, BatteryMedium, BatteryFull, Gauge, NotebookPen, Check, LineSquiggle
+  BatteryWarning, BatteryLow, BatteryMedium, BatteryFull, Gauge, NotebookPen, Check
 } from 'lucide-react';
 import TrackingCalendar from '../../components/TrackingCalendar';
 import { supabase } from '../../client';
@@ -64,36 +64,31 @@ const PeriodTracker = () => {
         birthdate: profile.birthdate
       });
 
-      const userKey = `loggedDates-${user.id}`;
-      const stored = localStorage.getItem(userKey);
+      // Always fetch fresh data from Supabase instead of using localStorage
+      const { data, error } = await supabase
+        .from('symptomlog')
+        .select('date_logged, symptoms, severity')
+        .eq('patients_id', user.id)
+        .order('date_logged', { ascending: false });
 
-      if (stored) {
-        setLoggedDates(JSON.parse(stored));
-      } else {
-        const { data, error } = await supabase
-          .from('symptomlog')
-          .select('date_logged, symptoms, severity')
-          .eq('patients_id', user.id);
-
-        if (error) {
-          console.error('Supabase fetch error:', error.message);
-          return;
-        }
-
-        const normalized = data.map(entry => ({
-          ...entry,
-          date_logged: new Date(entry.date_logged),
-        }));
-
-        setLoggedDates(normalized);
-        localStorage.setItem(userKey, JSON.stringify(normalized));
+      if (error) {
+        console.error('Supabase fetch error:', error.message);
+        return;
       }
+
+      // Normalize the data - ensure dates are properly formatted
+      const normalized = data.map(entry => ({
+        ...entry,
+        date_logged: new Date(entry.date_logged),
+      }));
+
+      setLoggedDates(normalized);
     };
 
     fetchAndStoreUserData();
   }, []);
 
-  // New effect to update selected values when date changes
+  // Effect to update selected values when date changes
   useEffect(() => {
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
@@ -162,89 +157,74 @@ const PeriodTracker = () => {
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    const existingEntryIndex = loggedDates.findIndex(entry => {
+    // Check if entry exists for this date and symptom type
+    const existingEntry = loggedDates.find(entry => {
       const entryDate = new Date(entry.date_logged);
       entryDate.setHours(0, 0, 0, 0);
       return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === selectedTab;
     });
 
-    // Get current timestamp with proper formatting
+    // Use the selected date but with current time for timestamp
     const now = new Date();
-    const timestamp = now.toISOString(); // This preserves the full timestamp
+    const dateWithCurrentTime = new Date(date);
+    dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
 
     const dataToSave = {
       symptoms: selectedTab,
       severity: valueToSave,
-      date_logged: timestamp, // Save full timestamp instead of just date
+      date_logged: dateWithCurrentTime.toISOString(),
       patients_id: user.id,
     };
 
     let supabaseError;
 
-    if (existingEntryIndex !== -1) {
-      // Update existing entry - also update the timestamp to reflect when it was last modified
+    if (existingEntry) {
+      // Update existing entry
       const { error } = await supabase
         .from('symptomlog')
         .update({ 
           severity: valueToSave,
-          date_logged: timestamp // Update timestamp on modification
+          date_logged: dateWithCurrentTime.toISOString()
         })
         .eq('patients_id', user.id)
         .eq('symptoms', selectedTab)
-        .eq('date_logged', normalizedDate.toISOString().split('T')[0]); // Match by date only for the WHERE clause
+        .eq('date_logged', existingEntry.date_logged.toISOString());
 
       supabaseError = error;
-
-      if (!error) {
-        // Re-fetch from Supabase to ensure data consistency
-        const { data, error: fetchError } = await supabase
-          .from('symptomlog')
-          .select('date_logged, symptoms, severity')
-          .eq('patients_id', user.id);
-
-        if (!fetchError) {
-          const normalized = data.map(entry => ({
-            ...entry,
-            date_logged: new Date(entry.date_logged),
-          }));
-          setLoggedDates(normalized);
-          localStorage.setItem(`loggedDates-${user.id}`, JSON.stringify(normalized));
-        }
-      }
     } else {
-      // Insert new entry with full timestamp
+      // Insert new entry
       const { error } = await supabase.from('symptomlog').insert([dataToSave]);
       supabaseError = error;
-
-      if (!error) {
-        // Re-fetch from Supabase to ensure data consistency
-        const { data, error: fetchError } = await supabase
-          .from('symptomlog')
-          .select('date_logged, symptoms, severity')
-          .eq('patients_id', user.id);
-
-        if (!fetchError) {
-          const normalized = data.map(entry => ({
-            ...entry,
-            date_logged: new Date(entry.date_logged),
-          }));
-          setLoggedDates(normalized);
-          localStorage.setItem(`loggedDates-${user.id}`, JSON.stringify(normalized));
-        }
-      }
     }
 
     if (supabaseError) {
       setModalContent({ title: 'Error', message: `Failed to save: ${supabaseError.message}`, isError: true });
-    } else {
-      const formattedDate = normalizedDate.toDateString();
-      const formattedTime = now.toLocaleTimeString();
-      setModalContent({
-        title: 'Success!',
-        message: `${selectedTab} saved as "${valueToSave}" on ${formattedDate} at ${formattedTime}`,
-        isError: false
-      });
+      setShowModal(true);
+      return;
     }
+
+    // Refresh data from Supabase after successful save
+    const { data, error: fetchError } = await supabase
+      .from('symptomlog')
+      .select('date_logged, symptoms, severity')
+      .eq('patients_id', user.id)
+      .order('date_logged', { ascending: false });
+
+    if (!fetchError) {
+      const normalized = data.map(entry => ({
+        ...entry,
+        date_logged: new Date(entry.date_logged),
+      }));
+      setLoggedDates(normalized);
+    }
+
+    const formattedDate = normalizedDate.toDateString();
+    const formattedTime = now.toLocaleTimeString();
+    setModalContent({
+      title: 'Success!',
+      message: `${selectedTab} saved as "${valueToSave}" on ${formattedDate} at ${formattedTime}`,
+      isError: false
+    });
 
     setShowModal(true);
   };
@@ -292,7 +272,6 @@ const PeriodTracker = () => {
         { name: 'Nausea', icon: CircleAlert, size: 36 },
         { name: 'Insomnia', icon: Eye, size: 36 },
         { name: 'Fatigue', icon: Bed, size: 36 },
-        { name: 'Hair Thinning', icon: LineSquiggle, size: 36 },
       ]
     },
     Feelings: {
@@ -449,9 +428,7 @@ const PeriodTracker = () => {
         <TrackingCalendar
           currentDate={currentDate}
           selectedDate={date}
-          appointments={loggedDates.map(entry => ({
-            date: new Date(entry.date_logged).toISOString().split('T')[0]
-          }))}
+          loggedDates={loggedDates}
           onDateSelect={handleDateSelect}
           onMonthNavigate={handleMonthNavigate}
           onMonthYearChange={handleMonthYearChange}
@@ -511,7 +488,7 @@ const PeriodTracker = () => {
           <button
             onClick={handleDownload}
             className="flex flex-col items-center text-[#F98679] hover:text-[#B65C4B] transition text-sm focus:outline-none"
-            disabled={!userInfo.name} // disable if not loaded
+            disabled={!userInfo.name}
           >
             <FileDown size={24} />
             <span className="mt-1 font-semibold">Download Report</span>
