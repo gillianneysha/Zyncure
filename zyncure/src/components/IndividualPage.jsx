@@ -502,7 +502,7 @@ export function BillingPage() {
 
       if (checkoutData?.checkout_url) {
         console.log('Redirecting to:', checkoutData.checkout_url);
-        
+
         // Redirect to PayMongo checkout
         window.location.href = checkoutData.checkout_url;
       } else {
@@ -543,28 +543,28 @@ export function BillingPage() {
   const handlePaymentSuccess = async (paymentRecordId, userId, tier) => {
     try {
       console.log('Handling payment success:', { paymentRecordId, userId, tier });
-      
+
       // Wait a bit for webhook to process
       await new Promise(resolve => setTimeout(resolve, 3000));
-      
+
       // Check if webhook already processed the payment
       let paymentRecord = null;
-      
+
       if (paymentRecordId) {
         const { data: payment, error: fetchError } = await supabase
           .from('payments')
           .select('*')
           .eq('id', paymentRecordId)
           .single();
-          
+
         if (!fetchError && payment) {
           paymentRecord = payment;
         }
       }
-      
+
       if (paymentRecord) {
         console.log('Found payment record:', paymentRecord);
-        
+
         if (paymentRecord.status === 'completed') {
           // Payment already processed by webhook
           console.log('Payment already completed by webhook');
@@ -573,7 +573,7 @@ export function BillingPage() {
           console.log('Updating payment status manually...');
           const { error: paymentError } = await supabase
             .from('payments')
-            .update({ 
+            .update({
               status: 'completed',
               updated_at: new Date().toISOString()
             })
@@ -584,7 +584,7 @@ export function BillingPage() {
             throw paymentError;
           }
         }
-        
+
         // Refresh current subscription
         const { data: subscription, error: subError } = await supabase
           .from('subscriptions')
@@ -601,7 +601,7 @@ export function BillingPage() {
         }
       } else {
         console.log('No payment record found, creating subscription manually...');
-        
+
         // Create subscription manually (fallback)
         const subscriptionData = {
           user_id: userId,
@@ -625,11 +625,11 @@ export function BillingPage() {
         console.log('Subscription created manually:', subscription);
         setCurrentSubscription(subscription);
       }
-      
+
       // Clear any errors and show success
       setError('');
       setShowPlans(false);
-      
+
       // Clean up URL parameters
       const url = new URL(window.location);
       url.searchParams.delete('success');
@@ -749,9 +749,9 @@ export function BillingPage() {
 
   // Testing mode indicator
   const renderTestingNotice = () => {
-    const isTestEnvironment = import.meta.env.DEV || 
-                             window.location.hostname === 'localhost' ||
-                             import.meta.env.VITE_PAYMONGO_MODE === 'test';
+    const isTestEnvironment = import.meta.env.DEV ||
+      window.location.hostname === 'localhost' ||
+      import.meta.env.VITE_PAYMONGO_MODE === 'test';
 
     if (!isTestEnvironment) return null;
 
@@ -1209,10 +1209,16 @@ export function DeleteAccountPage() {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // <-- Add this
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (error || success) {
+      setShowModal(false);
+    }
+  }, [error, success]);
 
   const handleDelete = () => setShowModal(true);
   const handleCancel = () => setShowModal(false);
@@ -1221,47 +1227,59 @@ export function DeleteAccountPage() {
     setError("");
     setSuccess("");
     setLoading(true);
-    // 1. Re-authenticate user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setError("You must be logged in.");
+
+    try {
+      // 1. Re-authenticate user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        setError("You must be logged in.");
+        setLoading(false);
+        return;
+      }
+      if (!email || !password) {
+        setError("Please enter your email and password.");
+        setLoading(false);
+        return;
+      }
+      if (email !== user.email) {
+        setError("Entered email does not match your account.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Sign in again to verify password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) {
+        setError("Incorrect password.");
+        setLoading(false);
+        return;
+      }
+
+      // 3. Calling Edge Function to delete the user
+      const { error: fnError } = await supabase.functions.invoke('delete-user', {
+        body: { user_id: user.id }
+      });
+      if (fnError) {
+        setError("Failed to delete account: " + fnError.message);
+        setLoading(false);
+        return;
+      }
+
+      setSuccess("Account deleted successfully.");
+
+      await supabase.auth.signOut();
+
+      setTimeout(() => {
+        window.location.href = "/register";
+      }, 1000);
+
+    } catch (error) {
+      setError("An unexpected error occurred.");
       setLoading(false);
-      return;
     }
-    if (!email || !password) {
-      setError("Please enter your email and password.");
-      setLoading(false);
-      return;
-    }
-    if (email !== user.email) {
-      setError("Entered email does not match your account.");
-      setLoading(false);
-      return;
-    }
-    // 2. Sign in again to verify password
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (signInError) {
-      setError("Incorrect password.");
-      setLoading(false);
-      return;
-    }
-    // 3. Call the Edge Function to delete the user
-    const { error: fnError } = await supabase.functions.invoke('delete-user', {
-      body: { user_id: user.id }
-    });
-    if (fnError) {
-      setError("Failed to delete account: " + fnError.message);
-      setLoading(false);
-      return;
-    }
-    setSuccess("Account deleted successfully.");
-    setLoading(false);
-    // Optionally: redirect or log out
-    await supabase.auth.signOut();
-    window.location.href = "/register";
   };
 
   return (
@@ -1274,6 +1292,9 @@ export function DeleteAccountPage() {
       </div>
 
       <div className="space-y-4">
+        {error && <div className="text-red-500 mt-4">{error}</div>}
+        {success && <div className="text-green-600 mt-4">{success}</div>}
+
         <div>
           <label className="block text-mySidebar mb-1">Email</label>
           <input
@@ -1303,15 +1324,21 @@ export function DeleteAccountPage() {
             {showPassword ? <Eye size={22} /> : <EyeClosed size={22} />}
           </button>
         </div>
+
         <div className="flex justify-center py-5">
           <button
-            className="bg-profileHeader text-white px-6 py-2 rounded-xl font-semibold hover:bg-red-600 transition-colors"
+            className={`px-6 py-2 rounded-xl font-semibold transition-colors ${email && password
+              ? "bg-profileHeader text-white hover:bg-red-600"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
             onClick={handleDelete}
             type="button"
+            disabled={!email || !password}
           >
             Delete Account
           </button>
         </div>
+
         {showModal && (
           <DeleteAccountModal
             open={showModal}
@@ -1322,8 +1349,6 @@ export function DeleteAccountPage() {
             loading={loading}
           />
         )}
-        {error && <div className="text-red-500 mt-4">{error}</div>}
-        {success && <div className="text-green-600 mt-4">{success}</div>}
       </div>
     </div>
   );
