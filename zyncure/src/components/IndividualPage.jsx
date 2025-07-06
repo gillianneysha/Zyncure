@@ -370,7 +370,6 @@ export function BillingPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
     const canceled = urlParams.get('canceled');
-    // const sessionId = urlParams.get('session_id');
 
     if (success === 'true') {
       setPaymentStatus("Payment successful! Your subscription is being activated.");
@@ -383,8 +382,7 @@ export function BillingPage() {
     }
   }, []);
 
-// Tier pricing (in PHP)
-// Tier pricing (in PHP)
+  // Tier pricing (in PHP - keep as regular amounts, NOT centavos)
   const tierPricing = {
     premium: 299,
     pro: 599
@@ -457,7 +455,7 @@ export function BillingPage() {
       // Create payment record with proper data structure
       const paymentData = {
         user_id: user.id,
-        amount: Math.round(amount * 100), // Convert PHP to centavos (e.g., 299 -> 29900)
+        amount: Math.round(amount * 100), // Convert PHP to centavos for database storage
         currency: 'PHP',
         status: 'pending',
         payment_method: 'online',
@@ -482,7 +480,7 @@ export function BillingPage() {
 
       // Create PayMongo checkout session using edge function
       const requestBody = {
-        amount: Math.round(amount * 100), // Convert PHP to centavos (e.g., 299 -> 29900)
+        amount: amount, // Send amount in PHP (not centavos) - edge function will convert
         description: description,
         user_id: user.id,
         tier: selectedTier,
@@ -542,12 +540,12 @@ export function BillingPage() {
   };
 
   // Handle payment success (call this when user returns from PayMongo)
-  const handlePaymentSuccess = async (sessionId, paymentRecordId) => {
+  const handlePaymentSuccess = async (paymentRecordId, userId, tier) => {
     try {
-      console.log('Handling payment success:', { sessionId, paymentRecordId });
+      console.log('Handling payment success:', { paymentRecordId, userId, tier });
       
       // Wait a bit for webhook to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Check if webhook already processed the payment
       let paymentRecord = null;
@@ -557,19 +555,6 @@ export function BillingPage() {
           .from('payments')
           .select('*')
           .eq('id', paymentRecordId)
-          .single();
-          
-        if (!fetchError && payment) {
-          paymentRecord = payment;
-        }
-      }
-      
-      // If no payment record found by ID, search by session ID
-      if (!paymentRecord) {
-        const { data: payment, error: fetchError } = await supabase
-          .from('payments')
-          .select('*')
-          .contains('metadata', { checkout_session_id: sessionId })
           .single();
           
         if (!fetchError && payment) {
@@ -590,7 +575,7 @@ export function BillingPage() {
             .from('payments')
             .update({ 
               status: 'completed',
-              paymongo_payment_id: sessionId 
+              updated_at: new Date().toISOString()
             })
             .eq('id', paymentRecord.id);
 
@@ -619,8 +604,8 @@ export function BillingPage() {
         
         // Create subscription manually (fallback)
         const subscriptionData = {
-          user_id: user.id,
-          tier: selectedTier,
+          user_id: userId,
+          tier: tier,
           status: 'active',
           started_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -648,10 +633,10 @@ export function BillingPage() {
       // Clean up URL parameters
       const url = new URL(window.location);
       url.searchParams.delete('success');
-      url.searchParams.delete('session_id');
       url.searchParams.delete('payment_record_id');
       url.searchParams.delete('user_id');
       url.searchParams.delete('tier');
+      url.searchParams.delete('canceled');
       window.history.replaceState({}, document.title, url.toString());
 
     } catch (error) {
@@ -664,12 +649,13 @@ export function BillingPage() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
-    const sessionId = urlParams.get('session_id');
     const canceled = urlParams.get('canceled');
     const paymentRecordId = urlParams.get('payment_record_id');
+    const userId = urlParams.get('user_id');
+    const tier = urlParams.get('tier');
 
-    if (success === 'true' && sessionId) {
-      handlePaymentSuccess(sessionId, paymentRecordId);
+    if (success === 'true' && paymentRecordId) {
+      handlePaymentSuccess(paymentRecordId, userId, tier);
     } else if (canceled === 'true') {
       setError('Payment was canceled');
       // Update payment record to canceled if we have the ID
@@ -682,6 +668,8 @@ export function BillingPage() {
       }
     }
   }, []);
+
+  // Rest of your component remains the same...
   const SecurityOption = ({ title, onClick }) => (
     <div
       className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-50 transition-colors"
@@ -739,6 +727,7 @@ export function BillingPage() {
       </div>
     );
   };
+
   const renderError = () => {
     if (!error) return null;
 
