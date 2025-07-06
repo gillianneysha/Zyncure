@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { FileDown } from 'lucide-react';
 import PatientCharts from '../../components/PatientCharts';
 import { supabase } from '../../client';
+import { generatePDF } from '../../utils/generateTrackingReport';
 
 const Home = () => {
   const [symptomStats, setSymptomStats] = useState({
@@ -9,10 +11,49 @@ const Home = () => {
     mostCommon: null,
     recentMood: null
   });
+  const [loggedDates, setLoggedDates] = useState([]);
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    email: '',
+    birthdate: ''
+  });
+  const [showModal, setShowModal] = useState(false);
+  const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
 
   useEffect(() => {
     fetchSymptomStats();
+    fetchUserInfo();
   }, []);
+
+  const fetchUserInfo = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('User fetch failed:', authError?.message);
+        return;
+      }
+
+      // Fetch profile info from patients table
+      const { data: profile, error: profileError } = await supabase
+        .from('patients')
+        .select('first_name, last_name, email, birthdate')
+        .eq('patient_id', user.id)
+        .maybeSingle();
+
+      if (profileError || !profile) {
+        console.error('Profile fetch error:', profileError?.message || 'No matching patient found');
+        return;
+      }
+
+      setUserInfo({
+        name: `${profile.first_name} ${profile.last_name}`,
+        email: profile.email,
+        birthdate: profile.birthdate
+      });
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
+  };
 
   const fetchSymptomStats = async () => {
     try {
@@ -49,29 +90,38 @@ const Home = () => {
         return;
       }
 
+      // Store the logged dates for PDF generation
+      if (symptomLogs) {
+        const normalizedLogs = symptomLogs.map(entry => ({
+          ...entry,
+          date_logged: new Date(entry.date_logged),
+        }));
+        setLoggedDates(normalizedLogs);
+      }
+
       // Process the data
       if (symptomLogs && symptomLogs.length > 0) {
         const totalLogs = symptomLogs.length;
-        
+
         // Get last logged date
         const lastLoggedDate = new Date(symptomLogs[0].date_logged);
         const lastLogged = formatLastLogged(lastLoggedDate);
-        
+
         // Count symptom types to find most common
         const symptomCounts = {};
         symptomLogs.forEach(log => {
           const symptom = log.symptoms;
           symptomCounts[symptom] = (symptomCounts[symptom] || 0) + 1;
         });
-        
-        const mostCommon = Object.keys(symptomCounts).reduce((a, b) => 
+
+        const mostCommon = Object.keys(symptomCounts).reduce((a, b) =>
           symptomCounts[a] > symptomCounts[b] ? a : b
         );
-        
+
         // Get most recent mood (Feelings entry)
         const recentMoodLog = symptomLogs.find(log => log.symptoms === 'Feelings');
         const recentMood = recentMoodLog ? recentMoodLog.severity : 'Not logged';
-        
+
         setSymptomStats({
           totalLogs,
           lastLogged,
@@ -79,7 +129,7 @@ const Home = () => {
           recentMood
         });
       } else {
-        // No data found, use demo data
+        // No data found, demo data
         setSymptomStats({
           totalLogs: 0,
           lastLogged: 'Never',
@@ -103,25 +153,71 @@ const Home = () => {
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 1) return 'Today';
     if (diffDays === 2) return 'Yesterday';
     if (diffDays <= 7) return `${diffDays - 1} days ago`;
     return date.toLocaleDateString();
   };
 
+  const handleDownload = async () => {
+    if (!userInfo.name) {
+      setModalContent({
+        title: 'Please wait',
+        message: 'Patient information is still loading. Try again in a moment.',
+        isError: true
+      });
+      setShowModal(true);
+      return;
+    }
+
+    if (loggedDates.length === 0) {
+      setModalContent({
+        title: 'No Data Available',
+        message: 'There are no symptom logs to generate a report. Start tracking your symptoms first.',
+        isError: true
+      });
+      setShowModal(true);
+      return;
+    }
+
+    try {
+      setModalContent({
+        title: 'Generating Report...',
+        message: 'Please wait while we create your comprehensive health report with charts.',
+        isError: false
+      });
+      setShowModal(true);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const fileName = await generatePDF(loggedDates, userInfo);
+
+      setModalContent({
+        title: 'PDF Generated!',
+        message: `Your health report with visual analytics has been downloaded as "${fileName}"`,
+        isError: false
+      });
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      setModalContent({
+        title: 'Error',
+        message: 'Failed to generate PDF report. Please try again.',
+        isError: true
+      });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-orange-50">
+    <div className="min-h-screen from-pink-50 to-orange-50">
       {/* Header Section */}
-      <div className="bg-white shadow-sm border-b border-pink-100">
-        <div className="px-6 py-4">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-orange-500 bg-clip-text text-transparent">
-            Welcome!
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Track your symptoms, mood, and wellness journey
-          </p>
-        </div>
+      <div className="px-6 py-4">
+        <h1 className="text-3xl font-bold" style={{ color: '#55A1A4' }}>
+          Welcome!
+        </h1>
+        <p className="text-gray-600 mt-1">
+          Track your symptoms, mood, and wellness journey.
+        </p>
       </div>
 
       {/* Quick Stats Cards */}
@@ -184,32 +280,41 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Health Tracking Navigation */}
-        {/* <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Quick Symptom Logging</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button className="p-4 rounded-lg border-2 border-pink-200 hover:border-pink-400 hover:bg-pink-50 transition-colors">
-              <div className="text-2xl mb-2">🩸</div>
-              <div className="font-medium text-gray-700">Period</div>
-            </button>
-            <button className="p-4 rounded-lg border-2 border-purple-200 hover:border-purple-400 hover:bg-purple-50 transition-colors">
-              <div className="text-2xl mb-2">😊</div>
-              <div className="font-medium text-gray-700">Feelings</div>
-            </button>
-            <button className="p-4 rounded-lg border-2 border-orange-200 hover:border-orange-400 hover:bg-orange-50 transition-colors">
-              <div className="text-2xl mb-2">✨</div>
-              <div className="font-medium text-gray-700">Skin</div>
-            </button>
-            <button className="p-4 rounded-lg border-2 border-green-200 hover:border-green-400 hover:bg-green-50 transition-colors">
-              <div className="text-2xl mb-2">⚡</div>
-              <div className="font-medium text-gray-700">Metabolism</div>
-            </button>
-          </div>
-        </div> */}
-
         {/* Charts Section */}
         <PatientCharts />
+
+        {/* Download Report Button */}
+        <div className="w-full flex justify-end mt-6">
+          <div className="bg-[#FFE0D3] rounded-2xl px-6 py-4 shadow-sm">
+            <button
+              onClick={handleDownload}
+              className="flex flex-col items-center text-[#F98679] hover:text-[#B65C4B] transition text-sm focus:outline-none"
+              disabled={!userInfo.name}
+            >
+              <FileDown size={24} />
+              <span className="mt-1 font-semibold">Download Report</span>
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-xl p-6 shadow-2xl text-center max-w-sm w-full">
+            <h2 className={`text-xl font-bold ${modalContent.isError ? 'text-red-600' : 'text-[#3BA4A0]'}`}>
+              {modalContent.title}
+            </h2>
+            <p className="text-[#555] mb-4 mt-2">{modalContent.message}</p>
+            <button
+              onClick={() => setShowModal(false)}
+              className={`${modalContent.isError ? 'bg-red-500 hover:bg-red-600' : 'bg-[#F98679] hover:bg-[#d87364]'} text-white font-semibold px-6 py-2 rounded-full transition`}
+            >
+              {modalContent.isError ? 'Close' : 'Got it'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
