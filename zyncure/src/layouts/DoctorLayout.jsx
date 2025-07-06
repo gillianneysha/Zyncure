@@ -3,9 +3,10 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar, { SidebarItem, SidebarSubItem } from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import DoctorVerificationModal from '../components/DoctorVerificationModal';
-import { CalendarDays, Users, Bell, Heart, House, User, FileText, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { CalendarDays, Users, Bell, Heart, House, User, FileText, Clock, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import { supabase } from '../client';
+import { ReportModal } from '../components/ReportModal';
 
 export default function DoctorLayout() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function DoctorLayout() {
 
   const isActive = (path) => location.pathname === `/doctor${path}`;
   const isHealthActive = location.pathname.includes('/doctor/patients');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Fixed: Use correct property names from useUser hook
   const verificationStatus = user?.verification_status;
@@ -24,21 +26,20 @@ export default function DoctorLayout() {
   const rejectionReason = user?.rejection_reason;
 
   // Show verification modal only for doctors with no_record or rejected status
-  const shouldShowVerificationModal = user?.role === 'doctor' && 
-                                     (verificationStatus === 'no_record' || verificationStatus === 'rejected');
+  const shouldShowVerificationModal = user?.role === 'doctor' &&
+    (verificationStatus === 'no_record' || verificationStatus === 'rejected');
 
   // Check if doctor features should be limited (frozen state)
   // Only doctors with 'approved' or 'verified' status should have full access
-  const isDoctorUnverified = user?.role === 'doctor' && 
-                            verificationStatus !== 'approved' && 
-                            verificationStatus !== 'verified' &&
-                            !isVerified;
+  const isDoctorUnverified = user?.role === 'doctor' &&
+    verificationStatus !== 'approved' &&
+    verificationStatus !== 'verified' &&
+    !isVerified;
 
   // Debug logging
- // Debug logging
   useEffect(() => {
     if (user) {
-      console.log('DoctorLayout - User ID:', user.id); // Add this line
+      console.log('DoctorLayout - User ID:', user.id);
       console.log('DoctorLayout - User data:', {
         role: user.role,
         verification_status: user.verification_status,
@@ -49,10 +50,11 @@ export default function DoctorLayout() {
       console.log('DoctorLayout - Is doctor unverified:', isDoctorUnverified);
     }
   }, [user, shouldShowVerificationModal, isDoctorUnverified]);
+
   const handleVerificationSubmit = async ({ licenseNumber, licenseFile }) => {
     setSubmissionLoading(true);
     setErrorMessage('');
-    
+
     try {
       // Validate inputs
       if (!licenseNumber || !licenseFile) {
@@ -85,9 +87,9 @@ export default function DoctorLayout() {
       // Upload license file to storage first
       const fileExt = licenseFile.name.split('.').pop();
       const fileName = `${user.id}_license_${Date.now()}.${fileExt}`;
-      
+
       console.log('Uploading file:', fileName);
-      
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('doctor-licenses')
         .upload(fileName, licenseFile, {
@@ -116,9 +118,6 @@ export default function DoctorLayout() {
       }
 
       console.log('Existing verification:', existingVerification);
-
-      // Prepare the verification data
-      // (Removed unused variable 'verificationData')
 
       let result;
       if (existingVerification) {
@@ -171,19 +170,19 @@ export default function DoctorLayout() {
 
       // Close modal
       setVerificationModalOpen(false);
-      
+
       // Show success message
       alert('Verification submitted successfully! We will review your documents and notify you of the result.');
-      
+
       // Instead of reloading the page, trigger a re-fetch of user data
       // This is more efficient and prevents UI flickering
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-      
+
     } catch (error) {
       console.error('Error submitting verification:', error);
-      
+
       // Clean up uploaded file if database operation failed
       if (error.message.includes('Database')) {
         try {
@@ -196,10 +195,10 @@ export default function DoctorLayout() {
           console.error('Error cleaning up file:', cleanupError);
         }
       }
-      
+
       const errorMsg = error.message || 'An unexpected error occurred. Please try again.';
       setErrorMessage(errorMsg);
-      
+
       // Show user-friendly error message
       if (error.message.includes('File upload failed')) {
         alert('Failed to upload file. Please check your internet connection and try again.');
@@ -217,7 +216,7 @@ export default function DoctorLayout() {
   useEffect(() => {
     console.log('Modal effect - shouldShowVerificationModal:', shouldShowVerificationModal);
     console.log('Modal effect - verificationModalOpen:', verificationModalOpen);
-    
+
     if (shouldShowVerificationModal && !verificationModalOpen) {
       console.log('Opening verification modal');
       setVerificationModalOpen(true);
@@ -302,68 +301,77 @@ export default function DoctorLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className="w-64 flex-shrink-0">
-        <Sidebar>
-          <SidebarItem 
-            icon={<House size={20} />} 
-            text="Home" 
-            active={isActive('')}
-            onClick={() => navigate('/doctor/home')} 
-          />
-          <SidebarItem 
-            icon={<User size={20} />} 
-            text="Profile" 
-            active={isActive('/profile')}
-            onClick={() => navigate('/doctor/profile')} 
-          />
-          <SidebarItem 
-            icon={<Heart size={20} />} 
-            text="Patients" 
-            active={isHealthActive}
-            disabled={isDoctorUnverified}
-          >
-            <SidebarSubItem 
-              icon={<CalendarDays size={20} />}
-              text="Appointments" 
-              active={isActive('/patients/appointments')}
-              onClick={() => !isDoctorUnverified && navigate('/doctor/patients/appointments')} 
-              disabled={isDoctorUnverified}
-            />
-            <SidebarSubItem 
-              icon={<FileText size={20} />}
-              text="Reports"
-              active={isActive('/patients/reports')}
-              onClick={() => !isDoctorUnverified && navigate('/doctor/patients/reports')} 
-              disabled={isDoctorUnverified}
-            />
-          </SidebarItem>
-          <SidebarItem 
-            icon={<Users size={20} />} 
-            text="Connections" 
-            active={isActive('/connections')}
-            onClick={() => !isDoctorUnverified && navigate('/doctor/connections')} 
+    <div className="min-h-screen bg-mainBg">
+      {/* Fixed Sidebar */}
+      <Sidebar>
+        <SidebarItem
+          icon={<House size={20} />}
+          text="Home"
+          active={isActive('')}
+          onClick={() => navigate('/doctor/home')}
+        />
+        <SidebarItem
+          icon={<User size={20} />}
+          text="Profile"
+          active={isActive('/profile')}
+          onClick={() => navigate('/doctor/profile')}
+        />
+        <SidebarItem
+          icon={<Heart size={20} />}
+          text="Patients"
+          active={isHealthActive}
+          disabled={isDoctorUnverified}
+        >
+          <SidebarSubItem
+            icon={<CalendarDays size={20} />}
+            text="Appointments"
+            active={isActive('/patients/appointments')}
+            onClick={() => !isDoctorUnverified && navigate('/doctor/patients/appointments')}
             disabled={isDoctorUnverified}
           />
-          <SidebarItem 
-            icon={<Bell size={20} />} 
-            text="Notifications" 
-            active={isActive('/notifications')}
-            onClick={() => navigate('/doctor/notifications')} 
-            alert 
+          <SidebarSubItem
+            icon={<FileText size={20} />}
+            text="Reports"
+            active={isActive('/patients/reports')}
+            onClick={() => !isDoctorUnverified && navigate('/doctor/patients/reports')}
+            disabled={isDoctorUnverified}
           />
-        </Sidebar>
-      </div>
-      
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Navbar />
-        <main className="flex-1 p-6 bg-mainBg text-gray-800 overflow-auto">
-          <VerificationStatusBanner />
-          <Outlet />
-        </main>
-      </div>
+        </SidebarItem>
+        <SidebarItem
+          icon={<Users size={20} />}
+          text="Connections"
+          active={isActive('/connections')}
+          onClick={() => !isDoctorUnverified && navigate('/doctor/connections')}
+          disabled={isDoctorUnverified}
+        />
+        <SidebarItem
+          icon={<Bell size={20} />}
+          text="Notifications"
+          active={isActive('/notifications')}
+          onClick={() => navigate('/doctor/notifications')}
+          alert
+        />
+        <SidebarItem
+          icon={<MessageSquare size={20} />}
+          text="Need Help?"
+          onClick={() => setIsReportModalOpen(true)}
+        />
+      </Sidebar>
+
+      {/* Fixed Navbar */}
+      <Navbar />
+
+      {/* Main Content Area - adjusted for fixed sidebar and navbar */}
+      <main className="ml-64 pt-16 p-6 text-gray-800 min-h-screen">
+        <VerificationStatusBanner />
+        <Outlet />
+      </main>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+      />
 
       {/* Verification Modal */}
       <DoctorVerificationModal
