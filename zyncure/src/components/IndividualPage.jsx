@@ -362,8 +362,29 @@ export function BillingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [user, setUser] = useState(null);
   const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [error, setError] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
 
-  // Tier pricing (in PHP)
+  // Check for payment success/failure in URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const canceled = urlParams.get('canceled');
+    // const sessionId = urlParams.get('session_id');
+
+    if (success === 'true') {
+      setPaymentStatus("Payment successful! Your subscription is being activated.");
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (canceled === 'true') {
+      setPaymentStatus("Payment was canceled. Please try again.");
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+// Tier pricing (in PHP)
+// Tier pricing (in PHP)
   const tierPricing = {
     premium: 299,
     pro: 599
@@ -379,7 +400,6 @@ export function BillingPage() {
         setUser(user);
 
         if (user) {
-          // Fixed subscription query - use proper filter format
           const { data: subscription, error: subError } = await supabase
             .from('subscriptions')
             .select('*')
@@ -387,7 +407,7 @@ export function BillingPage() {
             .eq('status', 'active')
             .order('created_at', { ascending: false })
             .limit(1)
-            .maybeSingle(); // Use maybeSingle instead of single to avoid error if no records
+            .maybeSingle();
 
           if (subError) {
             console.error('Subscription fetch error:', subError);
@@ -410,24 +430,39 @@ export function BillingPage() {
     }
   };
 
-  // Create PayMongo Payment Link
-  const createPaymentLink = async (amount, description) => {
+  // Create PayMongo Checkout Session with improved error handling
+  const createCheckoutSession = async (amount, description) => {
     if (!user) {
-      alert('Please log in to continue');
+      setError('Please log in to continue');
       return;
     }
 
     try {
       setIsProcessing(true);
+      setError("");
+
+      // Validate inputs
+      if (!amount || amount <= 0) {
+        throw new Error('Invalid amount');
+      }
+      if (!description || !selectedTier) {
+        throw new Error('Missing required information');
+      }
+
+      // Validate tier
+      if (!tierPricing[selectedTier]) {
+        throw new Error('Invalid subscription tier selected');
+      }
 
       // Create payment record with proper data structure
       const paymentData = {
         user_id: user.id,
-        amount: amount * 100, // Convert to centavos
+        amount: Math.round(amount * 100), // Convert PHP to centavos (e.g., 299 -> 29900)
         currency: 'PHP',
         status: 'pending',
-        payment_method: 'online', // Generic since PayMongo handles the specific method
-        tier: selectedTier
+        payment_method: 'online',
+        tier: selectedTier,
+        description: description
       };
 
       console.log('Creating payment record:', paymentData);
@@ -445,44 +480,39 @@ export function BillingPage() {
 
       console.log('Payment record created:', paymentRecord);
 
-      // Create PayMongo payment link using edge function
-      const { data: paymentLinkData, error: linkError } = await supabase.functions.invoke('create-payment-link', {
-        body: {
-          amount: amount * 100, // Convert to centavos
-          currency: 'PHP',
-          description: description,
-          remarks: `ZynCure ${selectedTier} subscription - User: ${user.id}`,
-          payment_record_id: paymentRecord.id
-        }
+      // Create PayMongo checkout session using edge function
+      const requestBody = {
+        amount: Math.round(amount * 100), // Convert PHP to centavos (e.g., 299 -> 29900)
+        description: description,
+        user_id: user.id,
+        tier: selectedTier,
+        payment_record_id: paymentRecord.id
+      };
+
+      console.log('Calling edge function with:', requestBody);
+
+      const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke('create-checkout-session', {
+        body: requestBody
       });
 
-      if (linkError) {
-        console.error('Payment link creation error:', linkError);
-        throw new Error(`Failed to create payment link: ${linkError.message}`);
+      if (checkoutError) {
+        console.error('Checkout session creation error:', checkoutError);
+        throw new Error(`Failed to create checkout session: ${checkoutError.message}`);
       }
 
-      if (paymentLinkData?.checkout_url) {
-        // Update payment record with PayMongo link ID
-        const { error: updateError } = await supabase
-          .from('payments')
-          .update({
-            paymongo_link_id: paymentLinkData.link_id,
-            paymongo_payment_id: paymentLinkData.payment_id
-          })
-          .eq('id', paymentRecord.id);
+      console.log('Checkout session response:', checkoutData);
 
-        if (updateError) {
-          console.error('Payment update error:', updateError);
-        }
-
+      if (checkoutData?.checkout_url) {
+        console.log('Redirecting to:', checkoutData.checkout_url);
+        
         // Redirect to PayMongo checkout
-        window.location.href = paymentLinkData.checkout_url;
+        window.location.href = checkoutData.checkout_url;
       } else {
-        throw new Error('No checkout URL received from payment link creation');
+        throw new Error('No checkout URL received from checkout session creation');
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert(`Payment processing failed: ${error.message}`);
+      setError(`Payment processing failed: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -491,21 +521,167 @@ export function BillingPage() {
   // Handle subscription
   const handleSubscribe = () => {
     if (!selectedTier) {
-      alert('Please select a subscription tier');
+      setError('Please select a subscription tier');
       return;
     }
 
     if (!user) {
-      alert('Please log in to continue');
+      setError('Please log in to continue');
       return;
     }
 
     const amount = tierPricing[selectedTier];
+    if (!amount) {
+      setError('Invalid subscription tier selected');
+      return;
+    }
+
     const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription`;
 
-    createPaymentLink(amount, description);
+    createCheckoutSession(amount, description);
   };
 
+  // Handle payment success (call this when user returns from PayMongo)
+  const handlePaymentSuccess = async (sessionId, paymentRecordId) => {
+    try {
+      console.log('Handling payment success:', { sessionId, paymentRecordId });
+      
+      // Wait a bit for webhook to process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Check if webhook already processed the payment
+      let paymentRecord = null;
+      
+      if (paymentRecordId) {
+        const { data: payment, error: fetchError } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('id', paymentRecordId)
+          .single();
+          
+        if (!fetchError && payment) {
+          paymentRecord = payment;
+        }
+      }
+      
+      // If no payment record found by ID, search by session ID
+      if (!paymentRecord) {
+        const { data: payment, error: fetchError } = await supabase
+          .from('payments')
+          .select('*')
+          .contains('metadata', { checkout_session_id: sessionId })
+          .single();
+          
+        if (!fetchError && payment) {
+          paymentRecord = payment;
+        }
+      }
+      
+      if (paymentRecord) {
+        console.log('Found payment record:', paymentRecord);
+        
+        if (paymentRecord.status === 'completed') {
+          // Payment already processed by webhook
+          console.log('Payment already completed by webhook');
+        } else {
+          // Update payment status manually (fallback)
+          console.log('Updating payment status manually...');
+          const { error: paymentError } = await supabase
+            .from('payments')
+            .update({ 
+              status: 'completed',
+              paymongo_payment_id: sessionId 
+            })
+            .eq('id', paymentRecord.id);
+
+          if (paymentError) {
+            console.error('Payment update error:', paymentError);
+            throw paymentError;
+          }
+        }
+        
+        // Refresh current subscription
+        const { data: subscription, error: subError } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!subError && subscription) {
+          console.log('Updated subscription:', subscription);
+          setCurrentSubscription(subscription);
+        }
+      } else {
+        console.log('No payment record found, creating subscription manually...');
+        
+        // Create subscription manually (fallback)
+        const subscriptionData = {
+          user_id: user.id,
+          tier: selectedTier,
+          status: 'active',
+          started_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        };
+
+        const { data: subscription, error: subscriptionError } = await supabase
+          .from('subscriptions')
+          .insert(subscriptionData)
+          .select()
+          .single();
+
+        if (subscriptionError) {
+          console.error('Subscription creation error:', subscriptionError);
+          throw subscriptionError;
+        }
+
+        console.log('Subscription created manually:', subscription);
+        setCurrentSubscription(subscription);
+      }
+      
+      // Clear any errors and show success
+      setError('');
+      setShowPlans(false);
+      
+      // Clean up URL parameters
+      const url = new URL(window.location);
+      url.searchParams.delete('success');
+      url.searchParams.delete('session_id');
+      url.searchParams.delete('payment_record_id');
+      url.searchParams.delete('user_id');
+      url.searchParams.delete('tier');
+      window.history.replaceState({}, document.title, url.toString());
+
+    } catch (error) {
+      console.error('Payment success handling error:', error);
+      setError(`Failed to complete subscription: ${error.message}`);
+    }
+  };
+
+  // Check URL parameters for payment success/failure on component mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const sessionId = urlParams.get('session_id');
+    const canceled = urlParams.get('canceled');
+    const paymentRecordId = urlParams.get('payment_record_id');
+
+    if (success === 'true' && sessionId) {
+      handlePaymentSuccess(sessionId, paymentRecordId);
+    } else if (canceled === 'true') {
+      setError('Payment was canceled');
+      // Update payment record to canceled if we have the ID
+      if (paymentRecordId) {
+        supabase
+          .from('payments')
+          .update({ status: 'cancelled' })
+          .eq('id', paymentRecordId)
+          .then(() => console.log('Payment marked as cancelled'));
+      }
+    }
+  }, []);
   const SecurityOption = ({ title, onClick }) => (
     <div
       className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-50 transition-colors"
@@ -538,6 +714,70 @@ export function BillingPage() {
     );
   };
 
+  // Payment status message component
+  const renderPaymentStatus = () => {
+    if (!paymentStatus) return null;
+
+    const isSuccess = paymentStatus.includes('successful');
+    const bgColor = isSuccess ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200';
+    const textColor = isSuccess ? 'text-green-800' : 'text-orange-800';
+
+    return (
+      <div className={`${bgColor} border rounded-lg p-4 mb-6`}>
+        <div className="flex items-center justify-between">
+          <div className={`${textColor} font-semibold`}>
+            {isSuccess ? '✓ Payment Status' : 'Payment Status'}
+          </div>
+          <button
+            onClick={() => setPaymentStatus("")}
+            className={`${textColor} hover:opacity-70`}
+          >
+            ×
+          </button>
+        </div>
+        <p className={`${textColor} text-sm mt-1`}>{paymentStatus}</p>
+      </div>
+    );
+  };
+  const renderError = () => {
+    if (!error) return null;
+
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div className="flex items-center">
+          <div className="text-red-800 font-semibold">Error</div>
+          <button
+            onClick={() => setError("")}
+            className="ml-auto text-red-600 hover:text-red-800"
+          >
+            ×
+          </button>
+        </div>
+        <p className="text-red-600 text-sm mt-1">{error}</p>
+      </div>
+    );
+  };
+
+  // Testing mode indicator
+  const renderTestingNotice = () => {
+    const isTestEnvironment = import.meta.env.DEV || 
+                             window.location.hostname === 'localhost' ||
+                             import.meta.env.VITE_PAYMONGO_MODE === 'test';
+
+    if (!isTestEnvironment) return null;
+
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <h3 className="text-yellow-800 font-semibold">🧪 Testing Mode</h3>
+        <p className="text-yellow-700 text-sm">
+          This is sandbox mode - no real payments will be processed.
+          <br />
+          Use test card numbers provided by PayMongo for testing.
+        </p>
+      </div>
+    );
+  };
+
   // Subscriptions page
   if (showPlans) {
     return (
@@ -549,6 +789,9 @@ export function BillingPage() {
           <ArrowLeft className="mr-2" size={20} /> Back to Billing
         </button>
 
+        {renderTestingNotice()}
+        {renderPaymentStatus()}
+        {renderError()}
         {renderSubscriptionStatus()}
 
         <h2 className="text-4xl text-teal-600 font-bold mb-2">Upgrade to Premium</h2>
@@ -634,6 +877,13 @@ export function BillingPage() {
             <br />
             All major payment methods are supported (Cards, GCash, Maya, etc.)
           </p>
+          {import.meta.env.DEV && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-600">
+                <strong>For Testing:</strong> Use test card 4343434343434345, any future expiry date, and any 3-digit CVC.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -652,6 +902,9 @@ export function BillingPage() {
         </p>
       </div>
 
+      {renderTestingNotice()}
+      {renderPaymentStatus()}
+      {renderError()}
       {renderSubscriptionStatus()}
 
       <div className="mt-8">
