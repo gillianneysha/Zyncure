@@ -14,7 +14,7 @@ export default function DeleteAccountModal({ open, onCancel, onConfirm, title, d
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+    <div className="fixed -top-5 left-0 right-0 bottom-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-[400px] max-w-full">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">{title || "This will delete your account"}</h2>
         <p className="text-gray-500 mb-6">{description || "Proceed with your deletion request?"}</p>
@@ -28,7 +28,7 @@ export default function DeleteAccountModal({ open, onCancel, onConfirm, title, d
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-3 rounded-lg bg-[#F46B5D] text-white font-semibold hover:bg-[#e05a4d] transition"
+            className="flex-1 py-3 rounded-lg bg-[#F46B5D] text-white font-semibold hover:bg-[#e05a4d] transition disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
             disabled={loading}
           >
             {loading ? "Deleting..." : "Delete"}
