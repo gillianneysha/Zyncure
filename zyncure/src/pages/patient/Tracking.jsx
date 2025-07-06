@@ -442,15 +442,25 @@ const PeriodTracker = () => {
     setCurrentDate(new Date(year, month, 1));
   };
 
+  // Create dots data for dates with logged entries
+  const getDatesWithLogs = () => {
+    const datesWithLogs = [];
+    loggedDates.forEach(entry => {
+      const dateStr = new Date(entry.date_logged).toISOString().split('T')[0];
+      if (!datesWithLogs.includes(dateStr)) {
+        datesWithLogs.push(dateStr);
+      }
+    });
+    return datesWithLogs;
+  };
+
   return (
     <div className="calendar-container min-h-[100vh] w-full relative">
       <div className="flex flex-col items-center px-4 md:px-8 py-4 space-y-6 w-full max-w-4xl mx-auto">
         <TrackingCalendar
           currentDate={currentDate}
           selectedDate={date}
-          appointments={loggedDates.map(entry => ({
-            date: new Date(entry.date_logged).toISOString().split('T')[0]
-          }))}
+          datesWithLogs={getDatesWithLogs()}
           onDateSelect={handleDateSelect}
           onMonthNavigate={handleMonthNavigate}
           onMonthYearChange={handleMonthYearChange}
