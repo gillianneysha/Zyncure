@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
+
 const Calendar = ({
   currentDate,
   selectedDate,
@@ -15,9 +16,11 @@ const Calendar = ({
   ];
   const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(currentDate.getMonth());
   const [pickerYear, setPickerYear] = useState(currentDate.getFullYear());
+
 
   // Define symptom categories and their colors based on your app's categories
   const symptomColors = {
@@ -40,12 +43,15 @@ const Calendar = ({
     'other': '#607D8B'           // Gray for miscellaneous
   };
 
+
   const formatDate = (date) => date.toISOString().split('T')[0];
+
 
   const isSameDate = (date1, date2) => {
     if (!date1 || !date2) return false;
     return formatDate(date1) === formatDate(date2);
   };
+
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -55,11 +61,13 @@ const Calendar = ({
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
 
+
     const days = [];
     for (let i = 0; i < startingDayOfWeek; i++) days.push(null);
     for (let day = 1; day <= daysInMonth; day++) days.push(new Date(year, month, day));
     return days;
   };
+
 
   // Updated function to check for logged symptoms on a specific date
   const getLoggedSymptomsForDate = (date) => {
@@ -69,6 +77,7 @@ const Calendar = ({
       return formatDate(entryDate) === dateStr;
     });
   };
+
 
   // Get unique symptom types for a specific date
   const getUniqueSymptomTypes = (date) => {
@@ -93,21 +102,23 @@ const Calendar = ({
     return uniqueTypes;
   };
 
+
   // Check if a date has any logged symptoms
   const hasLoggedSymptoms = (date) => {
     return getLoggedSymptomsForDate(date).length > 0;
   };
 
+
   // Helper function to determine symptom type from data
   const getSymptomType = (symptom) => {
     // Debug: log the symptom object to see its structure
     console.log('Symptom object:', symptom);
-    
+   
     // Check all possible property names and values
     const checkValue = (value) => {
       if (!value) return null;
       const val = value.toString().toLowerCase().replace(/\s+/g, '_');
-      
+     
       // Direct matches
       if (val.includes('period') || val.includes('flow')) return 'period_flow';
       if (val.includes('symptom')) return 'symptoms';
@@ -116,40 +127,42 @@ const Calendar = ({
       if (val.includes('energy') || val.includes('fatigue')) return 'energy';
       if (val.includes('weight')) return 'weight';
       if (val.includes('custom')) return 'custom';
-      
+     
       // Check if the value exactly matches our color keys
       if (symptomColors[val]) return val;
-      
+     
       return null;
     };
-    
+   
     // Check all properties of the symptom object
     for (const [key, value] of Object.entries(symptom)) {
       const result = checkValue(value);
       if (result) return result;
-      
+     
       // Also check the property name itself
       const keyResult = checkValue(key);
       if (keyResult) return keyResult;
     }
-    
+   
     return 'other';
   };
+
 
   // Render symptom dots for a specific date - shows total count of symptoms
   const renderSymptomDots = (date) => {
     const allSymptoms = getLoggedSymptomsForDate(date);
     if (allSymptoms.length === 0) return null;
 
+
     // Create dots for each individual symptom entry
     const dots = [];
     allSymptoms.forEach((symptom, index) => {
       const symptomType = getSymptomType(symptom);
       const color = symptomColors[symptomType] || symptomColors.other;
-      
+     
       // Debug: log the determined type and color
       console.log(`Symptom ${index + 1}:`, symptomType, 'Color:', color);
-      
+     
       dots.push(
         <div
           key={index}
@@ -159,7 +172,7 @@ const Calendar = ({
         />
       );
     });
-    
+   
     return (
       <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5 flex-wrap justify-center max-w-12">
         {dots}
@@ -167,14 +180,17 @@ const Calendar = ({
     );
   };
 
+
   // Today's date (normalized to 00:00:00)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
 
   const renderCalendar = () => {
     const days = getDaysInMonth(currentDate);
     const weeks = [];
     for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
 
     return weeks.map((week, weekIndex) => (
       <div key={weekIndex} className="grid grid-cols-7 gap-1">
@@ -184,6 +200,7 @@ const Calendar = ({
           const isSelected = isSameDate(day, selectedDate);
           const isToday = isSameDate(day, today);
           const hasSymptoms = hasLoggedSymptoms(day);
+
 
           return (
             <div
@@ -209,9 +226,11 @@ const Calendar = ({
     ));
   };
 
+
   // Picker years range
   const years = [];
   for (let y = today.getFullYear() - 10; y <= today.getFullYear() + 1; y++) years.push(y);
+
 
   const handlePickerApply = () => {
     setShowPicker(false);
@@ -221,6 +240,7 @@ const Calendar = ({
       onMonthNavigate(0, pickerMonth, pickerYear);
     }
   };
+
 
   return (
     <div className="bg-[#FFD4C3] rounded-2xl p-6 md:p-8 shadow-lg max-w-2xl w-full mx-auto">
@@ -287,9 +307,6 @@ const Calendar = ({
           <ChevronRight size={24} />
         </button>
       </div>
-      
-
-
       <div className="grid grid-cols-7 gap-1 mb-2">
         {daysOfWeek.map(day => (
           <div key={day} className="h-8 flex items-center justify-center text-xs md:text-base font-bold text-[#F15629] uppercase tracking-wide">
@@ -303,5 +320,6 @@ const Calendar = ({
     </div>
   );
 };
+
 
 export default Calendar;

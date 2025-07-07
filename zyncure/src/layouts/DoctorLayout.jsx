@@ -121,7 +121,6 @@ export default function DoctorLayout() {
 
       let result;
       if (existingVerification) {
-        // Update existing record
         console.log('Updating existing verification record...');
         const { data: updateData, error: updateError } = await supabase
           .from('doctor_verifications')
@@ -134,6 +133,7 @@ export default function DoctorLayout() {
           })
           .eq('id', existingVerification.id) // Use the record ID instead of user_id
           .select('id, status, admin_notes');
+
 
         if (updateError) {
           console.error('Update error:', updateError);
@@ -157,28 +157,27 @@ export default function DoctorLayout() {
           })
           .select('id, status, admin_notes');
 
+
         if (insertError) {
           console.error('Insert error:', insertError);
           throw new Error(`Database insert error: ${insertError.message}`);
         }
 
+
         result = insertData;
         console.log('Insert successful:', result);
       }
 
+
       console.log('Verification record created/updated:', result);
 
-      // Close modal
       setVerificationModalOpen(false);
-
-      // Show success message
       alert('Verification submitted successfully! We will review your documents and notify you of the result.');
 
-      // Instead of reloading the page, trigger a re-fetch of user data
-      // This is more efficient and prevents UI flickering
       setTimeout(() => {
         window.location.reload();
       }, 1000);
+
 
     } catch (error) {
       console.error('Error submitting verification:', error);
@@ -196,10 +195,11 @@ export default function DoctorLayout() {
         }
       }
 
+
       const errorMsg = error.message || 'An unexpected error occurred. Please try again.';
       setErrorMessage(errorMsg);
 
-      // Show user-friendly error message
+      // Show error message
       if (error.message.includes('File upload failed')) {
         alert('Failed to upload file. Please check your internet connection and try again.');
       } else if (error.message.includes('Database')) {
@@ -212,16 +212,19 @@ export default function DoctorLayout() {
     }
   };
 
+
   // Auto-open verification modal for unverified doctors
   useEffect(() => {
     console.log('Modal effect - shouldShowVerificationModal:', shouldShowVerificationModal);
     console.log('Modal effect - verificationModalOpen:', verificationModalOpen);
+
 
     if (shouldShowVerificationModal && !verificationModalOpen) {
       console.log('Opening verification modal');
       setVerificationModalOpen(true);
     }
   }, [shouldShowVerificationModal, verificationModalOpen]);
+
 
   if (isLoading) {
     return (
@@ -231,12 +234,14 @@ export default function DoctorLayout() {
     );
   }
 
+
   // Verification status component
   const VerificationStatusBanner = () => {
     // Don't show banner for verified doctors
     if (user?.role !== 'doctor' || isVerified || verificationStatus === 'approved' || verificationStatus === 'verified') {
       return null;
     }
+
 
     const getStatusConfig = () => {
       switch (verificationStatus) {
@@ -271,7 +276,9 @@ export default function DoctorLayout() {
       }
     };
 
+
     const config = getStatusConfig();
+
 
     return (
       <div className={`${config.bgColor} ${config.borderColor} border-l-4 p-4 mb-4`}>
@@ -300,9 +307,9 @@ export default function DoctorLayout() {
     );
   };
 
+
   return (
-    <div className="min-h-screen bg-mainBg">
-      {/* Fixed Sidebar */}
+    <div className="flex min-h-screen">
       <Sidebar>
         <SidebarItem
           icon={<House size={20} />}
@@ -358,20 +365,23 @@ export default function DoctorLayout() {
         />
       </Sidebar>
 
-      {/* Fixed Navbar */}
-      <Navbar />
 
-      {/* Main Content Area - adjusted for fixed sidebar and navbar */}
-      <main className="ml-64 pt-16 p-6 text-gray-800 min-h-screen">
-        <VerificationStatusBanner />
-        <Outlet />
-      </main>
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-1">
+        <Navbar />
+        <main className="flex-1 w-full p-6 bg-mainBg text-gray-800">
+          <VerificationStatusBanner />
+          <Outlet />
+        </main>
+      </div>
+
 
       {/* Report Modal */}
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
       />
+
 
       {/* Verification Modal */}
       <DoctorVerificationModal
