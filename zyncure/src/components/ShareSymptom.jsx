@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../client';
 
+
 const ShareSymptom = ({ isOpen, onClose }) => {
   const [symptomsDuration, setSymptomsDuration] = useState('');
   const [connections, setConnections] = useState([]);
@@ -9,6 +10,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
   const [accessDuration, setAccessDuration] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
 
   useEffect(() => {
     const fetchConnections = async () => {
@@ -18,11 +20,13 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         return;
       }
 
+
       const { data, error } = await supabase
         .from('patient_connection_details')
         .select('*')
         .eq('status', 'accepted')
         .eq('patient_id', user.id);
+
 
       if (error) {
         console.error('Error fetching connections:', error.message);
@@ -31,14 +35,17 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       }
     };
 
+
     if (isOpen) {
       fetchConnections();
     }
   }, [isOpen]);
 
+
   const fetchSymptomData = async (userId, duration) => {
     const endDate = new Date();
     const startDate = new Date();
+
 
     // Calculate start date based on selected duration
     switch (duration) {
@@ -58,8 +65,10 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         startDate.setMonth(startDate.getMonth() - 1);
     }
 
+
     console.log('Fetching symptomlog data for user:', userId);
     console.log('Date range:', startDate.toISOString(), 'to', endDate.toISOString());
+
 
     // Fix: Use the correct column names that match your PeriodTracker
     const { data, error } = await supabase
@@ -70,12 +79,15 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       .lte('date_logged', endDate.toISOString())
       .order('date_logged', { ascending: false });
 
+
     if (error) {
       console.error('Error fetching symptomlog data:', error.message);
       return [];
     }
 
+
     console.log('Fetched symptomlog data:', data);
+
 
     // Transform data to match the structure expected by generatePDF
     const transformedData = (data || []).map(entry => ({
@@ -86,8 +98,10 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       ...entry
     }));
 
+
     return transformedData;
   };
+
 
   const fetchUserInfo = async (userId) => {
     // Fix: Use the same table structure as your PeriodTracker
@@ -96,6 +110,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       .select('first_name, last_name, email, birthdate')
       .eq('patient_id', userId) // Use the correct column name
       .single();
+
 
     if (error) {
       console.error('Error fetching user info:', error.message);
@@ -106,12 +121,14 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       };
     }
 
+
     return {
       name: data.first_name && data.last_name ? `${data.first_name} ${data.last_name}` : 'Patient',
       email: data.email || '',
       birthdate: data.birthdate || ''
     };
   };
+
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -122,11 +139,13 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       return;
     }
 
+
     if (!symptomsDuration || !selectedConnection || !accessDuration) {
       alert('Please fill out all fields.');
       setLoading(false);
       return;
     }
+
 
     try {
       // Fetch symptom data and user info
@@ -135,7 +154,9 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         fetchUserInfo(user.id)
       ]);
 
+
       console.log('Data to be included in PDF:', { loggedDates, userInfo });
+
 
       // Check if we have data to include
       if (!loggedDates || loggedDates.length === 0) {
@@ -144,21 +165,24 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         return;
       }
 
+
       // Use the existing generatePDF function from your utils
       const { generatePDF } = await import('../utils/generateTrackingReport');
-      
+     
       // Generate PDF using your existing function that already works
       await generatePDF(loggedDates, userInfo);
-      
+     
       // Read the generated file and convert to blob for upload
       const pdfBlob = await generatePDFBlob(loggedDates, userInfo, symptomsDuration);
-      
+     
       // Create filename for sharing
       const shareFileName = `symptoms-report-${user.id}-${Date.now()}.pdf`;
+
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('sharedsymptoms')
         .upload(shareFileName, pdfBlob, { contentType: 'application/pdf' });
+
 
       if (uploadError) {
         console.error('Upload error:', uploadError.message);
@@ -167,9 +191,11 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         return;
       }
 
+
       const { data: urlData } = supabase.storage
         .from('sharedsymptoms')
         .getPublicUrl(uploadData.path);
+
 
       const now = new Date();
       const expiresAt = (() => {
@@ -186,6 +212,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         }
       })();
 
+
       const { error: insertError } = await supabase.from('shared_symptoms').insert([
         {
           shared_by: user.id,
@@ -199,6 +226,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         }
       ]);
 
+
       if (insertError) {
         console.error('DB insert error:', insertError.message);
         alert(`Failed to save shared report: ${insertError.message}`);
@@ -209,23 +237,27 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         setShowSuccessModal(true);
       }
 
+
     } catch (error) {
       console.error('Error generating report:', error);
       alert(`Error generating report: ${error.message}`);
     }
 
+
     setLoading(false);
   };
+
 
   // Generate PDF blob using the same logic as your working generatePDF function
   const generatePDFBlob = async (loggedDates, userInfo, duration) => {
     const { jsPDF } = await import('jspdf');
-    
+   
     const doc = new jsPDF();
     let yPosition = 20;
     const pageHeight = doc.internal.pageSize.height;
     const margin = 20;
     const lineHeight = 7;
+
 
     // Helper function to add new page if needed
     const checkPageBreak = (requiredSpace = 30) => {
@@ -234,6 +266,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         yPosition = 20;
       }
     };
+
 
     // Helper function to add text with word wrapping
     const addWrappedText = (text, x, y, maxWidth) => {
@@ -244,35 +277,38 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       return lines.length * lineHeight;
     };
 
+
     // Title
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
     doc.text('Comprehensive Symptoms Report', 20, yPosition);
     yPosition += 15;
 
+
     // Patient Info
     doc.setFontSize(12);
     doc.setFont(undefined, 'normal');
     doc.text(`Patient: ${userInfo.name || 'Unknown'}`, 20, yPosition);
     yPosition += 8;
-    
+   
     if (userInfo.birthdate) {
       const birthdate = typeof userInfo.birthdate === 'string' ? userInfo.birthdate : new Date(userInfo.birthdate).toLocaleDateString();
       doc.text(`Birth Date: ${birthdate}`, 20, yPosition);
       yPosition += 8;
     }
-    
+   
     if (userInfo.email) {
       doc.text(`Email: ${userInfo.email}`, 20, yPosition);
       yPosition += 8;
     }
-    
+   
     doc.text(`Report Generated: ${new Date().toLocaleString()}`, 20, yPosition);
     yPosition += 8;
     doc.text(`Data Duration: ${duration}`, 20, yPosition);
     yPosition += 8;
     doc.text(`Total Entries: ${loggedDates.length}`, 20, yPosition);
     yPosition += 15;
+
 
     // Group data by category like your original PeriodTracker
     const groupedData = {};
@@ -284,6 +320,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       groupedData[category].push(entry);
     });
 
+
     // Summary Statistics
     checkPageBreak(40);
     doc.setFontSize(16);
@@ -291,52 +328,57 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     doc.text('Summary by Category', 20, yPosition);
     yPosition += 12;
 
+
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    
+   
     Object.keys(groupedData).forEach(category => {
       doc.text(`• ${category}: ${groupedData[category].length} entries`, 25, yPosition);
       yPosition += 6;
     });
     yPosition += 10;
 
+
     // Detailed Entries by Category
     Object.keys(groupedData).forEach(category => {
       checkPageBreak(40);
-      
+     
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
       doc.text(`${category} Entries`, 20, yPosition);
       yPosition += 10;
 
+
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
 
+
       groupedData[category].forEach((entry) => {
         checkPageBreak(25);
-        
+       
         // Entry date
         const entryDate = new Date(entry.date_logged);
         const dateStr = entryDate.toLocaleDateString();
         const timeStr = entryDate.toLocaleTimeString();
-        
+       
         doc.setFont(undefined, 'bold');
         doc.text(`${dateStr} at ${timeStr}`, 25, yPosition);
         yPosition += 6;
-        
+       
         doc.setFont(undefined, 'normal');
-        
+       
         // Severity/Value
         if (entry.severity && entry.severity !== 'N/A') {
           doc.text(`Value: ${entry.severity}`, 30, yPosition);
           yPosition += 6;
         }
-        
+       
         yPosition += 4; // Space between entries
       });
-      
+     
       yPosition += 8; // Space between categories
     });
+
 
     // Footer
     checkPageBreak(20);
@@ -347,10 +389,13 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     yPosition += 4;
     doc.text('Please handle according to your organization\'s privacy policies.', 20, yPosition);
 
+
     return doc.output('blob');
   };
 
+
   if (!isOpen) return null;
+
 
   return (
     <>
@@ -362,6 +407,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
           <h2 className="text-xl font-bold text-[#3BA4A0] mb-4">Share Symptoms Report</h2>
           <p className="text-sm text-gray-600 mb-6">Generate and share a comprehensive PDF report containing all your symptoms data.</p>
 
+
           <div className="space-y-4">
             <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
               <div className="flex items-center gap-2 mb-2">
@@ -372,6 +418,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 Includes: Period Flow, Symptoms, Feelings, Cravings, Energy, Weight, Custom entries
               </p>
             </div>
+
 
             <div>
               <label className="block text-sm font-semibold mb-1">Report data duration</label>
@@ -387,6 +434,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 <option value="5 months">5 months</option>
               </select>
             </div>
+
 
             <div>
               <label className="block text-sm font-semibold mb-1">Share with doctor</label>
@@ -404,6 +452,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
               </select>
             </div>
 
+
             <div>
               <label className="block text-sm font-semibold mb-1">Access duration</label>
               <select
@@ -418,6 +467,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 <option value="1 month">1 month</option>
               </select>
             </div>
+
 
             <div className="flex justify-between mt-6">
               <button
@@ -439,6 +489,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         </div>
       </div>
 
+
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center">
@@ -457,5 +508,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     </>
   );
 };
+
 
 export default ShareSymptom;
