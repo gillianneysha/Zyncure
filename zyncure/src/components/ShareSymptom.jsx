@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../client';
@@ -70,11 +72,10 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     console.log('Date range:', startDate.toISOString(), 'to', endDate.toISOString());
 
 
-    // Fix: Use the correct column names that match your PeriodTracker
     const { data, error } = await supabase
       .from('symptomlog')
       .select('*')
-      .eq('patients_id', userId) // Changed from 'patient_id' to 'patients_id'
+      .eq('patients_id', userId)
       .gte('date_logged', startDate.toISOString())
       .lte('date_logged', endDate.toISOString())
       .order('date_logged', { ascending: false });
@@ -92,9 +93,8 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     // Transform data to match the structure expected by generatePDF
     const transformedData = (data || []).map(entry => ({
       date_logged: entry.date_logged,
-      symptoms: entry.symptoms, // This matches your PeriodTracker structure
+      symptoms: entry.symptoms,
       severity: entry.severity,
-      // Keep the original structure that works with your existing generatePDF function
       ...entry
     }));
 
@@ -104,11 +104,10 @@ const ShareSymptom = ({ isOpen, onClose }) => {
 
 
   const fetchUserInfo = async (userId) => {
-    // Fix: Use the same table structure as your PeriodTracker
     const { data, error } = await supabase
-      .from('patients') // Changed from 'profiles' to 'patients'
+      .from('patients')
       .select('first_name, last_name, email, birthdate')
-      .eq('patient_id', userId) // Use the correct column name
+      .eq('patient_id', userId)
       .single();
 
 
@@ -166,14 +165,11 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       }
 
 
-      // Use the existing generatePDF function from your utils
-      const { generatePDF } = await import('../utils/generateTrackingReport');
+      // Import the generatePDFAsBlob function
+      const { generatePDFAsBlob } = await import('../utils/generateTrackingReport');
      
-      // Generate PDF using your existing function that already works
-      await generatePDF(loggedDates, userInfo);
-     
-      // Read the generated file and convert to blob for upload
-      const pdfBlob = await generatePDFBlob(loggedDates, userInfo, symptomsDuration);
+      // Generate PDF blob using the updated function
+      const pdfBlob = await generatePDFAsBlob(loggedDates, userInfo);
      
       // Create filename for sharing
       const shareFileName = `symptoms-report-${user.id}-${Date.now()}.pdf`;
@@ -245,152 +241,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
 
 
     setLoading(false);
-  };
-
-
-  // Generate PDF blob using the same logic as your working generatePDF function
-  const generatePDFBlob = async (loggedDates, userInfo, duration) => {
-    const { jsPDF } = await import('jspdf');
-   
-    const doc = new jsPDF();
-    let yPosition = 20;
-    const pageHeight = doc.internal.pageSize.height;
-    const margin = 20;
-    const lineHeight = 7;
-
-
-    // Helper function to add new page if needed
-    const checkPageBreak = (requiredSpace = 30) => {
-      if (yPosition + requiredSpace > pageHeight - margin) {
-        doc.addPage();
-        yPosition = 20;
-      }
-    };
-
-
-    // Helper function to add text with word wrapping
-    const addWrappedText = (text, x, y, maxWidth) => {
-      const lines = doc.splitTextToSize(text, maxWidth);
-      lines.forEach((line, lineIndex) => {
-        doc.text(line, x, y + (lineIndex * lineHeight));
-      });
-      return lines.length * lineHeight;
-    };
-
-
-    // Title
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text('Comprehensive Symptoms Report', 20, yPosition);
-    yPosition += 15;
-
-
-    // Patient Info
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Patient: ${userInfo.name || 'Unknown'}`, 20, yPosition);
-    yPosition += 8;
-   
-    if (userInfo.birthdate) {
-      const birthdate = typeof userInfo.birthdate === 'string' ? userInfo.birthdate : new Date(userInfo.birthdate).toLocaleDateString();
-      doc.text(`Birth Date: ${birthdate}`, 20, yPosition);
-      yPosition += 8;
-    }
-   
-    if (userInfo.email) {
-      doc.text(`Email: ${userInfo.email}`, 20, yPosition);
-      yPosition += 8;
-    }
-   
-    doc.text(`Report Generated: ${new Date().toLocaleString()}`, 20, yPosition);
-    yPosition += 8;
-    doc.text(`Data Duration: ${duration}`, 20, yPosition);
-    yPosition += 8;
-    doc.text(`Total Entries: ${loggedDates.length}`, 20, yPosition);
-    yPosition += 15;
-
-
-    // Group data by category like your original PeriodTracker
-    const groupedData = {};
-    loggedDates.forEach(entry => {
-      const category = entry.symptoms || 'Other';
-      if (!groupedData[category]) {
-        groupedData[category] = [];
-      }
-      groupedData[category].push(entry);
-    });
-
-
-    // Summary Statistics
-    checkPageBreak(40);
-    doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
-    doc.text('Summary by Category', 20, yPosition);
-    yPosition += 12;
-
-
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-   
-    Object.keys(groupedData).forEach(category => {
-      doc.text(`• ${category}: ${groupedData[category].length} entries`, 25, yPosition);
-      yPosition += 6;
-    });
-    yPosition += 10;
-
-
-    // Detailed Entries by Category
-    Object.keys(groupedData).forEach(category => {
-      checkPageBreak(40);
-     
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text(`${category} Entries`, 20, yPosition);
-      yPosition += 10;
-
-
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-
-
-      groupedData[category].forEach((entry) => {
-        checkPageBreak(25);
-       
-        // Entry date
-        const entryDate = new Date(entry.date_logged);
-        const dateStr = entryDate.toLocaleDateString();
-        const timeStr = entryDate.toLocaleTimeString();
-       
-        doc.setFont(undefined, 'bold');
-        doc.text(`${dateStr} at ${timeStr}`, 25, yPosition);
-        yPosition += 6;
-       
-        doc.setFont(undefined, 'normal');
-       
-        // Severity/Value
-        if (entry.severity && entry.severity !== 'N/A') {
-          doc.text(`Value: ${entry.severity}`, 30, yPosition);
-          yPosition += 6;
-        }
-       
-        yPosition += 4; // Space between entries
-      });
-     
-      yPosition += 8; // Space between categories
-    });
-
-
-    // Footer
-    checkPageBreak(20);
-    yPosition += 10;
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'italic');
-    doc.text('This report was generated from symptom tracking data and contains confidential medical information.', 20, yPosition);
-    yPosition += 4;
-    doc.text('Please handle according to your organization\'s privacy policies.', 20, yPosition);
-
-
-    return doc.output('blob');
   };
 
 
