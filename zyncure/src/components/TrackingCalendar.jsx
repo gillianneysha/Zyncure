@@ -1,14 +1,14 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
-const TrackingCalendar = ({
-  currentDate = new Date(),
+
+const Calendar = ({
+  currentDate,
   selectedDate,
-  appointments = [],
-  loggedDates = [], // Add this prop for tracking data
-  onDateSelect = () => {},
-  onMonthNavigate = () => {},
-  onMonthYearChange
+  loggedDates = [], // Changed from appointments to loggedDates
+  onDateSelect,
+  onMonthNavigate,
+  onMonthYearChange // optional, for parent to handle
 }) => {
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -16,25 +16,51 @@ const TrackingCalendar = ({
   ];
   const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+
   const [showPicker, setShowPicker] = useState(false);
-  const [pickerMonth, setPickerMonth] = useState(currentDate?.getMonth() || new Date().getMonth());
-  const [pickerYear, setPickerYear] = useState(currentDate?.getFullYear() || new Date().getFullYear());
+  const [pickerMonth, setPickerMonth] = useState(currentDate.getMonth());
+  const [pickerYear, setPickerYear] = useState(currentDate.getFullYear());
+
+
+  // Define symptom categories and their colors based on your app's categories
+  const symptomColors = {
+    'period flow': '#E91E63',    // Pink for period tracking
+    'period_flow': '#E91E63',    // Alternative naming
+    'symptoms': '#FF6B6B',       // Coral red for general symptoms
+    'symptom': '#FF6B6B',        // Alternative naming
+    'feelings': '#9C27B0',       // Purple for emotional tracking
+    'mood': '#9C27B0',           // Alternative naming
+    'emotions': '#9C27B0',       // Alternative naming
+    'cravings': '#FF9800',       // Orange for food cravings
+    'craving': '#FF9800',        // Alternative naming
+    'food': '#FF9800',           // Alternative naming
+    'energy': '#4CAF50',         // Green for energy levels
+    'energy_level': '#4CAF50',   // Alternative naming
+    'fatigue': '#4CAF50',        // Related to energy
+    'weight': '#2196F3',         // Blue for weight tracking
+    'weight_change': '#2196F3',  // Alternative naming
+    'custom': '#607D8B',         // Blue-gray for custom entries
+    'other': '#607D8B'           // Gray for miscellaneous
+  };
+
 
   const formatDate = (date) => date.toISOString().split('T')[0];
+
 
   const isSameDate = (date1, date2) => {
     if (!date1 || !date2) return false;
     return formatDate(date1) === formatDate(date2);
   };
 
+
   const getDaysInMonth = (date) => {
-    const validDate = date || new Date();
-    const year = validDate.getFullYear();
-    const month = validDate.getMonth();
+    const year = date.getFullYear();
+    const month = date.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
+
 
     const days = [];
     for (let i = 0; i < startingDayOfWeek; i++) days.push(null);
@@ -42,77 +68,145 @@ const TrackingCalendar = ({
     return days;
   };
 
-  const getAppointmentsForDate = (date) => {
+
+  // Updated function to check for logged symptoms on a specific date
+  const getLoggedSymptomsForDate = (date) => {
     const dateStr = formatDate(date);
-    return appointments.filter(apt => apt.date === dateStr);
+    return loggedDates.filter(entry => {
+      const entryDate = new Date(entry.date_logged);
+      return formatDate(entryDate) === dateStr;
+    });
   };
 
-  // Enhanced dot logic from period tracker
-  const getTrackingDotsForDate = (date) => {
-    const normalized = new Date(date);
-    normalized.setHours(0, 0, 0, 0);
 
-    const matches = loggedDates.filter((entry) => {
-      const entryDate = new Date(entry.date_logged);
-      entryDate.setHours(0, 0, 0, 0);
-      return entryDate.getTime() === normalized.getTime();
-    });
+  // Get unique symptom types for a specific date
+  const getUniqueSymptomTypes = (date) => {
+    const symptoms = getLoggedSymptomsForDate(date);
+    const uniqueTypes = [...new Set(symptoms.map(symptom => {
+      // Extract symptom type from symptom object
+      // Check for various possible property names
+      if (symptom.category) return symptom.category.toLowerCase().replace(/\s+/g, '_');
+      if (symptom.type) return symptom.type.toLowerCase().replace(/\s+/g, '_');
+      if (symptom.symptom_type) return symptom.symptom_type.toLowerCase().replace(/\s+/g, '_');
+      if (symptom.name) return symptom.name.toLowerCase().replace(/\s+/g, '_');
+      // Handle specific app categories
+      if (symptom.period_flow) return 'period_flow';
+      if (symptom.symptoms) return 'symptoms';
+      if (symptom.feelings) return 'feelings';
+      if (symptom.cravings) return 'cravings';
+      if (symptom.energy) return 'energy';
+      if (symptom.weight) return 'weight';
+      if (symptom.custom) return 'custom';
+      return 'other';
+    }))];
+    return uniqueTypes;
+  };
 
-    if (matches.length === 0) return null;
 
-    const colorMap = {
-      Period: '#B65C4B',
-      Feelings: '#3BA4A0',
-      Skin: '#F98679',
-      Metabolism: '#FFD800',
+  // Check if a date has any logged symptoms
+  const hasLoggedSymptoms = (date) => {
+    return getLoggedSymptomsForDate(date).length > 0;
+  };
+
+
+  // Helper function to determine symptom type from data
+  const getSymptomType = (symptom) => {
+    // Debug: log the symptom object to see its structure
+    console.log('Symptom object:', symptom);
+   
+    // Check all possible property names and values
+    const checkValue = (value) => {
+      if (!value) return null;
+      const val = value.toString().toLowerCase().replace(/\s+/g, '_');
+     
+      // Direct matches
+      if (val.includes('period') || val.includes('flow')) return 'period_flow';
+      if (val.includes('symptom')) return 'symptoms';
+      if (val.includes('feeling') || val.includes('mood') || val.includes('emotion')) return 'feelings';
+      if (val.includes('craving') || val.includes('food')) return 'cravings';
+      if (val.includes('energy') || val.includes('fatigue')) return 'energy';
+      if (val.includes('weight')) return 'weight';
+      if (val.includes('custom')) return 'custom';
+     
+      // Check if the value exactly matches our color keys
+      if (symptomColors[val]) return val;
+     
+      return null;
     };
+   
+    // Check all properties of the symptom object
+    for (const [key, value] of Object.entries(symptom)) {
+      const result = checkValue(value);
+      if (result) return result;
+     
+      // Also check the property name itself
+      const keyResult = checkValue(key);
+      if (keyResult) return keyResult;
+    }
+   
+    return 'other';
+  };
 
-    const uniqueSymptoms = [...new Set(matches.map((m) => m.symptoms))];
 
+  // Render symptom dots for a specific date - shows total count of symptoms
+  const renderSymptomDots = (date) => {
+    const allSymptoms = getLoggedSymptomsForDate(date);
+    if (allSymptoms.length === 0) return null;
+
+
+    // Create dots for each individual symptom entry
+    const dots = [];
+    allSymptoms.forEach((symptom, index) => {
+      const symptomType = getSymptomType(symptom);
+      const color = symptomColors[symptomType] || symptomColors.other;
+     
+      // Debug: log the determined type and color
+      console.log(`Symptom ${index + 1}:`, symptomType, 'Color:', color);
+     
+      dots.push(
+        <div
+          key={index}
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ backgroundColor: color }}
+          title={`${symptomType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}: Entry ${index + 1}`}
+        />
+      );
+    });
+   
     return (
-      <div 
-        className="flex justify-center mt-0.5 space-x-0.5 flex-wrap max-w-full"
-        title={uniqueSymptoms.join(', ')}
-      >
-        {uniqueSymptoms.slice(0, 3).map((symptom, idx) => (
-          <span
-            key={idx}
-            className="block h-1.5 w-1.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: colorMap[symptom] || '#999' }}
-          />
-        ))}
-        {uniqueSymptoms.length > 3 && (
-          <span className="text-xs font-bold text-gray-600">+</span>
-        )}
+      <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5 flex-wrap justify-center max-w-12">
+        {dots}
       </div>
     );
   };
 
+
   // Today's date (normalized to 00:00:00)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
 
   const renderCalendar = () => {
     const days = getDaysInMonth(currentDate);
     const weeks = [];
     for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
+
     return weeks.map((week, weekIndex) => (
       <div key={weekIndex} className="grid grid-cols-7 gap-1">
         {week.map((day, dayIndex) => {
           if (!day) return <div key={dayIndex} className="h-12" />;
-          
           const isFuture = day > today;
           const isSelected = isSameDate(day, selectedDate);
           const isToday = isSameDate(day, today);
-          const hasAppointments = getAppointmentsForDate(day).length > 0;
-          const trackingDots = getTrackingDotsForDate(day);
+          const hasSymptoms = hasLoggedSymptoms(day);
+
 
           return (
             <div
               key={dayIndex}
               className={`
-                h-12 w-12 md:h-16 md:w-16 flex flex-col items-center justify-center text-base md:text-lg cursor-pointer relative select-none
+                h-12 w-12 md:h-16 md:w-16 flex items-center justify-center text-base md:text-lg cursor-pointer relative select-none
                 transition-all duration-150
                 ${isFuture ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}
                 ${isSelected && !isFuture ? 'bg-[#55A1A4] text-white rounded-full scale-110 shadow-lg' : ''}
@@ -123,18 +217,8 @@ const TrackingCalendar = ({
               aria-disabled={isFuture}
               tabIndex={isFuture ? -1 : 0}
             >
-              <span className="leading-none">{day.getDate()}</span>
-              
-              {/* Container for both appointment and tracking dots */}
-              <div className="flex flex-col items-center space-y-0.5 mt-0.5">
-                {/* Appointment dot (kept as single dot) */}
-                {hasAppointments && (
-                  <div className="w-1.5 h-1.5 bg-[#3BA4A0] rounded-full flex-shrink-0"></div>
-                )}
-                
-                {/* Tracking dots (multi-category) */}
-                {trackingDots}
-              </div>
+              {day.getDate()}
+              {hasSymptoms && renderSymptomDots(day)}
             </div>
           );
         })}
@@ -142,9 +226,11 @@ const TrackingCalendar = ({
     ));
   };
 
+
   // Picker years range
   const years = [];
   for (let y = today.getFullYear() - 10; y <= today.getFullYear() + 1; y++) years.push(y);
+
 
   const handlePickerApply = () => {
     setShowPicker(false);
@@ -154,6 +240,7 @@ const TrackingCalendar = ({
       onMonthNavigate(0, pickerMonth, pickerYear);
     }
   };
+
 
   return (
     <div className="bg-[#FFD4C3] rounded-2xl p-6 md:p-8 shadow-lg max-w-2xl w-full mx-auto">
@@ -171,7 +258,7 @@ const TrackingCalendar = ({
             onClick={() => setShowPicker(v => !v)}
             type="button"
           >
-            {months[currentDate?.getMonth() || new Date().getMonth()]} {currentDate?.getFullYear() || new Date().getFullYear()}
+            {months[currentDate.getMonth()]} {currentDate.getFullYear()}
           </button>
           {showPicker && (
             <div className="absolute z-50 mt-12 bg-white border rounded-xl shadow-lg p-4 flex flex-col items-center">
@@ -199,9 +286,11 @@ const TrackingCalendar = ({
                 className="bg-[#55A1A4] text-white px-4 py-1 rounded-full font-semibold"
                 onClick={() => {
                   setShowPicker(false);
+                  // Update parent calendar state
                   if (onMonthYearChange) {
                     onMonthYearChange(pickerMonth, pickerYear);
                   } else if (onMonthNavigate) {
+                    // Fallback: update currentDate in parent
                     onMonthNavigate(0, pickerMonth, pickerYear);
                   }
                 }}
@@ -232,4 +321,5 @@ const TrackingCalendar = ({
   );
 };
 
-export default TrackingCalendar;
+
+export default Calendar;
