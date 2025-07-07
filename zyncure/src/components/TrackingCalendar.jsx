@@ -1,13 +1,14 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
-const Calendar = ({
-  currentDate,
+const TrackingCalendar = ({
+  currentDate = new Date(),
   selectedDate,
   appointments = [],
-  onDateSelect,
-  onMonthNavigate,
-  onMonthYearChange // optional, for parent to handle
+  loggedDates = [], // Add this prop for tracking data
+  onDateSelect = () => {},
+  onMonthNavigate = () => {},
+  onMonthYearChange
 }) => {
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -16,8 +17,8 @@ const Calendar = ({
   const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
   const [showPicker, setShowPicker] = useState(false);
-  const [pickerMonth, setPickerMonth] = useState(currentDate.getMonth());
-  const [pickerYear, setPickerYear] = useState(currentDate.getFullYear());
+  const [pickerMonth, setPickerMonth] = useState(currentDate?.getMonth() || new Date().getMonth());
+  const [pickerYear, setPickerYear] = useState(currentDate?.getFullYear() || new Date().getFullYear());
 
   const formatDate = (date) => date.toISOString().split('T')[0];
 
@@ -27,8 +28,9 @@ const Calendar = ({
   };
 
   const getDaysInMonth = (date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
+    const validDate = date || new Date();
+    const year = validDate.getFullYear();
+    const month = validDate.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
@@ -45,6 +47,47 @@ const Calendar = ({
     return appointments.filter(apt => apt.date === dateStr);
   };
 
+  // Enhanced dot logic from period tracker
+  const getTrackingDotsForDate = (date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+
+    const matches = loggedDates.filter((entry) => {
+      const entryDate = new Date(entry.date_logged);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() === normalized.getTime();
+    });
+
+    if (matches.length === 0) return null;
+
+    const colorMap = {
+      Period: '#B65C4B',
+      Feelings: '#3BA4A0',
+      Skin: '#F98679',
+      Metabolism: '#FFD800',
+    };
+
+    const uniqueSymptoms = [...new Set(matches.map((m) => m.symptoms))];
+
+    return (
+      <div 
+        className="flex justify-center mt-0.5 space-x-0.5 flex-wrap max-w-full"
+        title={uniqueSymptoms.join(', ')}
+      >
+        {uniqueSymptoms.slice(0, 3).map((symptom, idx) => (
+          <span
+            key={idx}
+            className="block h-1.5 w-1.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: colorMap[symptom] || '#999' }}
+          />
+        ))}
+        {uniqueSymptoms.length > 3 && (
+          <span className="text-xs font-bold text-gray-600">+</span>
+        )}
+      </div>
+    );
+  };
+
   // Today's date (normalized to 00:00:00)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -58,16 +101,18 @@ const Calendar = ({
       <div key={weekIndex} className="grid grid-cols-7 gap-1">
         {week.map((day, dayIndex) => {
           if (!day) return <div key={dayIndex} className="h-12" />;
+          
           const isFuture = day > today;
           const isSelected = isSameDate(day, selectedDate);
           const isToday = isSameDate(day, today);
           const hasAppointments = getAppointmentsForDate(day).length > 0;
+          const trackingDots = getTrackingDotsForDate(day);
 
           return (
             <div
               key={dayIndex}
               className={`
-                h-12 w-12 md:h-16 md:w-16 flex items-center justify-center text-base md:text-lg cursor-pointer relative select-none
+                h-12 w-12 md:h-16 md:w-16 flex flex-col items-center justify-center text-base md:text-lg cursor-pointer relative select-none
                 transition-all duration-150
                 ${isFuture ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}
                 ${isSelected && !isFuture ? 'bg-[#55A1A4] text-white rounded-full scale-110 shadow-lg' : ''}
@@ -78,10 +123,18 @@ const Calendar = ({
               aria-disabled={isFuture}
               tabIndex={isFuture ? -1 : 0}
             >
-              {day.getDate()}
-              {hasAppointments && (
-                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-teal-400 rounded-full"></div>
-              )}
+              <span className="leading-none">{day.getDate()}</span>
+              
+              {/* Container for both appointment and tracking dots */}
+              <div className="flex flex-col items-center space-y-0.5 mt-0.5">
+                {/* Appointment dot (kept as single dot) */}
+                {hasAppointments && (
+                  <div className="w-1.5 h-1.5 bg-[#3BA4A0] rounded-full flex-shrink-0"></div>
+                )}
+                
+                {/* Tracking dots (multi-category) */}
+                {trackingDots}
+              </div>
             </div>
           );
         })}
@@ -118,7 +171,7 @@ const Calendar = ({
             onClick={() => setShowPicker(v => !v)}
             type="button"
           >
-            {months[currentDate.getMonth()]} {currentDate.getFullYear()}
+            {months[currentDate?.getMonth() || new Date().getMonth()]} {currentDate?.getFullYear() || new Date().getFullYear()}
           </button>
           {showPicker && (
             <div className="absolute z-50 mt-12 bg-white border rounded-xl shadow-lg p-4 flex flex-col items-center">
@@ -146,11 +199,9 @@ const Calendar = ({
                 className="bg-[#55A1A4] text-white px-4 py-1 rounded-full font-semibold"
                 onClick={() => {
                   setShowPicker(false);
-                  // Update parent calendar state
                   if (onMonthYearChange) {
                     onMonthYearChange(pickerMonth, pickerYear);
                   } else if (onMonthNavigate) {
-                    // Fallback: update currentDate in parent
                     onMonthNavigate(0, pickerMonth, pickerYear);
                   }
                 }}
@@ -181,4 +232,4 @@ const Calendar = ({
   );
 };
 
-export default Calendar;
+export default TrackingCalendar;
