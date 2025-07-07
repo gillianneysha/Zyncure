@@ -19,7 +19,7 @@ const PatientCharts = () => {
         try {
             // Get current user
             const { data: { user }, error: authError } = await supabase.auth.getUser();
-            
+
             if (authError || !user) {
                 console.error('Auth error:', authError?.message);
                 setLoading(false);
@@ -41,7 +41,7 @@ const PatientCharts = () => {
             } else {
                 setSymptomData(symptomLogs || []);
             }
-            
+
         } catch (err) {
             console.error('Unexpected error in fetchSymptomData:', err);
             setSymptomData([]);
@@ -66,9 +66,9 @@ const PatientCharts = () => {
             .map(([name, value]) => ({
                 name,
                 value,
-                color: name === 'Light' ? '#FFB6C1' : 
-                       name === 'Moderate' ? '#FF69B4' : 
-                       name === 'Heavy' ? '#DC143C' : '#8B0000'
+                color: name === 'Light' ? '#FFB6C1' :
+                    name === 'Moderate' ? '#FF69B4' :
+                        name === 'Heavy' ? '#DC143C' : '#8B0000'
             }))
             .filter(item => item.value > 0);
     };
@@ -101,11 +101,11 @@ const PatientCharts = () => {
             .sort((a, b) => new Date(a.date_logged) - new Date(b.date_logged));
 
         return feelingsData.map(item => {
-            const date = new Date(item.date_logged).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric' 
+            const date = new Date(item.date_logged).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
             });
-            
+
             // Convert mood to numeric value for charting
             const moodValue = {
                 'Energized': 5,
@@ -132,11 +132,11 @@ const PatientCharts = () => {
             .sort((a, b) => new Date(a.date_logged) - new Date(b.date_logged));
 
         return energyData.map(item => {
-            const date = new Date(item.date_logged).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric' 
+            const date = new Date(item.date_logged).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
             });
-            
+
             const energyValue = {
                 'energetic': 4,
                 'ok': 3,
@@ -159,11 +159,11 @@ const PatientCharts = () => {
             .sort((a, b) => new Date(a.date_logged) - new Date(b.date_logged));
 
         return weightData.map(item => {
-            const date = new Date(item.date_logged).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric' 
+            const date = new Date(item.date_logged).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
             });
-            
+
             // Extract numeric weight value
             const weightMatch = item.severity.match(/(\d+(?:\.\d+)?)/);
             const weight = weightMatch ? parseFloat(weightMatch[1]) : null;
@@ -252,11 +252,11 @@ const PatientCharts = () => {
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Your PCOS Health Dashboard</h2>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Period Flow Distribution */}
                 {periodFlowData.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-pink-100">
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-pink-100 chart-container" data-chart-title="Period Flow Patterns">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                             <span className="w-3 h-3 bg-pink-500 rounded-full mr-2"></span>
                             Period Flow Patterns
@@ -288,7 +288,7 @@ const PatientCharts = () => {
 
                 {/* PCOS Symptoms Frequency */}
                 {symptomFrequencyData.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-orange-100">
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-orange-100 chart-container" data-chart-title="Most Common Symptoms">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                             <span className="w-3 h-3 bg-orange-500 rounded-full mr-2"></span>
                             Most Common Symptoms
@@ -297,13 +297,13 @@ const PatientCharts = () => {
                             <BarChart data={symptomFrequencyData} layout="horizontal">
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis type="number" />
-                                <YAxis 
-                                    dataKey="symptom" 
-                                    type="category" 
+                                <YAxis
+                                    dataKey="symptom"
+                                    type="category"
                                     width={80}
                                     tick={{ fontSize: 12 }}
                                 />
-                                <Tooltip 
+                                <Tooltip
                                     formatter={(value) => [value, 'Frequency']}
                                     labelFormatter={(label, payload) => {
                                         const item = payload?.[0]?.payload;
@@ -321,7 +321,7 @@ const PatientCharts = () => {
 
                 {/* Mood Timeline */}
                 {moodTimelineData.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-100">
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-100 chart-container" data-chart-title="Mood Tracking Over Time">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                             <span className="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
                             Mood Tracking Over Time
@@ -358,7 +358,7 @@ const PatientCharts = () => {
 
                 {/* Energy Levels */}
                 {energyLevelsData.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-green-100">
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-green-100 chart-container" data-chart-title="Energy Level Trends">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                             <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
                             Energy Level Trends
@@ -394,7 +394,7 @@ const PatientCharts = () => {
 
                 {/* Weight Tracking */}
                 {weightData.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-100">
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-100 chart-container" data-chart-title="Weight Management Progress">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                             <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
                             Weight Management Progress
@@ -406,7 +406,7 @@ const PatientCharts = () => {
                                 <YAxis />
                                 <Tooltip
                                     formatter={(value, name, props) => [
-                                        `${value} ${props.payload.unit}`, 
+                                        `${value} ${props.payload.unit}`,
                                         'Weight'
                                     ]}
                                 />
@@ -428,7 +428,7 @@ const PatientCharts = () => {
 
                 {/* Cravings Distribution */}
                 {cravingsData.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg p-6 border border-yellow-100">
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-yellow-100 chart-container" data-chart-title="Food Cravings Pattern">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                             <span className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
                             Food Cravings Pattern
@@ -448,9 +448,6 @@ const PatientCharts = () => {
                     </div>
                 )}
             </div>
-
-           
-           
         </div>
     );
 };

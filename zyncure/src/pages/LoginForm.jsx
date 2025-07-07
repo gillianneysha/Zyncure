@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../client";
+import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
 
@@ -100,9 +101,9 @@ export default function LoginForm({ setToken }) {
     return "/home";
   };
 
-  const handleSubmit = useCallback(async (event) => {
+  // Regular email/password login
+  const handleSubmit = async (event) => {
     event.preventDefault();
-
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -116,57 +117,28 @@ export default function LoginForm({ setToken }) {
       });
 
       if (error) {
+        if (error.message.includes("mfa")) {
+          // Handle MFA challenge
+          setMfaChallenge(error.mfa_challenge);
+          return;
+        }
         throw error;
       }
 
-      // Check if user has MFA factors
-      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
-
-      if (factorsError) {
-        console.error("Error checking MFA factors:", factorsError);
-        // If we can't check factors, proceed without MFA
-        setToken(data);
-        const redirectPath = getRedirectPath(data.user);
-        navigate(redirectPath);
-        return;
-      }
-
-      // Find verified TOTP factor
-      const totpFactor = factors.factors?.find(f => f.factor_type === "totp" && f.status === "verified");
-
-      if (totpFactor) {
-        // User has MFA enabled, initiate challenge
-        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-          factorId: totpFactor.id
-        });
-
-        if (challengeError) {
-          console.error("MFA challenge error:", challengeError);
-          throw challengeError;
-        }
-
-        setMfaChallenge({
-          challengeId: challengeData.id,
-          factorId: totpFactor.id,
-          userData: data // Store user data for after MFA verification
-        });
-        return;
-      }
-
-      // No MFA enabled, proceed with normal login
-      setToken(data);
+      // Login successful
+      setToken(data.session);
       const redirectPath = getRedirectPath(data.user);
       navigate(redirectPath);
 
     } catch (error) {
       console.error("Login error:", error);
       setErrors({
-        submit: error.message || "Login failed. Please check your credentials and try again."
+        submit: error.message || "Login failed. Please try again."
       });
     } finally {
       setIsLoading(false);
     }
-  }, [formData, validateForm, setToken, navigate]);
+  };
 
   const handleGoogleSignIn = useCallback(async () => {
     try {
@@ -235,7 +207,7 @@ export default function LoginForm({ setToken }) {
       }
 
       // MFA verification successful
-      setToken(data);
+      setToken(data.session);
       const redirectPath = getRedirectPath(data.user);
       navigate(redirectPath);
 
@@ -248,132 +220,127 @@ export default function LoginForm({ setToken }) {
   };
 
   return (
-    <form onSubmit={mfaChallenge ? handleMfaSubmit : handleSubmit}>
-      {/* Error Message */}
-      {errors.submit && (
-        <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
-          {errors.submit}
-        </div>
-      )}
+    <>
+      <form onSubmit={mfaChallenge ? handleMfaSubmit : handleSubmit}>
+        {/* Error Message */}
+        {errors.submit && (
+          <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
+            {errors.submit}
+          </div>
+        )}
 
-      {!mfaChallenge && (
-        <>
-          <FormField
-            label="Email"
-            name="email"
-            type="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            error={errors.email}
-            disabled={isLoading}
-          />
-
-          <div className="w-4/5 mx-auto">
-            <PasswordInput
-              label="Password:"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Password"
-              error={errors.password}
+        {/* MFA Challenge Form */}
+        {mfaChallenge && (
+          <div className="w-4/5 mx-auto mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2 text-blue-800">Two-Factor Authentication</h3>
+            <p className="text-sm text-blue-600 mb-3">
+              Please enter the verification code from your authenticator app.
+            </p>
+            <input
+              type="text"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value)}
+              placeholder="Enter 6-digit code"
+              className="w-full p-2 border border-blue-300 rounded-lg mb-2"
+              maxLength="6"
               disabled={isLoading}
-              labelClassName = "text-[#F5E0D9]"
             />
+            {mfaError && (
+              <p className="text-sm text-red-600 mb-2">{mfaError}</p>
+            )}
           </div>
+        )}
 
-          <div className="w-4/5 mx-auto flex items-center justify-end mb-4">
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-xs text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+        {/* Regular Login Form */}
+        {!mfaChallenge && (
+          <>
+            <FormField
+              label="Email"
+              name="email"
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleChange}
+              error={errors.email}
               disabled={isLoading}
-            >
-              Forgot Password?
-            </button>
-          </div>
+              labelClassName="text-[#F5E0D9]"
+              inputClassName="bg-[#FFEDE7]"
+            />
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-4/5 block mx-auto py-2 mt-4 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${isLoading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#55A1A4] hover:bg-[#368487]"
-              }`}
-          >
-            {isLoading ? "Logging In..." : "Log In"}
-          </button>
-
-          <div className="w-4/5 mx-auto mt-2 text-left">
-            <span className="text-[#F5E0D9] text-sm">
-              Don't have an account?{" "}
-              <a
-                href="/register"
-                className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
-              >
-                Register Here
-              </a>
-            </span>
-          </div>
-
-          <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
-            <div className="flex items-center justify-center my-4">
-              <div className="flex-grow h-px bg-[#FEDED2]"></div>
-              <span className="px-2">OR</span>
-              <div className="flex-grow h-px bg-[#FEDED2]"></div>
+            <div className="w-4/5 mx-auto">
+              <PasswordInput
+                label="Password:"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Password"
+                error={errors.password}
+                disabled={isLoading}
+                labelClassName="text-[#F5E0D9]"
+                inputClassName="bg-[#FFEDE7]"
+              />
             </div>
 
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Sign in with Google"
-              disabled={isLoading}
-            >
-              <GoogleIcon className="w-10 h-10" />
-            </button>
-            <p className="mt-2">Log in using your Google account</p>
-          </div>
-        </>
-      )}
+            <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
+              <div />
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+                disabled={isLoading}
+              >
+                Forgot Password?
+              </button>
+            </div>
+          </>
+        )}
 
-      {mfaChallenge && (
-        <div className="w-4/5 mx-auto mt-4 p-4 bg-[#FFEDE7] rounded-lg shadow-md">
-          <p className="text-[#333] text-sm mb-2">
-            Two-factor authentication is enabled. Please enter the code from your authenticator app.
-          </p>
-          <FormField
-            label="MFA Code"
-            name="mfaCode"
-            type="text"
-            placeholder="Enter your MFA code"
-            value={mfaCode}
-            onChange={e => setMfaCode(e.target.value)}
-            error={mfaError}
-            disabled={isLoading}
-            labelClassName="text-[#333]"
-            inputClassName="bg-white"
-          />
-          <button
-            type="submit"
-            className="w-full py-2 mt-2 text-white bg-[#55A1A4] rounded-lg font-semibold transition-colors duration-200 hover:bg-[#368487]"
-            disabled={isLoading}
-          >
-            {isLoading ? "Verifying..." : "Verify MFA Code"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMfaChallenge(null);
-              setMfaCode("");
-              setMfaError("");
-            }}
-            className="w-full py-2 mt-2 text-[#55A1A4] bg-transparent border border-[#55A1A4] rounded-lg font-semibold transition-colors duration-200 hover:bg-[#55A1A4] hover:text-white"
-          >
-            Back to Login
-          </button>
-        </div>
-      )}
-    </form>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className={`w-4/5 block mx-auto py-2 mt-4 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${isLoading
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-[#55A1A4] hover:bg-[#368487]"
+            }`}
+        >
+          {isLoading ? "Logging in..." : (mfaChallenge ? "Verify Code" : "Log In")}
+        </button>
+
+        {!mfaChallenge && (
+          <>
+            <div className="w-4/5 mx-auto mt-2 text-left">
+              <span className="text-[#F5E0D9] text-sm">
+                Don't have an account?{" "}
+                <a
+                  href="/register"
+                  className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+                >
+                  Register Here
+                </a>
+              </span>
+            </div>
+
+            <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
+              <div className="flex items-center justify-center my-4">
+                <div className="flex-grow h-px bg-[#FEDED2]"></div>
+                <span className="px-2">OR</span>
+                <div className="flex-grow h-px bg-[#FEDED2]"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Sign in with Google"
+                disabled={isLoading}
+              >
+                <GoogleIcon className="w-10 h-10" />
+              </button>
+              <p className="mt-2">Log in using your Google account</p>
+            </div>
+          </>
+        )}
+      </form>
+    </>
   );
 }

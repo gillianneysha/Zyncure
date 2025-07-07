@@ -11,67 +11,67 @@ export default function PatientLayout() {
 
   const isActive = (path) => location.pathname === `/home${path}`;
   const isHealthActive = location.pathname.includes('/home/health');
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen">
       <Sidebar>
-        <SidebarItem 
-          icon={<House size={20} />} 
-          text="Home" 
+        <SidebarItem
+          icon={<House size={20} />}
+          text="Home"
           active={isActive('')}
-          onClick={() => navigate('/home')} 
+          onClick={() => navigate('/home')}
         />
-        <SidebarItem 
-          icon={<User size={20} />} 
-          text="Profile" 
+        <SidebarItem
+          icon={<User size={20} />}
+          text="Profile"
           active={isActive('/profile')}
-          onClick={() => navigate('/home/profile')} 
+          onClick={() => navigate('/home/profile')}
         />
-        <SidebarItem 
-          icon={<Heart size={20} />} 
-          text="Your Health" 
+        <SidebarItem
+          icon={<Heart size={20} />}
+          text="Your Health"
           active={isHealthActive}
         >
-          <SidebarSubItem 
+          <SidebarSubItem
             icon={<ChartPie size={20} />}
-            text="Tracking" 
+            text="Tracking"
             active={isActive('/health/tracking')}
-            onClick={() => navigate('/home/health/tracking')} 
+            onClick={() => navigate('/home/health/tracking')}
           />
-          <SidebarSubItem 
+          <SidebarSubItem
             icon={<Folders size={20} />}
             text="Records"
             active={isActive('/health/records')}
-            onClick={() => navigate('/home/health/records')} 
+            onClick={() => navigate('/home/health/records')}
           />
         </SidebarItem>
-        <SidebarItem 
-          icon={<Users size={20} />} 
-          text="Connections" 
+        <SidebarItem
+          icon={<Users size={20} />}
+          text="Connections"
           active={isActive('/connections')}
-          onClick={() => navigate('/home/connections')} 
+          onClick={() => navigate('/home/connections')}
         />
-        <SidebarItem 
-          icon={<Bell size={20} />} 
-          text="Notifications" 
+        <SidebarItem
+          icon={<Bell size={20} />}
+          text="Notifications"
           active={isActive('/notifications')}
-          onClick={() => navigate('/home/notifications')} 
-          alert 
+          onClick={() => navigate('/home/notifications')}
+          alert
         />
-        <SidebarItem 
-          icon={<CalendarDays size={20} />} 
-          text="Appointments" 
+        <SidebarItem
+          icon={<CalendarDays size={20} />}
+          text="Appointments"
           active={isActive('/appointments')}
-          onClick={() => navigate('/home/appointments')} 
-          alert 
+          onClick={() => navigate('/home/appointments')}
+          alert
         />
-        
-<SidebarItem 
-  icon={<MessageSquare size={20} />} 
-  text="Need Help?" 
-  onClick={() => setIsReportModalOpen(true)}
-/>
+
+        <SidebarItem
+          icon={<MessageSquare size={20} />}
+          text="Need Help?"
+          onClick={() => setIsReportModalOpen(true)}
+        />
       </Sidebar>
       <div className="flex flex-col flex-1">
         <Navbar />

@@ -13,9 +13,8 @@ export default function Sidebar({ children }) {
         <div className="p-4 pb-2 flex justify-between items-center">
           <img
             src="/zyncure_logo.png"
-            className={`overflow-hidden transition-all ${
-              expanded ? "w-40" : "w-0"
-            }`}
+            className={`overflow-hidden transition-all ${expanded ? "w-40" : "w-0"
+              }`}
             alt="Zyncure Logo"
           />
           <button
@@ -26,7 +25,7 @@ export default function Sidebar({ children }) {
           </button>
         </div>
 
-        <SidebarContext.Provider value={{ expanded }}>  
+        <SidebarContext.Provider value={{ expanded }}>
           <ul className="flex-1 px-3">{children}</ul>
         </SidebarContext.Provider>
       </nav>
@@ -34,14 +33,16 @@ export default function Sidebar({ children }) {
   );
 }
 
-export function SidebarItem({ icon, text, active, alert, onClick, children }) {
+export function SidebarItem({ icon, text, active, alert, onClick, children, disabled = false }) {
   const { expanded } = useContext(SidebarContext);
   const [isOpen, setIsOpen] = useState(false);
 
   const hasChildren = children && children.length > 0;
 
-  // Only toggle submenu when expanded
+  // Only toggle submenu when expanded and not disabled
   const handleClick = () => {
+    if (disabled) return;
+
     if (hasChildren && expanded) {
       setIsOpen(!isOpen);
     } else if (onClick) {
@@ -59,38 +60,37 @@ export function SidebarItem({ icon, text, active, alert, onClick, children }) {
           relative flex items-center py-2 px-3 my-1
           font-medium rounded-md cursor-pointer
           transition-colors group
-          ${
-            active
+          ${disabled
+            ? "opacity-50 cursor-not-allowed text-gray-400"
+            : active
               ? "bg-gradient-to-tr from-indigo-200 to-indigo-100 text-indigo-800"
               : "hover:bg-indigo-50 text-white hover:text-indigo-800"
           }
         `}
         onClick={handleClick}
-        onMouseEnter={() => setHovered(true)}
+        onMouseEnter={() => !disabled && setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
         {icon}
         <span
-          className={`overflow-hidden transition-all ${
-            expanded ? "w-52 ml-3" : "w-0"
-          }`}
+          className={`overflow-hidden transition-all ${expanded ? "w-52 ml-3" : "w-0"
+            }`}
         >
           {text}
         </span>
-        {hasChildren && expanded && (
+        {hasChildren && expanded && !disabled && (
           <span className="ml-auto">
             {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </span>
         )}
-        {alert && (
+        {alert && !disabled && (
           <div
-            className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${
-              expanded ? "" : "top-2"
-            }`}
+            className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${expanded ? "" : "top-2"
+              }`}
           />
         )}
         {/* Tooltip for collapsed */}
-        {!expanded && (
+        {!expanded && !disabled && (
           <div
             className={`
               absolute left-full rounded-md px-2 py-1 ml-6
@@ -102,8 +102,21 @@ export function SidebarItem({ icon, text, active, alert, onClick, children }) {
             {text}
           </div>
         )}
+        {/* Disabled tooltip */}
+        {!expanded && disabled && (
+          <div
+            className={`
+              absolute left-full rounded-md px-2 py-1 ml-6
+              bg-red-100 text-red-800 text-sm
+              invisible opacity-20 -translate-x-3 transition-all
+              group-hover:visible group-hover:opacity-100 group-hover:translate-x-0
+            `}
+          >
+            {text} - Verification Required
+          </div>
+        )}
         {/* Floating submenu when collapsed */}
-        {hasChildren && !expanded && hovered && (
+        {hasChildren && !expanded && hovered && !disabled && (
           <ul
             className="absolute left-full top-1/2 -translate-y-1/2 ml-6 bg-indigo-100 shadow-lg rounded-xl py-2 z-50 min-w-[160px] border border-gray-200"
             onMouseEnter={() => setHovered(true)}
@@ -116,7 +129,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children }) {
         )}
       </li>
       {/* Submenu items when expanded */}
-      {hasChildren && isOpen && expanded && (
+      {hasChildren && isOpen && expanded && !disabled && (
         <ul className="ml-6 mt-1 space-y-1">
           {children}
         </ul>
@@ -125,23 +138,29 @@ export function SidebarItem({ icon, text, active, alert, onClick, children }) {
   );
 }
 
-export function SidebarSubItem({ icon, text, active, onClick, submenu = false }) {
+export function SidebarSubItem({ icon, text, active, onClick, submenu = false, disabled = false }) {
+  const handleClick = () => {
+    if (disabled) return;
+    if (onClick) onClick();
+  };
+
   return (
     <li
       className={`
         flex items-center py-1 px-3 rounded-md cursor-pointer text-sm
         transition-colors
-        ${
-          submenu
+        ${disabled
+          ? "opacity-50 cursor-not-allowed text-gray-400"
+          : submenu
             ? active
               ? "bg-indigo-200 text-indigo-800"
               : "text-indigo-800 hover:bg-indigo-200"
             : active
-            ? "bg-indigo-50 text-indigo-800"
-            : "text-white hover:bg-indigo-50 hover:text-indigo-800"
+              ? "bg-indigo-50 text-indigo-800"
+              : "text-white hover:bg-indigo-50 hover:text-indigo-800"
         }
       `}
-      onClick={onClick}
+      onClick={handleClick}
     >
       {icon && <span className="mr-2">{icon}</span>}
       <span>{text}</span>
