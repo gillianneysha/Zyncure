@@ -1,7 +1,8 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export const generatePDF = async (loggedDates, userInfo = {}) => {
+export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
+    const { returnBlob = false, download = true } = options;
     const { jsPDF } = await import('jspdf');
 
     // Convert image URL to base64
@@ -171,30 +172,6 @@ export const generatePDF = async (loggedDates, userInfo = {}) => {
 
             return false;
         }
-    };
-
-    // Helper function to create info card
-    const addInfoCard = (label, value, x, y, width = 80, height = 25) => {
-        // Card background
-        setFillColor('#FFFFFF');
-        doc.rect(x, y, width, height, 'F');
-
-        // Card border
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.rect(x, y, width, height);
-
-        // Label
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        setColor(brandColors.lightText);
-        doc.text(label, x + 5, y + 8);
-
-        // Value
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        setColor(brandColors.text);
-        doc.text(String(value), x + 5, y + 18);
     };
 
     try {
@@ -367,9 +344,22 @@ export const generatePDF = async (loggedDates, userInfo = {}) => {
 
         // Generate filename with timestamp
         const fileName = `zyncure-tracker-report-${new Date().toISOString().slice(0, 10)}.pdf`;
-        doc.save(fileName);
-
-        return fileName;
+        
+        // Return blob if requested, otherwise save/download
+        if (returnBlob) {
+            return {
+                blob: doc.output('blob'),
+                filename: fileName
+            };
+        } else if (download) {
+            doc.save(fileName);
+            return fileName;
+        } else {
+            return {
+                doc: doc,
+                filename: fileName
+            };
+        }
 
     } catch (error) {
         console.error('Error generating PDF:', error);
@@ -422,4 +412,15 @@ export const captureChartsForPDF = async () => {
         console.error('Error capturing charts:', error);
         return [];
     }
+};
+
+// Convenience function for generating PDF as blob (for sharing)
+export const generatePDFAsBlob = async (loggedDates, userInfo = {}) => {
+    const result = await generatePDF(loggedDates, userInfo, { returnBlob: true, download: false });
+    return result.blob;
+};
+
+// Convenience function for downloading PDF (existing behavior)
+export const downloadPDF = async (loggedDates, userInfo = {}) => {
+    return await generatePDF(loggedDates, userInfo, { returnBlob: false, download: true });
 };
