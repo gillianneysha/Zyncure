@@ -9,7 +9,7 @@ export default function OTPModal({
     error,
     loading,
     onResend,
-    resendCooldown = 300
+    resendCooldown = 60
 }) {
     const [secondsLeft, setSecondsLeft] = useState(resendCooldown);
     const timerRef = useRef();
