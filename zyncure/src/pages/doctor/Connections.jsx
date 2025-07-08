@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X, Clock, Send } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X, Clock, Send, CheckCircle, XCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../client'; 
 
 const DoctorConnectionsPage = () => {
@@ -14,6 +14,12 @@ const DoctorConnectionsPage = () => {
   const [showDropdown, setShowDropdown] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState(''); // 'accept', 'decline', 'remove', or 'confirm-remove'
+  const [modalPatientName, setModalPatientName] = useState('');
+  const [pendingRemoveConnectionId, setPendingRemoveConnectionId] = useState(null);
 
   // ========================================
   // USER AUTHENTICATION & INITIALIZATION
@@ -180,9 +186,16 @@ const handleConnectionRequest = async (connectionId, action) => {
       throw error;
     }
 
+    // Find the patient name for the modal
+    const connection = pendingRequests.find(req => req.id === connectionId);
+    const patientName = connection ? formatPatientName(connection.patient_first_name, connection.patient_last_name) : 'Patient';
+
     await loadConnections();
     
-    alert(`Connection request ${action}ed successfully!`);
+    // Show modal instead of alert
+    setModalType(action);
+    setModalPatientName(patientName);
+    setShowModal(true);
     
   } catch (error) {
     console.error(`Error ${action}ing connection:`, error);
@@ -201,27 +214,45 @@ const handleConnectionRequest = async (connectionId, action) => {
 // ========================================
 // FIXED CONNECTION REMOVAL MANAGEMENT
 // ========================================
-const removeConnection = async (connectionId) => {
-  if (!confirm('Are you sure you want to remove this connection?')) {
-    return;
-  }
+const showRemoveConfirmation = (connectionId) => {
+  // Find the connection details for the modal
+  const connection = connections.find(conn => conn.id === connectionId);
+  const patientName = connection ? formatPatientName(connection.patient_first_name, connection.patient_last_name) : 'Patient';
+  
+  setModalType('confirm-remove');
+  setModalPatientName(patientName);
+  setPendingRemoveConnectionId(connectionId);
+  setShowModal(true);
+};
+
+const confirmRemoveConnection = async () => {
+  if (!pendingRemoveConnectionId) return;
 
   try {
     const { error } = await supabase
       .rpc('remove_connection', {
-        connection_id: connectionId
+        connection_id: pendingRemoveConnectionId
       });
 
     if (error) {
       console.error('Error removing connection:', error);
       throw error;
     }
+    
     await loadConnections();
     
-    alert('Connection removed successfully!');
+    // Show success modal
+    setModalType('remove');
+    // modalPatientName is already set
+    setPendingRemoveConnectionId(null);
+    // Keep modal open to show success message
     
   } catch (error) {
     console.error('Error removing connection:', error);
+    
+    // Close modal and show error
+    setShowModal(false);
+    setPendingRemoveConnectionId(null);
     
     if (error.message.includes('not found or you do not have permission')) {
       alert('You do not have permission to remove this connection.');
@@ -229,6 +260,12 @@ const removeConnection = async (connectionId) => {
       alert(`Failed to remove connection: ${error.message}`);
     }
   }
+};
+
+const cancelRemoveConnection = () => {
+  setShowModal(false);
+  setPendingRemoveConnectionId(null);
+  setModalPatientName('');
 };
 
   // ========================================
@@ -266,6 +303,108 @@ const removeConnection = async (connectionId) => {
 
   const isPatientUnavailable = (patientId) => {
     return [...connections, ...pendingRequests].some(conn => conn.patient_id === patientId);
+  };
+
+  // ========================================
+  // MODAL COMPONENT
+  // ========================================
+  const Modal = () => {
+    if (!showModal) return null;
+
+    const isAccept = modalType === 'accept';
+    const isDecline = modalType === 'reject';
+    const isRemove = modalType === 'remove';
+    const isConfirmRemove = modalType === 'confirm-remove';
+    
+    const getModalConfig = () => {
+      if (isAccept) {
+        return {
+          bgColor: 'bg-green-100',
+          textColor: 'text-green-600',
+          buttonColor: 'bg-green-600 hover:bg-green-700',
+          icon: <CheckCircle className="w-8 h-8 text-green-600" />,
+          title: 'Connection Request Accepted',
+          message: `You have successfully accepted the connection request from ${modalPatientName}. You can now access their medical records and provide care.`,
+          showSingleButton: true
+        };
+      } else if (isDecline) {
+        return {
+          bgColor: 'bg-red-100',
+          textColor: 'text-red-600',
+          buttonColor: 'bg-red-600 hover:bg-red-700',
+          icon: <XCircle className="w-8 h-8 text-red-600" />,
+          title: 'Connection Request Declined',
+          message: `You have declined the connection request from ${modalPatientName}. They will be notified of your decision.`,
+          showSingleButton: true
+        };
+      } else if (isRemove) {
+        return {
+          bgColor: 'bg-orange-100',
+          textColor: 'text-orange-600',
+          buttonColor: 'bg-orange-600 hover:bg-orange-700',
+          icon: <AlertCircle className="w-8 h-8 text-orange-600" />,
+          title: 'Connection Removed',
+          message: `You have successfully removed the connection with ${modalPatientName}. You will no longer have access to their medical records.`,
+          showSingleButton: true
+        };
+      } else if (isConfirmRemove) {
+        return {
+          bgColor: 'bg-yellow-100',
+          textColor: 'text-yellow-600',
+          buttonColor: 'bg-red-600 hover:bg-red-700',
+          icon: <AlertTriangle className="w-8 h-8 text-yellow-600" />,
+          title: 'Remove Connection',
+          message: `Are you sure you want to remove the connection with ${modalPatientName}? This action cannot be undone and you will lose access to their medical records.`,
+          showSingleButton: false
+        };
+      }
+    };
+
+    const config = getModalConfig();
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="text-center">
+            <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${config.bgColor}`}>
+              {config.icon}
+            </div>
+            
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {config.title}
+            </h3>
+            
+            <p className="text-gray-600 mb-6">
+              {config.message}
+            </p>
+            
+            {config.showSingleButton ? (
+              <button
+                onClick={() => setShowModal(false)}
+                className={`w-full px-4 py-2 rounded-lg text-white font-medium transition-colors ${config.buttonColor}`}
+              >
+                Close
+              </button>
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelRemoveConnection}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRemoveConnection}
+                  className={`flex-1 px-4 py-2 rounded-lg text-white font-medium transition-colors ${config.buttonColor}`}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // ========================================
@@ -447,7 +586,7 @@ const removeConnection = async (connectionId) => {
                         <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
                           <button
                             onClick={() => {
-                              removeConnection(connection.id);
+                              showRemoveConfirmation(connection.id);
                               setShowDropdown(null);
                             }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -473,6 +612,9 @@ const removeConnection = async (connectionId) => {
           )}
         </div>
       </div>
+
+      {/* Modal */}
+      <Modal />
     </div>
   );
 };
