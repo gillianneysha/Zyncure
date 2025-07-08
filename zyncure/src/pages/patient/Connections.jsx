@@ -165,7 +165,8 @@ const PatientConnectionsPage = () => {
   // ========================================
   // DATA LOADING FUNCTIONS
   // ========================================
- const loadConnections = async () => {
+ // Replace your existing loadConnections function with this fixed version
+const loadConnections = async () => {
   try {
     setIsLoading(true);
     
@@ -179,9 +180,13 @@ const PatientConnectionsPage = () => {
     const { data, error } = await supabase
       .from('patient_connection_details')
       .select('*')
+      .eq('patient_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
 
     const allConnections = data || [];
     
@@ -190,18 +195,32 @@ const PatientConnectionsPage = () => {
     
     console.log('Total connections returned:', allConnections.length);
     console.log('User connections after filtering:', userConnections.length);
+    console.log('All connections data:', userConnections);
     
-    // FIXED: Only show pending requests where current user is the RECIPIENT
-    // For patients, they should only see pending requests where a doctor requested to connect with them
-    // This means filtering for requests where the doctor initiated the connection
+    // Debug: Log the requester_type and request_direction for each connection
+    userConnections.forEach(conn => {
+      console.log(`Connection ${conn.id}:`, {
+        requester_type: conn.requester_type,
+        request_direction: conn.request_direction,
+        status: conn.status,
+        doctor_name: `${conn.doctor_first_name} ${conn.doctor_last_name}`
+      });
+    });
+    
+    // FIXED: Show pending requests where the DOCTOR requested to connect with the PATIENT
+    // This means requester_type = 'doctor' and status = 'pending'
     const pendingIncoming = userConnections.filter(
-      conn => conn.status === 'pending' && conn.request_direction === 'incoming'
+      conn => conn.status === 'pending' && conn.requester_type === 'doctor'
     );
+    
+    console.log('Pending incoming requests:', pendingIncoming);
     
     // All other connections (accepted, rejected, or outgoing pending requests)
     const otherConnections = userConnections.filter(
-      conn => !(conn.status === 'pending' && conn.request_direction === 'incoming')
+      conn => !(conn.status === 'pending' && conn.requester_type === 'doctor')
     );
+    
+    console.log('Other connections:', otherConnections);
     
     setConnections(otherConnections);
     setPendingRequests(pendingIncoming);
