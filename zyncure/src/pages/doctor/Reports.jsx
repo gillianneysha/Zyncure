@@ -97,7 +97,7 @@ function FileCard({ file, onPreview }) {
       </div>
       <div className="p-2 flex items-center gap-1 text-xs text-white">
         <Clock size={14} className="inline-block mr-1" />
-        {formatExpiresAt(file.expires_at)}
+        {file.symptom_file ? "Permanent" : formatExpiresAt(file.expires_at)}
       </div>
     </div>
   );
@@ -125,6 +125,37 @@ export default function DoctorsPatientsFolders() {
     loadPatientsWithInfo();
   }, [currentUser]);
 
+  // --- New logic: fetch symptom files for a patient ---
+  async function loadSymptomTrackingFiles(patientId) {
+    try {
+      // List all files in sharedsymptoms bucket for this patient (assuming naming convention "patientId/filename.json" or similar)
+      const { data: files, error } = await supabase
+        .storage
+        .from('sharedsymptoms')
+        .list(`${patientId}`, {
+          limit: 100,
+          offset: 0,
+        });
+      if (error) return [];
+      // Map to the same structure as a "file" for FileCard
+      return (files || [])
+        .filter(item => !!item.name && !item.name.endsWith('/')) // ignore folders
+        .map(item => ({
+          id: `symptom_${patientId}_${item.name}`,
+          name: item.name,
+          file_url: null, // We'll get URL on preview or download
+          preview_url: null, // We'll get URL on preview
+          expires_at: null,
+          symptom_file: true, // flag for UI/logic if needed
+          patient_id: patientId,
+          metadata: item,
+        }));
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // --- Modified: load patients, include symptom files ---
   async function loadPatientsWithInfo() {
     setLoading(true);
     const { data: connections, error: connError } = await supabase
@@ -171,17 +202,63 @@ export default function DoctorsPatientsFolders() {
           }
         }
       }
+
+      // --- Merge: Add symptom tracking files ---
+      const symptomFiles = await loadSymptomTrackingFiles(conn.patient_id);
+      // For each symptom file, add to files array
+      // You may optionally add a suffix to name or show an icon in FileCard if you want to distinguish (not required)
+
       return {
         id: conn.patient_id,
         name: `${conn.patient_first_name || ''} ${conn.patient_last_name || ''}`.trim() || conn.patient_email || 'Unknown',
         email: conn.patient_email,
         folders,
-        files
+        files: [...files, ...symptomFiles],
       }
     }));
     setPatients(enrichedPatients);
     setLoading(false);
   }
+
+  // --- For opened folders: merge in symptom files if needed ---
+  async function handleOpenSharedFolder(folder) {
+    setOpenedFolder(folder);
+    setPreviewFile(null);
+    const { data: files } = await supabase
+      .from('medical_files')
+      .select('*')
+      .eq('folder_id', folder.id)
+      .eq('owner_id', selectedPatient.id);
+
+    // Optionally, if you want symptom files to show in every folder, you could merge here too.
+    // But if you want them only at the root, skip merging here.
+
+    setFolderFiles(files || []);
+  }
+
+  // --- For previewing symptom files ---
+  async function handlePreviewFile(file) {
+    if (!file.symptom_file) {
+      setPreviewFile(file);
+      return;
+    }
+    // Get signed URL for preview/download
+    const { data, error } = await supabase
+      .storage
+      .from('sharedsymptoms')
+      .createSignedUrl(`${file.patient_id}/${file.name}`, 60 * 30); // 30 min
+    if (error) {
+      alert("Failed to load preview");
+      return;
+    }
+    setPreviewFile({
+      ...file,
+      file_url: data.signedUrl,
+      preview_url: data.signedUrl, // could be a direct link for viewing or downloading
+    });
+  }
+
+  // --- UI rendering below (unchanged, except for using handlePreviewFile for preview) ---
 
   const handlePatientClick = (patient) => {
     setSelectedPatient(patient);
@@ -190,17 +267,6 @@ export default function DoctorsPatientsFolders() {
     setOpenedFolder(null);
     setFolderFiles([]);
     setPreviewFile(null);
-  };
-
-  const handleOpenSharedFolder = async (folder) => {
-    setOpenedFolder(folder);
-    setPreviewFile(null);
-    const { data: files } = await supabase
-      .from('medical_files')
-      .select('*')
-      .eq('folder_id', folder.id)
-      .eq('owner_id', selectedPatient.id);
-    setFolderFiles(files || []);
   };
 
   return (
@@ -288,7 +354,7 @@ export default function DoctorsPatientsFolders() {
                 <div className="col-span-4 text-gray-400">No files shared.</div>
               )}
               {sharedFiles.map(file => (
-                <FileCard key={file.id} file={file} onPreview={setPreviewFile} />
+                <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
               ))}
             </div>
             {previewFile && (
@@ -302,6 +368,7 @@ export default function DoctorsPatientsFolders() {
                   </button>
                   <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
                   <div className="flex-1 flex items-center justify-center overflow-auto">
+                    {/* For symptom files, show link or preview if supported */}
                     {previewFile.preview_url ? (
                       previewFile.name.toLowerCase().endsWith(".pdf") ? (
                         <iframe
@@ -321,13 +388,15 @@ export default function DoctorsPatientsFolders() {
                     )}
                   </div>
                   <div className="mt-4 text-right">
-                    <a
-                      href={previewFile.file_url}
-                      download={previewFile.name}
-                      className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
-                    >
-                      Download
-                    </a>
+                    {previewFile.file_url && (
+                      <a
+                        href={previewFile.file_url}
+                        download={previewFile.name}
+                        className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+                      >
+                        Download
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -345,7 +414,7 @@ export default function DoctorsPatientsFolders() {
                 <div className="col-span-4 text-gray-400">No files in this folder.</div>
               ) : (
                 folderFiles.map(file => (
-                  <FileCard key={file.id} file={file} onPreview={setPreviewFile} />
+                  <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
                 ))
               )}
             </div>
@@ -379,13 +448,15 @@ export default function DoctorsPatientsFolders() {
                     )}
                   </div>
                   <div className="mt-4 text-right">
-                    <a
-                      href={previewFile.file_url}
-                      download={previewFile.name}
-                      className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
-                    >
-                      Download
-                    </a>
+                    {previewFile.file_url && (
+                      <a
+                        href={previewFile.file_url}
+                        download={previewFile.name}
+                        className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+                      >
+                        Download
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
