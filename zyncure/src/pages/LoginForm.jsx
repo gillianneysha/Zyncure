@@ -4,10 +4,7 @@ import { supabase } from "../client";
 import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
-import OTPModal from "../components/OTPModal";
 
-const REQUEST_OTP_URL = "https://vneigpczfmvwlfcvdgtl.supabase.co/functions/v1/request-otp";
-const VERIFY_OTP_URL = "https://vneigpczfmvwlfcvdgtl.supabase.co/functions/v1/verify-otp";
 
 const FormField = React.memo(({
   label,
@@ -45,6 +42,7 @@ const FormField = React.memo(({
   </div>
 ));
 
+
 export default function LoginForm({ setToken }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -56,9 +54,7 @@ export default function LoginForm({ setToken }) {
   const [mfaChallenge, setMfaChallenge] = useState(null);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaError, setMfaError] = useState("");
-  // OTP states
-  const [showOtpForm, setShowOtpForm] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
+
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -66,6 +62,7 @@ export default function LoginForm({ setToken }) {
       ...prev,
       [name]: value
     }));
+
 
     if (errors[name]) {
       setErrors(prev => ({
@@ -75,8 +72,10 @@ export default function LoginForm({ setToken }) {
     }
   }, [errors]);
 
+
   const validateForm = useCallback(() => {
     const newErrors = {};
+
 
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
@@ -87,149 +86,83 @@ export default function LoginForm({ setToken }) {
       }
     }
 
+
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
     }
+
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
-  // Helper function to get auth headers
-  const getAuthHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${session?.access_token || supabase.supabaseKey}`,
-      "apikey": supabase.supabaseKey
-    };
-  };
 
   // Simple redirect based on user metadata - useUser hook will handle role detection
   const getRedirectPath = (user) => {
     // Check user metadata for medical professional
     const userRole = user.user_metadata?.user_type;
 
+
     if (userRole === "doctor") {
       return "/doctor";
     }
+
 
     // Default to home - the router will redirect admins appropriately
     return "/home";
   };
 
-  // --- OTP login logic ---
-  const handleOtpChange = (e) => {
-    // Ensure OTP is always treated as string and remove any non-numeric characters
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtpCode(value);
-  };
 
-  // Step 1: Request OTP
-  const handleOtpRequest = async (event) => {
+  // Regular email/password login
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateForm()) return;
+
+
     setIsLoading(true);
     setErrors({});
     setMfaError("");
-    try {
-      const headers = await getAuthHeaders();
-      // Normalize email before sending
-      const normalizedFormData = {
-        ...formData,
-        email: formData.email.toLowerCase().trim()
-      };
 
-      const res = await fetch(REQUEST_OTP_URL, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(normalizedFormData),
-      });
-      const result = await res.json();
-      console.log("OTP request response:", result); // Debug log
-
-      if (!res.ok) throw new Error(result.error || "Failed to request OTP");
-      setShowOtpForm(true);
-    } catch (err) {
-      console.error("OTP request error:", err);
-      setErrors({ submit: err.message });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Step 2: Verify OTP (Enhanced version)
-  const handleOtpSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setErrors({});
-
-    // Validate OTP format
-    if (!otpCode || otpCode.length !== 6) {
-      setErrors({ otp: "Please enter a 6-digit OTP code" });
-      setIsLoading(false);
-      return;
-    }
 
     try {
-      const headers = await getAuthHeaders();
-      const payload = {
-        email: formData.email.toLowerCase().trim(),
-        otp_code: otpCode.trim()
-      };
-
-      console.log("Sending OTP verification payload:", payload); // Debug log
-
-      const res = await fetch(VERIFY_OTP_URL, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
       });
 
-      const result = await res.json();
-      console.log("OTP verification response:", result); // Debug log
 
-      if (!res.ok) {
-        console.error("OTP verification failed:", result);
-        // Show more specific error messages
-        if (result.debug) {
-          console.log("Debug info:", result.debug);
-        }
-        throw new Error(result.error || "OTP verification failed");
-      }
-
-      if (result.success) {
-        console.log("OTP verified, attempting sign in...");
-        // OTP verified successfully, now sign in with the original credentials
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: formData.email.toLowerCase().trim(),
-          password: formData.password,
-        });
-
-        if (error) {
-          console.error("Sign in error after OTP verification:", error);
-          setErrors({ otp: "Login failed after OTP verification. Please try again." });
+      if (error) {
+        if (error.message.includes("mfa")) {
+          // Handle MFA challenge
+          setMfaChallenge(error.mfa_challenge);
           return;
         }
-
-        console.log("Sign in successful:", data);
-        setToken(data.session);
-        const redirectPath = getRedirectPath(data.user);
-        navigate(redirectPath);
+        throw error;
       }
-    } catch (err) {
-      console.error("OTP submit error:", err);
-      setErrors({ otp: err.message });
+
+
+      // Login successful
+      setToken(data.session);
+      const redirectPath = getRedirectPath(data.user);
+      navigate(redirectPath);
+
+
+    } catch (error) {
+      console.error("Login error:", error);
+      setErrors({
+        submit: error.message || "Login failed. Please try again."
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- Google login and MFA logic remain unchanged ---
+
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrors({});
+
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -237,6 +170,7 @@ export default function LoginForm({ setToken }) {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       });
+
 
       if (error) throw error;
     } catch (error) {
@@ -249,11 +183,13 @@ export default function LoginForm({ setToken }) {
     }
   }, []);
 
+
   const handleForgotPassword = async () => {
     if (!formData.email) {
       setErrors({ email: "Please enter your email address first" });
       return;
     }
+
 
     try {
       setIsLoading(true);
@@ -261,7 +197,9 @@ export default function LoginForm({ setToken }) {
         redirectTo: `${window.location.origin}/reset-password`
       });
 
+
       if (error) throw error;
+
 
       alert("Password reset email sent! Please check your inbox.");
     } catch (error) {
@@ -274,11 +212,13 @@ export default function LoginForm({ setToken }) {
     }
   };
 
+
   // Handle MFA code submission
   const handleMfaSubmit = async (event) => {
     event.preventDefault();
     setMfaError("");
     setIsLoading(true);
+
 
     try {
       const { data, error } = await supabase.auth.mfa.verify({
@@ -287,15 +227,18 @@ export default function LoginForm({ setToken }) {
         code: mfaCode,
       });
 
+
       if (error) {
         setMfaError("Invalid code. Please try again.");
         return;
       }
 
+
       // MFA verification successful
-      setToken(data);
+      setToken(data.session);
       const redirectPath = getRedirectPath(data.user);
       navigate(redirectPath);
+
 
     } catch (error) {
       console.error("MFA verification error:", error);
@@ -305,40 +248,10 @@ export default function LoginForm({ setToken }) {
     }
   };
 
-  // Enhanced resend OTP function
-  const handleResendOtp = async () => {
-    setIsLoading(true);
-    setErrors({});
-    try {
-      const headers = await getAuthHeaders();
-      const normalizedFormData = {
-        ...formData,
-        email: formData.email.toLowerCase().trim()
-      };
-
-      const res = await fetch(REQUEST_OTP_URL, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(normalizedFormData),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to resend OTP");
-
-      // Clear the OTP input when resending
-      setOtpCode("");
-      // Optionally show a success message
-      console.log("OTP resent successfully");
-    } catch (err) {
-      console.error("Resend OTP error:", err);
-      setErrors({ otp: err.message });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <>
-      <form onSubmit={showOtpForm ? handleOtpSubmit : (mfaChallenge ? handleMfaSubmit : handleOtpRequest)}>
+      <form onSubmit={mfaChallenge ? handleMfaSubmit : handleSubmit}>
         {/* Error Message */}
         {errors.submit && (
           <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
@@ -346,44 +259,76 @@ export default function LoginForm({ setToken }) {
           </div>
         )}
 
-        <FormField
-          label="Email"
-          name="email"
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={handleChange}
-          error={errors.email}
-          disabled={isLoading}
-          labelClassName="text-[#F5E0D9]"
-          inputClassName="bg-[#FFEDE7]"
-        />
 
-        <div className="w-4/5 mx-auto">
-          <PasswordInput
-            label="Password:"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="Password"
-            error={errors.password}
-            disabled={isLoading}
-            labelClassName="text-[#F5E0D9]"
-            inputClassName="bg-[#FFEDE7]"
-          />
-        </div>
+        {/* MFA Challenge Form */}
+        {mfaChallenge && (
+          <div className="w-4/5 mx-auto mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2 text-blue-800">Two-Factor Authentication</h3>
+            <p className="text-sm text-blue-600 mb-3">
+              Please enter the verification code from your authenticator app.
+            </p>
+            <input
+              type="text"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value)}
+              placeholder="Enter 6-digit code"
+              className="w-full p-2 border border-blue-300 rounded-lg mb-2"
+              maxLength="6"
+              disabled={isLoading}
+            />
+            {mfaError && (
+              <p className="text-sm text-red-600 mb-2">{mfaError}</p>
+            )}
+          </div>
+        )}
 
-        <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
-          <div />
-          <button
-            type="button"
-            onClick={handleForgotPassword}
-            className="text-xs text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
-            disabled={isLoading}
-          >
-            Forgot Password?
-          </button>
-        </div>
+
+        {/* Regular Login Form */}
+        {!mfaChallenge && (
+          <>
+            <FormField
+              label="Email"
+              name="email"
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleChange}
+              error={errors.email}
+              disabled={isLoading}
+              labelClassName="text-[#F5E0D9]"
+              inputClassName="bg-[#FFEDE7]"
+            />
+
+
+            <div className="w-4/5 mx-auto">
+              <PasswordInput
+                label="Password:"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Password"
+                error={errors.password}
+                disabled={isLoading}
+                labelClassName="text-[#F5E0D9]"
+                inputClassName="bg-[#FFEDE7]"
+              />
+            </div>
+
+
+            <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
+              <div />
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+                disabled={isLoading}
+              >
+                Forgot Password?
+              </button>
+            </div>
+          </>
+        )}
+
 
         <button
           type="submit"
@@ -393,54 +338,47 @@ export default function LoginForm({ setToken }) {
             : "bg-[#55A1A4] hover:bg-[#368487]"
             }`}
         >
-          {isLoading ? "Sending OTP..." : "Log In"}
+          {isLoading ? "Logging in..." : (mfaChallenge ? "Verify Code" : "Log In")}
         </button>
 
-        <div className="w-4/5 mx-auto mt-2 text-left">
-          <span className="text-[#F5E0D9] text-sm">
-            Don't have an account?{" "}
-            <a
-              href="/register"
-              className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
-            >
-              Register Here
-            </a>
-          </span>
-        </div>
 
-        <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
-          <div className="flex items-center justify-center my-4">
-            <div className="flex-grow h-px bg-[#FEDED2]"></div>
-            <span className="px-2">OR</span>
-            <div className="flex-grow h-px bg-[#FEDED2]"></div>
-          </div>
+        {!mfaChallenge && (
+          <>
+            <div className="w-4/5 mx-auto mt-2 text-left">
+              <span className="text-[#F5E0D9] text-sm">
+                Don't have an account?{" "}
+                <a
+                  href="/register"
+                  className="font-bold text-[#F5E0D9] hover:underline bg-transparent border-none cursor-pointer"
+                >
+                  Register Here
+                </a>
+              </span>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Sign in with Google"
-            disabled={isLoading}
-          >
-            <GoogleIcon className="w-10 h-10" />
-          </button>
-          <p className="mt-2">Log in using your Google account</p>
-        </div>
+
+            <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
+              <div className="flex items-center justify-center my-4">
+                <div className="flex-grow h-px bg-[#FEDED2]"></div>
+                <span className="px-2">OR</span>
+                <div className="flex-grow h-px bg-[#FEDED2]"></div>
+              </div>
+
+
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="flex items-center justify-center w-14 h-14 rounded-full bg-[#FFEDE7] shadow-lg transition-transform duration-200 hover:scale-95 active:scale-95 hover:shadow-xl ring-2 ring-[#F46B5D] ring-opacity-0 hover:ring-opacity-100 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Sign in with Google"
+                disabled={isLoading}
+              >
+                <GoogleIcon className="w-10 h-10" />
+              </button>
+              <p className="mt-2">Log in using your Google account</p>
+            </div>
+          </>
+        )}
       </form>
-      <OTPModal
-        open={showOtpForm}
-        otpCode={otpCode}
-        onChange={handleOtpChange}
-        onSubmit={handleOtpSubmit}
-        onClose={() => {
-          setShowOtpForm(false);
-          setOtpCode("");
-          setErrors({});
-        }}
-        error={errors.otp}
-        loading={isLoading}
-        onResend={handleResendOtp}
-      />
     </>
   );
 }
