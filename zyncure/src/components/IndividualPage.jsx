@@ -556,8 +556,11 @@ export function BillingPage() {
   }, []);
 
   const handleOptionClick = (option) => {
-    if (option === "Subscriptions") setShowPlans(true);
-    else if (option === "Contact Information") setShowContactInfo(true);
+
+    if (option === "Subscriptions" || option === "Manage Subscription") setShowPlans(true);
+    else if (option === "Contact Information") {
+      
+    }
   };
 
   // Create PayMongo Checkout Session with improved error handling
@@ -669,6 +672,40 @@ export function BillingPage() {
     const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription`;
 
     createCheckoutSession(amount, description);
+  };
+
+  // Handle plan upgrade/downgrade
+  const handlePlanChange = () => {
+    if (!selectedTier) {
+      setError('Please select a new subscription tier');
+      return;
+    }
+
+    const amount = tierPricing[selectedTier];
+    const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription (Plan Change)`;
+
+    createCheckoutSession(amount, description);
+  };
+
+  // Handle cancellation
+  const handleCancelSubscription = async () => {
+    if (!currentSubscription) return;
+
+    if (confirm('Are you sure you want to cancel your subscription? This action cannot be undone.')) {
+      try {
+        const { error } = await supabase
+          .from('subscriptions')
+          .update({ status: 'cancelled' })
+          .eq('id', currentSubscription.id);
+
+        if (error) throw error;
+
+        setCurrentSubscription({ ...currentSubscription, status: 'cancelled' });
+        setPaymentStatus('Your subscription has been cancelled successfully.');
+      } catch (error) {
+        setError(`Failed to cancel subscription: ${error.message}`);
+      }
+    }
   };
 
   // Handle payment success (call this when user returns from PayMongo)
@@ -801,6 +838,23 @@ export function BillingPage() {
     }
   }, []);
 
+  // Helper function to check if user has active subscription
+  const hasActiveSubscription = () => {
+    return currentSubscription && currentSubscription.status === 'active';
+  };
+
+  // Helper function to get current tier
+  const getCurrentTier = () => {
+    if (!hasActiveSubscription()) return 'free';
+    return currentSubscription.tier;
+  };
+
+  // Helper function to check if subscription is expired
+  const isSubscriptionExpired = () => {
+    if (!currentSubscription) return false;
+    return currentSubscription.expires_at && new Date(currentSubscription.expires_at) < new Date();
+  };
+
   // Rest of your component remains the same...
   const SecurityOption = ({ title, onClick }) => (
     <div
@@ -812,24 +866,99 @@ export function BillingPage() {
     </div>
   );
 
-  // Show current subscription status
+  // Enhanced subscription status display
   const renderSubscriptionStatus = () => {
     if (!currentSubscription) return null;
 
+    const isActive = currentSubscription.status === 'active';
+    const isExpired = isSubscriptionExpired();
+    const isCancelled = currentSubscription.status === 'cancelled';
+
+    let statusColor = 'green';
+    let statusText = 'Active';
+    let bgColor = 'bg-green-50 border-green-200';
+    let textColor = 'text-green-800';
+    let statusIcon = '✓';
+
+    if (isCancelled) {
+      statusColor = 'red';
+      statusText = 'Cancelled';
+      bgColor = 'bg-red-50 border-red-200';
+      textColor = 'text-red-800';
+      statusIcon = '✗';
+    } else if (isExpired) {
+      statusColor = 'orange';
+      statusText = 'Expired';
+      bgColor = 'bg-orange-50 border-orange-200';
+      textColor = 'text-orange-800';
+      statusIcon = '⚠';
+    }
+
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-        <h3 className="text-green-800 font-semibold">Current Subscription</h3>
-        <p className="text-green-600">
-          {currentSubscription.tier.charAt(0).toUpperCase() + currentSubscription.tier.slice(1)} Plan
-        </p>
-        {currentSubscription.expires_at && (
-          <p className="text-green-600 text-sm">
-            Expires: {new Date(currentSubscription.expires_at).toLocaleDateString()}
-          </p>
+      <div className={`${bgColor} border rounded-lg p-6 mb-6`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`${textColor} font-semibold text-lg flex items-center gap-2`}>
+            <span className="text-xl">{statusIcon}</span>
+            Current Subscription
+          </h3>
+          {isActive && !isExpired && (
+            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+              {statusText}
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className={`${textColor} font-medium`}>
+              Plan: {currentSubscription.tier.charAt(0).toUpperCase() + currentSubscription.tier.slice(1)}
+            </p>
+            <p className={`${textColor} text-sm`}>
+              Monthly fee: ₱{tierPricing[currentSubscription.tier] || 0}
+            </p>
+          </div>
+          
+          <div>
+            {currentSubscription.expires_at && (
+              <p className={`${textColor} text-sm`}>
+                Expires: {new Date(currentSubscription.expires_at).toLocaleDateString()}
+              </p>
+            )}
+            {currentSubscription.started_at && (
+              <p className={`${textColor} text-sm`}>
+                Started: {new Date(currentSubscription.started_at).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {isActive && !isExpired && (
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={() => setShowPlans(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+            >
+              Change Plan
+            </button>
+            <button
+              onClick={handleCancelSubscription}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+            >
+              Cancel Subscription
+            </button>
+          </div>
         )}
-        <p className="text-green-600 text-sm">
-          Status: {currentSubscription.status.charAt(0).toUpperCase() + currentSubscription.status.slice(1)}
-        </p>
+
+        {(isExpired || isCancelled) && (
+          <div className="mt-4">
+            <button
+              onClick={() => setShowPlans(true)}
+              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
+            >
+              Reactivate Subscription
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -887,20 +1016,23 @@ export function BillingPage() {
 
     if (!isTestEnvironment) return null;
 
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-        <h3 className="text-yellow-800 font-semibold">🧪 Testing Mode</h3>
-        <p className="text-yellow-700 text-sm">
-          This is sandbox mode - no real payments will be processed.
-          <br />
-          Use test card numbers provided by PayMongo for testing.
-        </p>
-      </div>
-    );
+    // return (
+    //   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+    //     <h3 className="text-yellow-800 font-semibold">🧪 Testing Mode</h3>
+    //     <p className="text-yellow-700 text-sm">
+    //       This is sandbox mode - no real payments will be processed.
+    //       <br />
+    //       Use test card numbers provided by PayMongo for testing.
+    //     </p>
+    //   </div>
+    // );
   };
 
-  // Subscriptions page
+  // Enhanced subscriptions page
   if (showPlans) {
+    const currentTier = getCurrentTier();
+    const isUpgrading = hasActiveSubscription();
+
     return (
       <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
         <button
@@ -915,16 +1047,27 @@ export function BillingPage() {
         {renderError()}
         {renderSubscriptionStatus()}
 
-        <h2 className="text-4xl text-teal-600 font-bold mb-2">Upgrade to Premium</h2>
-        <p className="text-teal-600 mb-8">Enjoy an enhanced experience</p>
+        <h2 className="text-4xl text-teal-600 font-bold mb-2">
+          {isUpgrading ? 'Change Your Plan' : 'Upgrade to Premium'}
+        </h2>
+        <p className="text-teal-600 mb-8">
+          {isUpgrading ? 'Select a new plan to switch to' : 'Enjoy an enhanced experience'}
+        </p>
 
         <div className="flex gap-6">
           {/* Tier 1 - Free */}
-          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
-            <h3 className="font-bold text-orange-600 mb-2">
+          <div className={`rounded-2xl p-6 flex-1 relative ${
+            currentTier === 'free' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+          }`}>
+            {currentTier === 'free' && (
+              <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Current Plan
+              </div>
+            )}
+            <h3 className={`font-bold mb-2 ${currentTier === 'free' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 1: Free <span className="font-normal text-sm">(Basic Access)</span>
             </h3>
-            <ul className="text-orange-600 text-sm space-y-2">
+            <ul className={`text-sm space-y-2 ${currentTier === 'free' ? 'text-teal-600' : 'text-orange-600'}`}>
               <li>✓ View and manage personal health records.</li>
               <li>✓ Upload and store up to 2GB of medical files.</li>
               <li>✓ Share records with up to 3 healthcare providers.</li>
@@ -933,24 +1076,43 @@ export function BillingPage() {
               <li>✓ Access to a health dashboard.</li>
               <li>✓ Ability to export health records in a standard format (e.g., PDF).</li>
             </ul>
+            {currentTier !== 'free' && hasActiveSubscription() && (
+              <button
+                onClick={handleCancelSubscription}
+                className="mt-4 w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition text-sm"
+              >
+                Downgrade to Free
+              </button>
+            )}
           </div>
 
           {/* Tier 2 - Premium */}
-          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
-            <input
-              type="radio"
-              name="subscriptionTier"
-              value="premium"
-              checked={selectedTier === "premium"}
-              onChange={() => setSelectedTier("premium")}
-              className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-              aria-label="Select Premium"
-            />
-            <h3 className="font-bold text-orange-600 mb-2">
+          <div className={`rounded-2xl p-6 flex-1 relative ${
+            currentTier === 'premium' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+          }`}>
+            {currentTier === 'premium' && (
+              <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Current Plan
+              </div>
+            )}
+            {currentTier !== 'premium' && (
+              <input
+                type="radio"
+                name="subscriptionTier"
+                value="premium"
+                checked={selectedTier === "premium"}
+                onChange={() => setSelectedTier("premium")}
+                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+                aria-label="Select Premium"
+              />
+            )}
+            <h3 className={`font-bold mb-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 2: Premium <span className="font-normal text-sm">(Enhanced Access)</span>
             </h3>
-            <p className="text-orange-600 font-bold mb-2">₱299/month</p>
-            <ul className="text-orange-600 text-sm space-y-2">
+            <p className={`font-bold mb-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
+              ₱299/month
+            </p>
+            <ul className={`text-sm space-y-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
               <li>✓ All features in the Free tier</li>
               <li>✓ Increased storage capacity up to 5GB.</li>
               <li>✓ Track all predefined symptoms and custom symptoms.</li>
@@ -959,21 +1121,32 @@ export function BillingPage() {
           </div>
 
           {/* Tier 3 - Pro */}
-          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
-            <input
-              type="radio"
-              name="subscriptionTier"
-              value="pro"
-              checked={selectedTier === "pro"}
-              onChange={() => setSelectedTier("pro")}
-              className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-              aria-label="Select Pro"
-            />
-            <h3 className="font-bold text-orange-600 mb-2">
+          <div className={`rounded-2xl p-6 flex-1 relative ${
+            currentTier === 'pro' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+          }`}>
+            {currentTier === 'pro' && (
+              <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Current Plan
+              </div>
+            )}
+            {currentTier !== 'pro' && (
+              <input
+                type="radio"
+                name="subscriptionTier"
+                value="pro"
+                checked={selectedTier === "pro"}
+                onChange={() => setSelectedTier("pro")}
+                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+                aria-label="Select Pro"
+              />
+            )}
+            <h3 className={`font-bold mb-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 3: Pro <span className="font-normal text-sm">(Comprehensive Access)</span>
             </h3>
-            <p className="text-orange-600 font-bold mb-2">₱599/month</p>
-            <ul className="text-orange-600 text-sm space-y-2">
+            <p className={`font-bold mb-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
+              ₱599/month
+            </p>
+            <ul className={`text-sm space-y-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
               <li>✓ All features in the Premium tier</li>
               <li>✓ Priority support for technical issues</li>
               <li>✓ Early access to future feature expansions and integrations.</li>
@@ -983,18 +1156,33 @@ export function BillingPage() {
         </div>
 
         <div className="flex justify-center mt-8">
-          <button
-            className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
-            disabled={!selectedTier || isProcessing || !user}
-            onClick={handleSubscribe}
-          >
-            {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
-          </button>
+          {!hasActiveSubscription() ? (
+            <button
+              className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
+              disabled={!selectedTier || isProcessing || !user}
+              onClick={handleSubscribe}
+            >
+              {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
+            </button>
+          ) : (
+            <button
+              className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
+              disabled={!selectedTier || isProcessing || !user || selectedTier === currentTier}
+              onClick={handlePlanChange}
+            >
+              {isProcessing ? 'Processing...' : 
+               !user ? 'Please log in' : 
+               selectedTier === currentTier ? 'Current Plan' : 'Change Plan'}
+            </button>
+          )}
         </div>
 
         <div className="text-center mt-4">
           <p className="text-sm text-gray-600">
-            You'll be redirected to PayMongo to complete your payment securely.
+            {isUpgrading ? 
+              'Your plan will be changed immediately upon successful payment.' :
+              'You\'ll be redirected to PayMongo to complete your payment securely.'
+            }
             <br />
             All major payment methods are supported (Cards, GCash, Maya, etc.)
           </p>
@@ -1010,10 +1198,12 @@ export function BillingPage() {
     );
   }
 
+
   // Default Billing Home
   if (showContactInfo) {
     return <ContactInformationPage onBack={() => setShowContactInfo(false)} />;
   }
+
 
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
@@ -1023,7 +1213,10 @@ export function BillingPage() {
           Billing
         </h2>
         <p className="text-zyncureOrange text-left mt-3">
-          Manage your subscriptions and billing information
+          {hasActiveSubscription() ? 
+            'Manage your active subscription and billing information' :
+            'Manage your subscriptions and billing information'
+          }
         </p>
       </div>
 
@@ -1034,7 +1227,7 @@ export function BillingPage() {
 
       <div className="mt-8">
         <SecurityOption
-          title="Subscriptions"
+          title={hasActiveSubscription() ? "Manage Subscription" : "Subscriptions"}
           onClick={handleOptionClick}
         />
         <SecurityOption
