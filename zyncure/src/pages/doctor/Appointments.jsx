@@ -534,13 +534,12 @@ const handleViewDetails = async (appointment) => {
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-3">
                         <div className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-sm font-semibold">
-  {formatTimeForDisplay(appointment.time)}
-</div>
+                          {formatTimeForDisplay(appointment.time)}
+                        </div>
                         <div>
                           <h3 className="font-semibold text-gray-800">
                             {appointment.patient_name}
                           </h3>
-                          <p className="text-gray-600 text-sm">{appointment.type}</p>
                         </div>
                       </div>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(appointment.status)}`}>
@@ -689,12 +688,7 @@ const handleViewDetails = async (appointment) => {
                   <span className="text-gray-600">{selectedAppointment.patient_id}</span>
                 </div>
                 
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Contact
-  </label>
-  <span className="text-gray-600">{patientDetails?.contact_no || 'Loading...'}</span>
-</div>
+               
               </div>
 
               {/* Additional patient details if loaded */}
@@ -739,15 +733,6 @@ const handleViewDetails = async (appointment) => {
                   )}
                 </div>
               )}
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Appointment Type
-                </label>
-                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg">
-                  {selectedAppointment.type}
-                </span>
-              </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
