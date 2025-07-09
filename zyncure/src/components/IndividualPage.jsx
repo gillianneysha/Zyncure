@@ -355,6 +355,139 @@ export { Security as SecurityPage }
 
 export { Notification as NotificationPage }
 
+export function ContactInformationPage({ onBack }) {
+  const [contactData, setContactData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    mobileNumber: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchContactInfo() {
+      setLoading(true);
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          setError("Failed to authenticate user");
+          setLoading(false);
+          return;
+        }
+
+        // Get user type from profiles table
+        let { data: profileData, error: _profileError } = await supabase
+          .from("profiles")
+          .select("user_type")
+          .eq("id", user.id)
+          .single();
+
+        let currentUserType = profileData?.user_type || user.user_metadata?.user_type;
+
+        if (!currentUserType) {
+          setError("User type not found");
+          setLoading(false);
+          return;
+        }
+
+        // Determine which table to query based on user type
+        const tableName = currentUserType === 'patient' ? 'patients' : 'medicalprofessionals';
+        const idColumn = currentUserType === 'patient' ? 'patient_id' : 'med_id';
+
+        // Fetch user data from the appropriate table
+        let { data: userData, error: userDataError } = await supabase
+          .from(tableName)
+          .select("*")
+          .eq(idColumn, user.id)
+          .single();
+
+        if (userDataError && userDataError.code !== 'PGRST116') {
+          console.error(`Error fetching from ${tableName}:`, userDataError);
+          setError(`Failed to fetch user data from ${tableName}`);
+          setLoading(false);
+          return;
+        }
+
+        let profile = userData || user.user_metadata || {};
+
+        const formattedData = {
+          firstName: profile.first_name || "",
+          lastName: profile.last_name || "",
+          email: user.email || profile.email || "",
+          mobileNumber: profile.contact_no || "",
+        };
+
+        setContactData(formattedData);
+        setLoading(false);
+      } catch (err) {
+        console.error("Unexpected error in fetchContactInfo:", err);
+        setError("An unexpected error occurred");
+        setLoading(false);
+      }
+    }
+    fetchContactInfo();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-profileBg rounded-xl p-8 h-[700px] flex items-center justify-center">
+        <div className="text-mySidebar">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+      <button
+        onClick={onBack}
+        className="flex items-center text-mySidebar mb-6 hover:underline"
+      >
+        <ArrowLeft className="mr-2" size={20} /> Back to Billing
+      </button>
+
+      <h2 className="text-4xl text-profileHeader font-bold mb-6 flex items-center gap-3">
+        <Smartphone className="w-9 h-9 text-profileHeader" />
+        Contact Information
+      </h2>
+
+      {error && <div className="text-red-500 mb-4">{error}</div>}
+
+      <div className="space-y-6">
+        <div>
+          <label className="block text-mySidebar mb-2 font-semibold">Full Name</label>
+          <div className="w-full p-3 border border-mySidebar rounded-xl bg-profileBg text-mySidebar">
+            {contactData.firstName && contactData.lastName
+              ? `${contactData.firstName} ${contactData.lastName}`
+              : "Not provided"
+            }
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-mySidebar mb-2 font-semibold">Email Address</label>
+          <div className="w-full p-3 border border-mySidebar rounded-xl bg-profileBg text-mySidebar">
+            {contactData.email || "Not provided"}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-mySidebar mb-2 font-semibold">Mobile Number</label>
+          <div className="w-full p-3 border border-mySidebar rounded-xl bg-profileBg text-mySidebar">
+            {contactData.mobileNumber || "Not provided"}
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+          <p className="text-blue-800 text-sm">
+            <strong>Note:</strong> To update your contact information, please go to the Personal Information section in your profile settings.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function BillingPage() {
   const [showPlans, setShowPlans] = useState(false);
@@ -364,6 +497,7 @@ export function BillingPage() {
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [error, setError] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
+  const [showContactInfo, setShowContactInfo] = useState(false);
 
   // Check for payment success/failure in URL params
   useEffect(() => {
@@ -423,9 +557,7 @@ export function BillingPage() {
 
   const handleOptionClick = (option) => {
     if (option === "Subscriptions") setShowPlans(true);
-    else if (option === "Contact Information") {
-      // Add logic for Contact Information if needed
-    }
+    else if (option === "Contact Information") setShowContactInfo(true);
   };
 
   // Create PayMongo Checkout Session with improved error handling
@@ -672,7 +804,7 @@ export function BillingPage() {
   // Rest of your component remains the same...
   const SecurityOption = ({ title, onClick }) => (
     <div
-      className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-50 transition-colors"
+      className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
       onClick={() => onClick(title)}
     >
       <span className="text-mySidebar">{title}</span>
@@ -773,7 +905,7 @@ export function BillingPage() {
       <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
         <button
           onClick={() => setShowPlans(false)}
-          className="flex items-center text-gray-600 mb-6 hover:underline"
+          className="flex items-center text-mySidebar mb-6 hover:underline"
         >
           <ArrowLeft className="mr-2" size={20} /> Back to Billing
         </button>
@@ -879,6 +1011,10 @@ export function BillingPage() {
   }
 
   // Default Billing Home
+  if (showContactInfo) {
+    return <ContactInformationPage onBack={() => setShowContactInfo(false)} />;
+  }
+
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
@@ -1041,7 +1177,7 @@ export function TermsOfServicePage({ onBack }) {
         <ul className="list-disc ml-6">
           <li>ZynCure reserves the right to amend these Terms and Conditions at any time.</li>
           <li>Users will be notified of significant changes through email or in-app notifications.</li>
-          <li>For questions or concerns, contact ZynCure Support at <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a>.</li>
+          <li>For questions or concerns, contact ZynCure Support at <a className="underline" href="mailto:zyncure2025@gmail.com">zyncure2025@gmail.com</a>.</li>
         </ul>
         <p>
           By using ZynCure, you acknowledge and agree to these Terms and Conditions. If you do not agree, please discontinue use immediately.
@@ -1124,7 +1260,7 @@ export function PrivacyPolicyPage({ onBack }) {
           </li>
         </ul>
         <p>
-          To exercise these rights, please contact us at <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a>.
+          To exercise these rights, please contact us at <a className="underline" href="mailto:zyncure2025@gmail.com">zyncure2025@gmail.com</a>.
         </p>
         <h3 className="font-bold text-lg mt-4 mb-2">VI. Data Retention</h3>
         <p>
@@ -1137,8 +1273,8 @@ export function PrivacyPolicyPage({ onBack }) {
         <h3 className="font-bold text-lg mt-4 mb-2">VIII. Contact Us</h3>
         <p>
           If you have any questions, concerns, or requests regarding this Privacy Agreement or your data, please contact us at:<br />
-          <b>Email:</b> <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a><br />
-          <b>Phone:</b> +63 (2) 1234-5678
+          <b>Email:</b> <a className="underline" href="mailto:zyncure2025@gmail.com">zyncure2025@gmail.com</a><br />
+          <b>Phone:</b> +63 921 642 4770
 
         </p>
         <p>
@@ -1194,10 +1330,6 @@ export function PoliciesPage() {
         />
         <SecurityOption
           title="Privacy Policy"
-          onClick={handleOptionClick}
-        />
-        <SecurityOption
-          title="Community Standards"
           onClick={handleOptionClick}
         />
       </div>
