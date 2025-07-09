@@ -212,7 +212,7 @@ const Home = () => {
     <div className="min-h-screen from-pink-50 to-orange-50">
       {/* Header Section */}
       <div className="px-6 py-4">
-        <h1 className="text-3xl font-bold" style={{ color: '#55A1A4' }}>
+        <h1 className="text-4xl font-bold" style={{ color: '#55A1A4' }}>
           Welcome!
         </h1>
         <p className="text-gray-600 mt-1">
