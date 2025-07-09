@@ -13,7 +13,6 @@ function truncateFileName(fileName, maxLength = 25) {
   return fileName.slice(0, keep) + "..." + "." + extension;
 }
 
-// Helper: format expires_at
 function formatExpiresAt(expires_at) {
   if (!expires_at) return "Permanent";
   const expiresDate = new Date(expires_at);
@@ -30,7 +29,6 @@ function formatExpiresAt(expires_at) {
   return "Expires soon";
 }
 
-// Folder Card
 function FolderCard({ folder, onClick }) {
   return (
     <div
@@ -45,9 +43,9 @@ function FolderCard({ folder, onClick }) {
   );
 }
 
-// File Card with duration indicator
 function FileCard({ file, onPreview }) {
   const ext = file.name?.split(".").pop().toLowerCase() || 'file';
+
   return (
     <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden">
       <div className="p-2 flex justify-between items-center">
@@ -74,19 +72,23 @@ function FileCard({ file, onPreview }) {
           <Download size={18} />
         </a>
       </div>
+
       <div
         className="bg-white p-2 cursor-pointer"
         onClick={() => onPreview(file)}
         title="Click to preview"
       >
-        {file.preview_url ? (
+        {file.file_url ? (
           ext === "pdf" ? (
-            <div className="w-full h-32 rounded bg-gray-50 flex items-center justify-center">
-              <span className="text-gray-500">PDF Preview</span>
-            </div>
+            <iframe
+              src={file.file_url}
+              title={`Preview of ${file.name}`}
+              className="w-full h-32 rounded border"
+              style={{ border: 'none' }}
+            />
           ) : (
             <img
-              src={file.preview_url}
+              src={file.file_url}
               alt={`Preview of ${file.name}`}
               className="w-full h-32 object-cover rounded"
             />
@@ -97,9 +99,12 @@ function FileCard({ file, onPreview }) {
           </div>
         )}
       </div>
+
       <div className="p-2 flex items-center gap-1 text-xs text-white">
         <Clock size={14} className="inline-block mr-1" />
-        {file.symptom_file ? (file.expires_at ? formatExpiresAt(file.expires_at) : "Permanent") : formatExpiresAt(file.expires_at)}
+        {file.symptom_file
+          ? (file.expires_at ? formatExpiresAt(file.expires_at) : "Permanent")
+          : formatExpiresAt(file.expires_at)}
       </div>
     </div>
   );
@@ -128,31 +133,29 @@ export default function DoctorsPatientsFolders() {
     // eslint-disable-next-line
   }, [currentUser]);
 
-  // --- Fetch shared symptom report files from shared_symptoms table for this doctor/patient ---
   async function loadSharedSymptomReports(doctorId, patientId) {
     const nowISOString = new Date().toISOString();
+
     const { data, error } = await supabase
       .from('shared_symptoms')
       .select('*')
       .eq('shared_with', doctorId)
       .eq('shared_by', patientId)
       .or(`expires_at.is.null,expires_at.gt.${nowISOString}`);
-    console.log("SYMPTOM QUERY doctorId:", doctorId, "patientId:", patientId, "RESULT:", data, "ERROR:", error); // DEBUG
+
     if (error) return [];
+
     return (data || []).map(report => ({
       id: `sharedsymptom_${report.id}`,
       name: report.pdf_filename || 'symptom-report.pdf',
-      file_url: report.report_url || null, // may be null, will get signed URL if needed
-      preview_url: null,
+      file_url: report.report_url || null,
+      preview_url: report.report_url || null,
       expires_at: report.expires_at,
       symptom_file: true,
-      patient_id: patientId,
-      storage_path: report.pdf_filename,
-      shared_symptom_id: report.id,
+      patient_id: patientId
     }));
   }
 
-  // --- Fetch standard files/folders ---
   async function loadPatientsWithInfo() {
     setLoading(true);
     const { data: connections, error: connError } = await supabase
@@ -166,7 +169,6 @@ export default function DoctorsPatientsFolders() {
     }
 
     const enrichedPatients = await Promise.all(connections.map(async conn => {
-      // Fetch shared folders/files as before
       const { data: shares } = await supabase
         .from('file_shares')
         .select(`
@@ -190,18 +192,17 @@ export default function DoctorsPatientsFolders() {
           if (share.folders && !folders.find(f => f.id === share.folders.id)) {
             folders.push(share.folders);
           }
-          if (share.medical_files && !share.medical_files.folder_id) {
+          // Only add as a file if this share is for a file (file_id is set)
+          if (share.medical_files && share.file_id) {
             files.push({
               ...share.medical_files,
               expires_at: share.expires_at,
-              share_id: share.id,
-              share_info: share
+              share_id: share.id
             });
           }
         }
       }
 
-      // Fetch shared symptom PDF reports via shared_symptoms logic
       const sharedSymptomFiles = await loadSharedSymptomReports(currentUser.id, conn.patient_id);
 
       return {
@@ -216,7 +217,6 @@ export default function DoctorsPatientsFolders() {
     setLoading(false);
   }
 
-  // --- For opened folders: standard logic ---
   async function handleOpenSharedFolder(folder) {
     setOpenedFolder(folder);
     setPreviewFile(null);
@@ -228,29 +228,10 @@ export default function DoctorsPatientsFolders() {
     setFolderFiles(files || []);
   }
 
-  // --- For previewing files, get signed URL for symptom report if needed ---
-  async function handlePreviewFile(file) {
-    if (!file.symptom_file) {
-      setPreviewFile(file);
-      return;
-    }
-    // For shared_symptom PDF, get signed URL if not already present
-    let signedUrl = file.file_url;
-    if (!signedUrl && file.storage_path) {
-      const { data, error } = await supabase
-        .storage
-        .from('sharedsymptoms')
-        .createSignedUrl(file.storage_path, 60 * 30); // 30 min
-      if (error) {
-        alert("Failed to load preview");
-        return;
-      }
-      signedUrl = data.signedUrl;
-    }
+  function handlePreviewFile(file) {
     setPreviewFile({
       ...file,
-      file_url: signedUrl,
-      preview_url: signedUrl,
+      preview_url: file.file_url
     });
   }
 
@@ -369,6 +350,12 @@ export default function DoctorsPatientsFolders() {
                           src={previewFile.preview_url}
                           title={`Preview of ${previewFile.name}`}
                           className="w-full h-[60vh] rounded border"
+                          style={{ border: 'none' }}
+                          onLoad={() => console.log('PDF loaded successfully:', previewFile.preview_url)}
+                          onError={(e) => {
+                            console.error('PDF failed to load:', previewFile.preview_url);
+                            console.error('Error details:', e);
+                          }}
                         />
                       ) : (
                         <img
@@ -380,6 +367,7 @@ export default function DoctorsPatientsFolders() {
                     ) : (
                       <div className="text-gray-400">No Preview Available</div>
                     )}
+
                   </div>
                   <div className="mt-4 text-right">
                     {previewFile.file_url && (
