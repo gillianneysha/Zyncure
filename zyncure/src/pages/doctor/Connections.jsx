@@ -41,7 +41,8 @@ const DoctorConnectionsPage = () => {
   // ========================================
   // DATA LOADING FUNCTIONS
   // ========================================
-  const loadConnections = async () => {
+// Replace your existing doctor loadConnections function with this fixed version
+const loadConnections = async () => {
   try {
     setIsLoading(true);
     
@@ -66,14 +67,33 @@ const DoctorConnectionsPage = () => {
 
     const allConnections = data || [];
     
-    // Separate pending incoming requests from other connections
+    console.log('Total doctor connections returned:', allConnections.length);
+    console.log('All doctor connections data:', allConnections);
+    
+    // Debug: Log the requester_type and request_direction for each connection
+    allConnections.forEach(conn => {
+      console.log(`Doctor Connection ${conn.id}:`, {
+        requester_type: conn.requester_type,
+        request_direction: conn.request_direction,
+        status: conn.status,
+        patient_name: `${conn.patient_first_name} ${conn.patient_last_name}`
+      });
+    });
+    
+    // FIXED: Show pending requests where the PATIENT requested to connect with the DOCTOR
+    // This means requester_type = 'patient' and status = 'pending'
     const pendingIncoming = allConnections.filter(
-      conn => conn.status === 'pending' 
+      conn => conn.status === 'pending' && conn.requester_type === 'patient'
     );
     
+    console.log('Pending incoming requests for doctor:', pendingIncoming);
+    
+    // All other connections (accepted, rejected, or outgoing pending requests)
     const otherConnections = allConnections.filter(
-      conn => !(conn.status === 'pending')
+      conn => !(conn.status === 'pending' && conn.requester_type === 'patient')
     );
+    
+    console.log('Other doctor connections:', otherConnections);
     
     setConnections(otherConnections);
     setPendingRequests(pendingIncoming);
