@@ -51,9 +51,9 @@ export default function LoginForm({ setToken }) {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [mfaChallenge, setMfaChallenge] = useState(null);
-  const [mfaCode, setMfaCode] = useState("");
-  const [mfaError, setMfaError] = useState("");
+  const [emailVerification, setEmailVerification] = useState(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationError, setVerificationError] = useState("");
 
 
   const handleChange = useCallback((event) => {
@@ -97,19 +97,59 @@ export default function LoginForm({ setToken }) {
   }, [formData]);
 
 
-  // Simple redirect based on user metadata - useUser hook will handle role detection
+  // Simple redirect based on user metadata
   const getRedirectPath = (user) => {
-    // Check user metadata for medical professional
     const userRole = user.user_metadata?.user_type;
-
-
     if (userRole === "doctor") {
       return "/doctor";
     }
-
-
-    // Default to home - the router will redirect admins appropriately
     return "/home";
+  };
+
+
+  // Check if user has 2FA enabled from user metadata
+  const check2FAEnabled = (user) => {
+    return user.user_metadata?.two_factor_enabled || false;
+  };
+
+
+  // Send email verification code
+  const sendVerificationCode = async (email) => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: window.location.origin
+        }
+      });
+
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error("Error sending verification code:", error);
+      return false;
+    }
+  };
+
+
+  // Verify email code
+  const verifyEmailCode = async (email, code) => {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email,
+        token: code,
+        type: 'email'
+      });
+
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error verifying email code:", error);
+      throw error;
+    }
   };
 
 
@@ -121,10 +161,11 @@ export default function LoginForm({ setToken }) {
 
     setIsLoading(true);
     setErrors({});
-    setMfaError("");
+    setVerificationError("");
 
 
     try {
+      // First, try regular login
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -132,19 +173,38 @@ export default function LoginForm({ setToken }) {
 
 
       if (error) {
-        if (error.message.includes("mfa")) {
-          // Handle MFA challenge
-          setMfaChallenge(error.mfa_challenge);
-          return;
-        }
         throw error;
       }
 
 
-      // Login successful
-      setToken(data.session);
-      const redirectPath = getRedirectPath(data.user);
-      navigate(redirectPath);
+      // Check if user has 2FA enabled from user metadata
+      const has2FA = check2FAEnabled(data.user);
+
+
+      if (has2FA) {
+        // Sign out the user temporarily
+        await supabase.auth.signOut();
+
+
+        // Send verification code
+        const codeSent = await sendVerificationCode(formData.email);
+
+
+        if (codeSent) {
+          setEmailVerification({
+            email: formData.email,
+            password: formData.password,
+            user: data.user
+          });
+        } else {
+          throw new Error("Failed to send verification code");
+        }
+      } else {
+        // No 2FA required - proceed with login
+        setToken(data.session);
+        const redirectPath = getRedirectPath(data.user);
+        navigate(redirectPath);
+      }
 
 
     } catch (error) {
@@ -152,6 +212,52 @@ export default function LoginForm({ setToken }) {
       setErrors({
         submit: error.message || "Login failed. Please try again."
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  // Handle email verification
+  const handleEmailVerification = async (event) => {
+    event.preventDefault();
+    setVerificationError("");
+    setIsLoading(true);
+
+
+    if (!verificationCode.trim()) {
+      setVerificationError("Please enter the verification code.");
+      setIsLoading(false);
+      return;
+    }
+
+
+    try {
+      // Verify the email code
+      const verificationData = await verifyEmailCode(emailVerification.email, verificationCode);
+
+
+      if (verificationData.session) {
+        // Email verification successful - complete login
+        setToken(verificationData.session);
+        const redirectPath = getRedirectPath(verificationData.user);
+        navigate(redirectPath);
+      } else {
+        throw new Error("Email verification failed");
+      }
+
+
+    } catch (error) {
+      console.error("Email verification error:", error);
+      if (error.message.includes("expired")) {
+        setVerificationError("Verification code has expired. Please try logging in again.");
+        setEmailVerification(null);
+        setVerificationCode("");
+      } else if (error.message.includes("invalid")) {
+        setVerificationError("Invalid verification code. Please check your email and try again.");
+      } else {
+        setVerificationError("Verification failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -213,45 +319,9 @@ export default function LoginForm({ setToken }) {
   };
 
 
-  // Handle MFA code submission
-  const handleMfaSubmit = async (event) => {
-    event.preventDefault();
-    setMfaError("");
-    setIsLoading(true);
-
-
-    try {
-      const { data, error } = await supabase.auth.mfa.verify({
-        factorId: mfaChallenge.factorId,
-        challengeId: mfaChallenge.challengeId,
-        code: mfaCode,
-      });
-
-
-      if (error) {
-        setMfaError("Invalid code. Please try again.");
-        return;
-      }
-
-
-      // MFA verification successful
-      setToken(data.session);
-      const redirectPath = getRedirectPath(data.user);
-      navigate(redirectPath);
-
-
-    } catch (error) {
-      console.error("MFA verification error:", error);
-      setMfaError("Verification failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
   return (
     <>
-      <form onSubmit={mfaChallenge ? handleMfaSubmit : handleSubmit}>
+      <form onSubmit={emailVerification ? handleEmailVerification : handleSubmit}>
         {/* Error Message */}
         {errors.submit && (
           <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
@@ -260,31 +330,42 @@ export default function LoginForm({ setToken }) {
         )}
 
 
-        {/* MFA Challenge Form */}
-        {mfaChallenge && (
+        {/* Email Verification Form */}
+        {emailVerification && (
           <div className="w-4/5 mx-auto mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <h3 className="text-lg font-semibold mb-2 text-blue-800">Two-Factor Authentication</h3>
             <p className="text-sm text-blue-600 mb-3">
-              Please enter the verification code from your authenticator app.
+              We've sent a verification code to {emailVerification.email}. Please enter it below to complete your login.
             </p>
             <input
               type="text"
-              value={mfaCode}
-              onChange={(e) => setMfaCode(e.target.value)}
-              placeholder="Enter 6-digit code"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value)}
+              placeholder="Enter verification code"
               className="w-full p-2 border border-blue-300 rounded-lg mb-2"
-              maxLength="6"
               disabled={isLoading}
             />
-            {mfaError && (
-              <p className="text-sm text-red-600 mb-2">{mfaError}</p>
+            {verificationError && (
+              <p className="text-sm text-red-600 mb-2">{verificationError}</p>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                setEmailVerification(null);
+                setVerificationCode("");
+                setVerificationError("");
+              }}
+              className="text-sm text-blue-600 hover:underline"
+              disabled={isLoading}
+            >
+              Back to login
+            </button>
           </div>
         )}
 
 
         {/* Regular Login Form */}
-        {!mfaChallenge && (
+        {!emailVerification && (
           <>
             <FormField
               label="Email"
@@ -338,11 +419,11 @@ export default function LoginForm({ setToken }) {
             : "bg-[#55A1A4] hover:bg-[#368487]"
             }`}
         >
-          {isLoading ? "Logging in..." : (mfaChallenge ? "Verify Code" : "Log In")}
+          {isLoading ? "Processing..." : (emailVerification ? "Verify Code" : "Log In")}
         </button>
 
 
-        {!mfaChallenge && (
+        {!emailVerification && (
           <>
             <div className="w-4/5 mx-auto mt-2 text-left">
               <span className="text-[#F5E0D9] text-sm">
