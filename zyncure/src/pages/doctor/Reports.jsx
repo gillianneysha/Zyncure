@@ -2,46 +2,51 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../client';
 import { X, Folder, FileText, Download, ArrowLeft, User, Clock } from 'lucide-react';
 
+
 // Utility for truncating file names
 function truncateFileName(fileName, maxLength = 25) {
-  if (!fileName || fileName.length <= maxLength) return fileName;
-  const lastDot = fileName.lastIndexOf(".");
-  if (lastDot === -1 || lastDot === 0) return fileName.slice(0, maxLength - 3) + "...";
-  const extension = fileName.slice(lastDot + 1);
-  const keep = maxLength - extension.length - 4;
-  if (keep <= 0) return "..." + fileName.slice(lastDot);
-  return fileName.slice(0, keep) + "..." + "." + extension;
+ if (!fileName || fileName.length <= maxLength) return fileName;
+ const lastDot = fileName.lastIndexOf(".");
+ if (lastDot === -1 || lastDot === 0) return fileName.slice(0, maxLength - 3) + "...";
+ const extension = fileName.slice(lastDot + 1);
+ const keep = maxLength - extension.length - 4;
+ if (keep <= 0) return "..." + fileName.slice(lastDot);
+ return fileName.slice(0, keep) + "..." + "." + extension;
 }
+
 
 function formatExpiresAt(expires_at) {
-  if (!expires_at) return "Permanent";
-  const expiresDate = new Date(expires_at);
-  const now = new Date();
-  if (expiresDate < now) return "Expired";
-  const diffMs = expiresDate - now;
-  const diffMins = Math.round(diffMs / (1000 * 60));
-  const diffHrs = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHrs / 24);
+ if (!expires_at) return "Permanent";
+ const expiresDate = new Date(expires_at);
+ const now = new Date();
+ if (expiresDate < now) return "Expired";
+ const diffMs = expiresDate - now;
+ const diffMins = Math.round(diffMs / (1000 * 60));
+ const diffHrs = Math.floor(diffMins / 60);
+ const diffDays = Math.floor(diffHrs / 24);
 
-  if (diffDays > 0) return `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
-  if (diffHrs > 0) return `Expires in ${diffHrs} hour${diffHrs > 1 ? 's' : ''}`;
-  if (diffMins > 0) return `Expires in ${diffMins} minute${diffMins > 1 ? 's' : ''}`;
-  return "Expires soon";
+
+ if (diffDays > 0) return `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+ if (diffHrs > 0) return `Expires in ${diffHrs} hour${diffHrs > 1 ? 's' : ''}`;
+ if (diffMins > 0) return `Expires in ${diffMins} minute${diffMins > 1 ? 's' : ''}`;
+ return "Expires soon";
 }
+
 
 function FolderCard({ folder, onClick }) {
-  return (
-    <div
-      className="bg-[#55A1A4] text-white p-4 rounded-lg shadow-md flex items-center justify-between cursor-pointer hover:bg-[#478384] transition"
-      onClick={() => onClick(folder)}
-    >
-      <div className="flex items-center">
-        <Folder className="mr-2" />
-        <span className="font-medium">{truncateFileName(folder.name, 20)}</span>
-      </div>
-    </div>
-  );
+ return (
+   <div
+     className="bg-[#55A1A4] text-white p-4 rounded-lg shadow-md flex items-center justify-between cursor-pointer hover:bg-[#478384] transition"
+     onClick={() => onClick(folder)}
+   >
+     <div className="flex items-center">
+       <Folder className="mr-2" />
+       <span className="font-medium">{truncateFileName(folder.name, 20)}</span>
+     </div>
+   </div>
+ );
 }
+
 
 function FileCard({ file, onPreview }) {
   const ext = file.name?.split(".").pop().toLowerCase() || 'file';
@@ -108,9 +113,12 @@ function FileCard({ file, onPreview }) {
       </div>
     </div>
   );
+
 }
 
+
 export default function DoctorsPatientsFolders() {
+
   const [currentUser, setCurrentUser] = useState(null);
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -449,4 +457,5 @@ export default function DoctorsPatientsFolders() {
       </div>
     </div>
   );
+
 }

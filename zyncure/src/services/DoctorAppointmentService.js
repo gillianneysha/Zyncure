@@ -195,148 +195,145 @@ export const doctorAppointmentService = {
     }
   },
 
-  /**
-   * Get all appointments for the logged-in doctor for a specific date
-   * @param {string} date - Date in YYYY-MM-DD format
-   * @param {string} status - Filter by status ('all', 'confirmed', 'pending', 'cancelled', 'completed')
-   * @returns {object} Appointments data and error
-   */
-  async getDoctorAppointments(date, status = 'all') {
-    try {
-      const doctorInfo = await getCurrentDoctor();
-      
-      console.log('Debug - Query params:', {
-        date,
-        doctorId: doctorInfo.id,
-        status
-      });
+/**
+ * Get all appointments for the logged-in doctor for a specific date
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @param {string} status - Filter by status ('all', 'confirmed', 'pending', 'cancelled', 'completed')
+ * @returns {object} Appointments data and error
+ */
+async getDoctorAppointments(date, status = 'all') {
+  try {
+    const doctorInfo = await getCurrentDoctor();
+    
+    console.log('Debug - Query params:', {
+      date,
+      doctorId: doctorInfo.id,
+      status
+    });
 
-      // Convert input date to start and end of day in UTC
-      const targetDate = new Date(date);
-      const startDate = new Date(targetDate);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(targetDate);
-      endDate.setHours(23, 59, 59, 999);
+    // Fix: Construct date range without timezone conversion
+    const startDate = `${date}T00:00:00`;
+    const endDate = `${date}T23:59:59`;
 
-      console.log('Debug - Date range:', {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
-      });
+    console.log('Debug - Date range:', {
+      startDate,
+      endDate
+    });
 
-      let query = supabase
-        .from('appointment_details')
-        .select('*')
-        .eq('med_id', doctorInfo.id)
-        .gte('appointment_date', startDate.toISOString())
-        .lte('appointment_date', endDate.toISOString())
-        .order('appointment_date');
+    let query = supabase
+      .from('appointment_details')
+      .select('*')
+      .eq('med_id', doctorInfo.id)
+      .gte('appointment_date', startDate)
+      .lte('appointment_date', endDate)
+      .order('appointment_date');
 
-      if (status !== 'all') {
-        query = query.eq('status', status);
-      }
-
-      const { data, error } = await query;
-
-      console.log('Debug - Query result:', {
-        appointmentsFound: data?.length || 0,
-        error: error?.message
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Transform the data
-      const transformedData = (data || []).map(apt => {
-        const appointmentDate = new Date(apt.appointment_date);
-        return {
-          id: apt.appointment_id,
-          time: appointmentDate.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          }),
-          patient_name: apt.patient_name,
-          patient_id: apt.patient_id,
-          patient_email: apt.patient_email,
-          type: 'Consultation',
-          status: apt.status,
-          reason: apt.reason,
-          created_at: apt.created_at,
-          updated_at: apt.updated_at,
-          doctor_name: apt.doctor_name,
-          doctor_email: apt.doctor_email
-        };
-      });
-
-      console.log('Debug - Transformed data:', {
-        transformedCount: transformedData.length,
-        firstAppointment: transformedData[0]
-      });
-
-      return { data: transformedData, error: null };
-      
-    } catch (error) {
-      console.error('Error in getDoctorAppointments:', error);
-      return { data: [], error: error.message };
+    if (status !== 'all') {
+      query = query.eq('status', status);
     }
-  },
 
-  /**
-   * Get appointments for a date range
-   * @param {string} startDate - Start date in YYYY-MM-DD format
-   * @param {string} endDate - End date in YYYY-MM-DD format
-   * @param {string} status - Filter by status
-   * @returns {object} Appointments data and error
-   */
-  async getDoctorAppointmentsByDateRange(startDate, endDate, status = 'all') {
-    try {
-      const doctorInfo = await getCurrentDoctor();
-      
-      let query = supabase
-        .from('appointment_details')
-        .select('*')
-        .eq('med_id', doctorInfo.id)
-        .gte('appointment_date', `${startDate}T00:00:00`)
-        .lt('appointment_date', `${endDate}T23:59:59`)
-        .order('appointment_date');
+    const { data, error } = await query;
 
-      if (status !== 'all') {
-        query = query.eq('status', status);
-      }
+    console.log('Debug - Query result:', {
+      appointmentsFound: data?.length || 0,
+      error: error?.message
+    });
 
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching doctor appointments by date range:', error);
-        throw error;
-      }
-
-      const transformedData = (data || []).map(apt => {
-        const { date: appointmentDate, time } = formatAppointmentDateTime(apt.appointment_date);
-        return {
-          id: apt.appointment_id,
-          date: appointmentDate,
-          time,
-          patient_name: apt.patient_name,
-          patient_id: apt.patient_id,
-          patient_email: apt.patient_email,
-          type: 'Consultation',
-          status: apt.status,
-          reason: apt.reason,
-          created_at: apt.created_at,
-          updated_at: apt.updated_at,
-          doctor_name: apt.doctor_name,
-          doctor_email: apt.doctor_email
-        };
-      });
-
-      return { data: transformedData, error: null };
-    } catch (error) {
-      console.error('Error in getDoctorAppointmentsByDateRange:', error);
-      return { data: [], error: error.message };
+    if (error) {
+      throw error;
     }
-  },
+
+    // Transform the data
+    const transformedData = (data || []).map(apt => {
+      const appointmentDate = new Date(apt.appointment_date);
+      return {
+        id: apt.appointment_id,
+        time: appointmentDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }),
+        patient_name: apt.patient_name,
+        patient_id: apt.patient_id,
+        patient_email: apt.patient_email,
+        type: 'Consultation',
+        status: apt.status,
+        reason: apt.reason,
+        created_at: apt.created_at,
+        updated_at: apt.updated_at,
+        doctor_name: apt.doctor_name,
+        doctor_email: apt.doctor_email
+      };
+    });
+
+    console.log('Debug - Transformed data:', {
+      transformedCount: transformedData.length,
+      firstAppointment: transformedData[0]
+    });
+
+    return { data: transformedData, error: null };
+    
+  } catch (error) {
+    console.error('Error in getDoctorAppointments:', error);
+    return { data: [], error: error.message };
+  }
+},
+  /**
+ **
+ * Get appointments for a date range
+ * @param {string} startDate - Start date in YYYY-MM-DD format
+ * @param {string} endDate - End date in YYYY-MM-DD format
+ * @param {string} status - Filter by status
+ * @returns {object} Appointments data and error
+ */
+async getDoctorAppointmentsByDateRange(startDate, endDate, status = 'all') {
+  try {
+    const doctorInfo = await getCurrentDoctor();
+    
+    let query = supabase
+      .from('appointment_details')
+      .select('*')
+      .eq('med_id', doctorInfo.id)
+      .gte('appointment_date', `${startDate}T00:00:00`)
+      .lte('appointment_date', `${endDate}T23:59:59`)
+      .order('appointment_date');
+
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching doctor appointments by date range:', error);
+      throw error;
+    }
+
+    const transformedData = (data || []).map(apt => {
+      const { date: appointmentDate, time } = formatAppointmentDateTime(apt.appointment_date);
+      return {
+        id: apt.appointment_id,
+        date: appointmentDate,
+        time,
+        patient_name: apt.patient_name,
+        patient_id: apt.patient_id,
+        patient_email: apt.patient_email,
+        type: 'Consultation',
+        status: apt.status,
+        reason: apt.reason,
+        created_at: apt.created_at,
+        updated_at: apt.updated_at,
+        doctor_name: apt.doctor_name,
+        doctor_email: apt.doctor_email
+      };
+    });
+
+    return { data: transformedData, error: null };
+  } catch (error) {
+    console.error('Error in getDoctorAppointmentsByDateRange:', error);
+    return { data: [], error: error.message };
+  }
+},
 
   /**
    * Update appointment status

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import Calendar from '../../components/Calendar';
 import AppointmentModal from '../../components/AppointmentModal';
@@ -6,7 +5,6 @@ import AppointmentList from '../../components/AppointmentList';
 import { appointmentService, userService } from '../../services/AppointmentService';
 import RescheduleModal from '../../components/RescheduleModal'; 
 import { supabase } from "../../client";
-
 
 const PersonalAppointmentTracker = () => {
   const [userData, setUserData] = useState({
@@ -26,109 +24,128 @@ const PersonalAppointmentTracker = () => {
   const [newAppointment, setNewAppointment] = useState({
     doctor_id: '',
     time: '',
-    reason: '',
-    type: 'Consultation'
+    reason: ''
   });
 
- useEffect(() => {
-  const initializeData = async () => {
-    setLoading(true);
+  // Function to refresh appointments from the database
+  const refreshAppointments = async () => {
+    if (!userData.id || userData.id === "----") return;
+    
     try {
-      const user = await userService.getUserData();
-      if (user) {
-        setUserData(user);
-        
-        const { data: userAppointments, error: appointmentsError } = 
-          await appointmentService.getUserAppointments(user.id);
-        
-        if (appointmentsError) {
-          console.error('Error loading appointments:', appointmentsError);
-          setError('Failed to load your appointments');
-        } else if (userAppointments) {
-          setAppointments(userAppointments);
-        }
-      }
-
-      const { data: connectedDoctors, error: doctorsError } = 
-        await appointmentService.getConnectedDoctors();
+      const { data: refreshedAppointments, error: refreshError } = 
+        await appointmentService.getUserAppointments(userData.id);
       
-      if (doctorsError) {
-        console.error('Error loading doctors:', doctorsError);
-        setError('Failed to load connected doctors');
-      } else if (connectedDoctors) {
-        setDoctors(connectedDoctors);
+      if (refreshError) {
+        console.error('Error refreshing appointments:', refreshError);
+        setError('Failed to refresh appointments');
+      } else if (refreshedAppointments) {
+        setAppointments(refreshedAppointments);
       }
     } catch (err) {
-      console.error('Initialization error:', err);
-      setError('Failed to initialize appointment system');
-    } finally {
-      setLoading(false);
+      console.error('Error refreshing appointments:', err);
+      setError('Failed to refresh appointments');
     }
   };
 
-  // Set up real-time notification subscription
-  const setupNotificationSubscription = async () => {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error) {
-        console.error('Error getting user:', error);
+  useEffect(() => {
+    const initializeData = async () => {
+      setLoading(true);
+      try {
+        const user = await userService.getUserData();
+        if (user) {
+          setUserData(user);
+          
+          const { data: userAppointments, error: appointmentsError } = 
+            await appointmentService.getUserAppointments(user.id);
+          
+          if (appointmentsError) {
+            console.error('Error loading appointments:', appointmentsError);
+            setError('Failed to load your appointments');
+          } else if (userAppointments) {
+            setAppointments(userAppointments);
+          }
+        }
+
+        const { data: connectedDoctors, error: doctorsError } = 
+          await appointmentService.getConnectedDoctors();
+        
+        if (doctorsError) {
+          console.error('Error loading doctors:', doctorsError);
+          setError('Failed to load connected doctors');
+        } else if (connectedDoctors) {
+          setDoctors(connectedDoctors);
+        }
+      } catch (err) {
+        console.error('Initialization error:', err);
+        setError('Failed to initialize appointment system');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Set up real-time notification subscription
+    const setupNotificationSubscription = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error) {
+          console.error('Error getting user:', error);
+          return null;
+        }
+        
+        if (user?.id) {
+          const notificationSubscription = supabase
+            .channel('appointment_notifications')
+            .on('postgres_changes', 
+              { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'notifications',
+                filter: `user_id=eq.${user.id}`
+              }, 
+              (payload) => {
+                // Show a toast notification or update UI when new notification arrives
+                if (payload.new.type.includes('appointment')) {
+                  console.log('New appointment notification:', payload.new);
+                  // You can add a toast notification here
+                }
+              }
+            )
+            .subscribe();
+
+          return notificationSubscription;
+        }
+      } catch (err) {
+        console.error('Error setting up notification subscription:', err);
         return null;
       }
-      
-      if (user?.id) {
-        const notificationSubscription = supabase
-          .channel('appointment_notifications')
-          .on('postgres_changes', 
-            { 
-              event: 'INSERT', 
-              schema: 'public', 
-              table: 'notifications',
-              filter: `user_id=eq.${user.id}`
-            }, 
-            (payload) => {
-              // Show a toast notification or update UI when new notification arrives
-              if (payload.new.type.includes('appointment')) {
-                console.log('New appointment notification:', payload.new);
-                // You can add a toast notification here
-              }
-            }
-          )
-          .subscribe();
-
-        return notificationSubscription;
-      }
-    } catch (err) {
-      console.error('Error setting up notification subscription:', err);
       return null;
-    }
-    return null;
+    };
+
+    // Initialize data and set up subscription
+    initializeData();
+    
+    let notificationSubscription = null;
+    setupNotificationSubscription().then((subscription) => {
+      notificationSubscription = subscription;
+    });
+
+    // Cleanup function
+    return () => {
+      if (notificationSubscription) {
+        notificationSubscription.unsubscribe();
+      }
+    };
+  }, []);
+
+  const formatDateForStorage = (date) => {
+    // Create a new date object to avoid timezone issues
+    const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
-
-  // Initialize data and set up subscription
-  initializeData();
-  
-  let notificationSubscription = null;
-  setupNotificationSubscription().then((subscription) => {
-    notificationSubscription = subscription;
-  });
-
-  // Cleanup function
-  return () => {
-    if (notificationSubscription) {
-      notificationSubscription.unsubscribe();
-    }
-  };
-}, []);
-
-const formatDateForStorage = (date) => {
-  // Create a new date object to avoid timezone issues
-  const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-  const year = localDate.getFullYear();
-  const month = String(localDate.getMonth() + 1).padStart(2, '0');
-  const day = String(localDate.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
@@ -207,17 +224,11 @@ const formatDateForStorage = (date) => {
         setNewAppointment({
           doctor_id: '',
           time: '',
-          reason: '',
-          type: 'Consultation'
+          reason: ''
         });
 
-        setTimeout(async () => {
-          const { data: refreshedAppointments } = 
-            await appointmentService.getUserAppointments(userData.id);
-          if (refreshedAppointments) {
-            setAppointments(refreshedAppointments);
-          }
-        }, 1000);
+        // Refresh appointments after a short delay
+        setTimeout(refreshAppointments, 1000);
 
         return true;
       } else {
@@ -240,68 +251,74 @@ const formatDateForStorage = (date) => {
     setNewAppointment({
       doctor_id: '',
       time: '',
-      reason: '',
-      type: 'Consultation'
+      reason: ''
     });
   };
 
   const handleRescheduleRequest = (appointment) => {
-  setAppointmentToReschedule(appointment);
-  setShowRescheduleModal(true);
-  setError('');
-};
+    setAppointmentToReschedule(appointment);
+    setShowRescheduleModal(true);
+    setError('');
+  };
 
-const handleCancelRequest = async (appointment) => {
-  if (!window.confirm('Are you sure you want to cancel this appointment?')) {
-    return;
-  }
-  
-  setLoading(true);
-  try {
-    const { error: cancelError } = await appointmentService.updateAppointment(
-      appointment.id, 
-      { status: 'cancelled' }
+  const handleCancelRequest = async (appointment) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { error: cancelError } = await appointmentService.updateAppointment(
+        appointment.id, 
+        { status: 'cancelled' }
+      );
+      
+      if (cancelError) {
+        setError(`Failed to cancel appointment: ${cancelError}`);
+      } else {
+        // Update local state
+        setAppointments(prevAppointments => 
+          prevAppointments.map(apt => 
+            apt.id === appointment.id 
+              ? { ...apt, status: 'cancelled' }
+              : apt
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error cancelling appointment:', err);
+      setError('Failed to cancel appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle permanent removal of appointment from the list
+  const handlePermanentRemove = (removedAppointment) => {
+    setAppointments(prevAppointments => 
+      prevAppointments.filter(apt => apt.id !== removedAppointment.id)
+    );
+  };
+
+  const handleRescheduleComplete = (updatedAppointment) => {
+    // Update the appointments list with the rescheduled appointment
+    setAppointments(prevAppointments => 
+      prevAppointments.map(apt => 
+        apt.id === updatedAppointment.id 
+          ? updatedAppointment 
+          : apt
+      )
     );
     
-    if (cancelError) {
-      setError(`Failed to cancel appointment: ${cancelError}`);
-    } else {
-      // Update local state
-      setAppointments(prevAppointments => 
-        prevAppointments.map(apt => 
-          apt.id === appointment.id 
-            ? { ...apt, status: 'cancelled' }
-            : apt
-        )
-      );
-    }
-  } catch (err) {
-    console.error('Error cancelling appointment:', err);
-    setError('Failed to cancel appointment. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+    setShowRescheduleModal(false);
+    setAppointmentToReschedule(null);
+  };
 
-const handleRescheduleComplete = (updatedAppointment) => {
-  // Update the appointments list with the rescheduled appointment
-  setAppointments(prevAppointments => 
-    prevAppointments.map(apt => 
-      apt.id === updatedAppointment.id 
-        ? updatedAppointment 
-        : apt
-    )
-  );
-  
-  setShowRescheduleModal(false);
-  setAppointmentToReschedule(null);
-};
-
-const handleCloseRescheduleModal = () => {
-  setShowRescheduleModal(false);
-  setAppointmentToReschedule(null);
-  setError('');
-};
+  const handleCloseRescheduleModal = () => {
+    setShowRescheduleModal(false);
+    setAppointmentToReschedule(null);
+    setError('');
+  };
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -342,13 +359,15 @@ const handleCloseRescheduleModal = () => {
 
         {/* Right Appointments Section */}
         <div className="flex-1">
-         <AppointmentList
-  selectedDate={selectedDate}
-  appointments={appointments}
-  doctors={doctors}
-  onRescheduleRequest={handleRescheduleRequest}
-  onCancelRequest={handleCancelRequest}
-/>
+          <AppointmentList
+            selectedDate={selectedDate}
+            appointments={appointments}
+            doctors={doctors}
+            onRescheduleRequest={handleRescheduleRequest}
+            onCancelRequest={handleCancelRequest}
+            onPermanentRemove={handlePermanentRemove}
+            onRefresh={refreshAppointments}
+          />
         </div>
       </div>
 
@@ -369,13 +388,13 @@ const handleCloseRescheduleModal = () => {
       />
 
       {/* Reschedule Modal */}
-<RescheduleModal
-  isOpen={showRescheduleModal}
-  onClose={handleCloseRescheduleModal}
-  appointment={appointmentToReschedule}
-  doctors={doctors}
-  onRescheduleComplete={handleRescheduleComplete}
-/>
+      <RescheduleModal
+        isOpen={showRescheduleModal}
+        onClose={handleCloseRescheduleModal}
+        appointment={appointmentToReschedule}
+        doctors={doctors}
+        onRescheduleComplete={handleRescheduleComplete}
+      />
     </div>
   );
 };

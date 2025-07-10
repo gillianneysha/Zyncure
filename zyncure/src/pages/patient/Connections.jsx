@@ -1,7 +1,113 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X, Clock, Send } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X, Clock, Send, AlertTriangle, CheckCircle } from 'lucide-react';
 import { supabase } from '../../client'; 
 import { useNotifications } from '../../hooks/useNotifications'; 
+
+// Confirmation Modal Component
+const ConfirmationModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title, 
+  message, 
+  confirmText = "Remove", 
+  cancelText = "Cancel",
+  confirmButtonClass = "bg-red-600 hover:bg-red-700 text-white"
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          </div>
+          
+          {/* Message */}
+          <p className="text-gray-600 mb-6">{message}</p>
+          
+          {/* Actions */}
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+            >
+              {cancelText}
+            </button>
+            <button
+              onClick={onConfirm}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${confirmButtonClass}`}
+            >
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Success Modal Component
+const SuccessModal = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  message, 
+  buttonText = "OK",
+  autoClose = true,
+  autoCloseDelay = 3000,
+  variant = "success" // "success" or "warning"
+}) => {
+  useEffect(() => {
+    if (isOpen && autoClose) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, autoCloseDelay);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoClose, autoCloseDelay, onClose]);
+
+  if (!isOpen) return null;
+
+  const isWarning = variant === "warning";
+  const iconBgColor = isWarning ? "bg-orange-100" : "bg-green-100";
+  const iconColor = isWarning ? "text-orange-600" : "text-green-600";
+  const buttonColor = isWarning ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700";
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+        <div className="p-6">
+          {/* Header with centered icon */}
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className={`p-3 ${iconBgColor} rounded-full mb-4`}>
+              {isWarning ? (
+                <AlertTriangle className={`w-6 h-6 ${iconColor}`} />
+              ) : (
+                <CheckCircle className={`w-6 h-6 ${iconColor}`} />
+              )}
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+            <p className="text-gray-600 text-sm leading-relaxed">{message}</p>
+          </div>
+          
+          {/* Full-width button */}
+          <button
+            onClick={onClose}
+            className={`w-full py-3 ${buttonColor} text-white rounded-lg font-medium transition-colors`}
+          >
+            {buttonText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const PatientConnectionsPage = () => {
   // ========================================
@@ -16,6 +122,24 @@ const PatientConnectionsPage = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const { refetch: refetchNotifications } = useNotifications();
+
+  // Modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    connectionId: null,
+    connectionName: '',
+    isRequestCancel: false
+  });
+
+  // Success modal state
+  const [successModal, setSuccessModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    buttonText: 'OK',
+    autoClose: true,
+    variant: 'success'
+  });
 
   // ========================================
   // USER AUTHENTICATION & INITIALIZATION
@@ -41,7 +165,8 @@ const PatientConnectionsPage = () => {
   // ========================================
   // DATA LOADING FUNCTIONS
   // ========================================
- const loadConnections = async () => {
+ // Replace your existing loadConnections function with this fixed version
+const loadConnections = async () => {
   try {
     setIsLoading(true);
     
@@ -55,9 +180,13 @@ const PatientConnectionsPage = () => {
     const { data, error } = await supabase
       .from('patient_connection_details')
       .select('*')
+      .eq('patient_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
 
     const allConnections = data || [];
     
@@ -66,18 +195,32 @@ const PatientConnectionsPage = () => {
     
     console.log('Total connections returned:', allConnections.length);
     console.log('User connections after filtering:', userConnections.length);
+    console.log('All connections data:', userConnections);
     
-    // FIXED: Only show pending requests where current user is the RECIPIENT
-    // For patients, they should only see pending requests where a doctor requested to connect with them
-    // This means filtering for requests where the doctor initiated the connection
+    // Debug: Log the requester_type and request_direction for each connection
+    userConnections.forEach(conn => {
+      console.log(`Connection ${conn.id}:`, {
+        requester_type: conn.requester_type,
+        request_direction: conn.request_direction,
+        status: conn.status,
+        doctor_name: `${conn.doctor_first_name} ${conn.doctor_last_name}`
+      });
+    });
+    
+    // FIXED: Show pending requests where the DOCTOR requested to connect with the PATIENT
+    // This means requester_type = 'doctor' and status = 'pending'
     const pendingIncoming = userConnections.filter(
-      conn => conn.status === 'pending' && conn.request_direction === 'incoming'
+      conn => conn.status === 'pending' && conn.requester_type === 'doctor'
     );
+    
+    console.log('Pending incoming requests:', pendingIncoming);
     
     // All other connections (accepted, rejected, or outgoing pending requests)
     const otherConnections = userConnections.filter(
-      conn => !(conn.status === 'pending' && conn.request_direction === 'incoming')
+      conn => !(conn.status === 'pending' && conn.requester_type === 'doctor')
     );
+    
+    console.log('Other connections:', otherConnections);
     
     setConnections(otherConnections);
     setPendingRequests(pendingIncoming);
@@ -155,7 +298,12 @@ const PatientConnectionsPage = () => {
       
       setSearchResults(prev => prev.filter(d => d.med_id !== doctor.med_id));
       
-      alert('Connection request sent successfully!');
+      // Show success modal instead of alert
+      setSuccessModal({
+        isOpen: true,
+        title: 'Connection Request Sent!',
+        message: `Your connection request has been sent to ${formatDoctorName(doctor.first_name, doctor.last_name)}. You'll be notified when they respond.`
+      });
       
     } catch (error) {
       console.error('Error sending connection request:', error);
@@ -193,7 +341,13 @@ const handleConnectionRequest = async (connectionId, action) => {
     await loadConnections();
     refetchNotifications(); 
     
-    alert(`Connection request ${action}ed successfully!`);
+    // Show success modal instead of alert
+    const doctorName = pendingRequests.find(req => req.id === connectionId)?.doctor_first_name || 'Doctor';
+    setSuccessModal({
+      isOpen: true,
+      title: `Connection ${action === 'accept' ? 'Accepted' : 'Declined'}!`,
+      message: `You have successfully ${action}ed the connection request${action === 'accept' ? ` from Dr. ${doctorName}` : ''}.`
+    });
     
   } catch (error) {
     console.error(`Error ${action}ing connection:`, error);
@@ -208,19 +362,46 @@ const handleConnectionRequest = async (connectionId, action) => {
   }
 };
 
+// ========================================
+// MODAL HANDLERS
+// ========================================
+const openConfirmModal = (connection) => {
+  const doctorName = formatDoctorName(connection.doctor_first_name, connection.doctor_last_name);
+  const isRequestCancel = connection.status === 'pending' && connection.request_direction === 'outgoing';
+  
+  setConfirmModal({
+    isOpen: true,
+    connectionId: connection.id,
+    connectionName: doctorName,
+    isRequestCancel
+  });
+  setShowDropdown(null);
+};
 
-// ========================================
-// FIXED CONNECTION REMOVAL MANAGEMENT
-// ========================================
-const removeConnection = async (connectionId) => {
-  if (!confirm('Are you sure you want to remove this connection?')) {
-    return;
-  }
+const closeConfirmModal = () => {
+  setConfirmModal({
+    isOpen: false,
+    connectionId: null,
+    connectionName: '',
+    isRequestCancel: false
+  });
+};
+
+const closeSuccessModal = () => {
+  setSuccessModal({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+};
+
+const confirmRemoveConnection = async () => {
+  if (!confirmModal.connectionId) return;
 
   try {
     const { error } = await supabase
       .rpc('remove_connection', {
-        connection_id: connectionId
+        connection_id: confirmModal.connectionId
       });
 
     if (error) {
@@ -230,7 +411,20 @@ const removeConnection = async (connectionId) => {
 
     await loadConnections();
     
-    alert('Connection removed successfully!');
+    // Show success modal with orange styling for removal
+    const actionText = confirmModal.isRequestCancel ? 'cancelled' : 'removed';
+    const isCancel = confirmModal.isRequestCancel;
+    
+    setSuccessModal({
+      isOpen: true,
+      title: isCancel ? 'Request Cancelled' : 'Connection Removed',
+      message: isCancel 
+        ? `You have successfully cancelled the connection request to ${confirmModal.connectionName}.`
+        : `You have successfully removed the connection with ${confirmModal.connectionName}. You will no longer have access to their medical records.`,
+      variant: 'warning',
+      buttonText: 'Close',
+      autoClose: false
+    });
     
   } catch (error) {
     console.error('Error removing connection:', error);
@@ -240,6 +434,8 @@ const removeConnection = async (connectionId) => {
     } else {
       alert(`Failed to remove connection: ${error.message}`);
     }
+  } finally {
+    closeConfirmModal();
   }
 };
 
@@ -286,6 +482,33 @@ const removeConnection = async (connectionId) => {
   // ========================================
   return (
     <div className="max-w-6xl mx-auto">
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmRemoveConnection}
+        title={confirmModal.isRequestCancel ? "Cancel Connection Request" : "Remove Connection"}
+        message={
+          confirmModal.isRequestCancel 
+            ? `Are you sure you want to cancel your connection request to ${confirmModal.connectionName}?`
+            : `Are you sure you want to remove your connection with ${confirmModal.connectionName}? This action cannot be undone.`
+        }
+        confirmText={confirmModal.isRequestCancel ? "Cancel Request" : "Remove Connection"}
+        cancelText="Keep Connection"
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={successModal.isOpen}
+        onClose={closeSuccessModal}
+        title={successModal.title}
+        message={successModal.message}
+        buttonText={successModal.buttonText || "Great!"}
+        autoClose={successModal.autoClose !== false}
+        autoCloseDelay={4000}
+        variant={successModal.variant || "success"}
+      />
+
       {/* Page Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -462,10 +685,7 @@ const removeConnection = async (connectionId) => {
                         ></div>
                         <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
                           <button
-                            onClick={() => {
-                              removeConnection(connection.id);
-                              setShowDropdown(null);
-                            }}
+                            onClick={() => openConfirmModal(connection)}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             <UserMinus className="w-4 h-4" />
