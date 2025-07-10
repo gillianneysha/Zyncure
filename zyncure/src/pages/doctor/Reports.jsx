@@ -15,7 +15,6 @@ function truncateFileName(fileName, maxLength = 25) {
 }
 
 
-// Helper: format expires_at
 function formatExpiresAt(expires_at) {
  if (!expires_at) return "Permanent";
  const expiresDate = new Date(expires_at);
@@ -34,7 +33,6 @@ function formatExpiresAt(expires_at) {
 }
 
 
-// Folder Card
 function FolderCard({ folder, onClick }) {
  return (
    <div
@@ -50,450 +48,414 @@ function FolderCard({ folder, onClick }) {
 }
 
 
-// File Card with duration indicator
 function FileCard({ file, onPreview }) {
- const ext = file.name?.split(".").pop().toLowerCase() || 'file';
- return (
-   <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden">
-     <div className="p-2 flex justify-between items-center">
-       <div className="flex items-center min-w-0 flex-1">
-         <FileText className="mr-2 text-white flex-shrink-0" />
-         <button
-           type="button"
-           className="text-white text-sm font-medium hover:text-indigo-200 transition truncate text-left"
-           title={file.name}
-           onClick={() => onPreview(file)}
-           style={{ background: "none", border: "none", padding: 0, margin: 0 }}
-         >
-           {truncateFileName(file.name, 24)}
-         </button>
-       </div>
-       <a
-         href={file.file_url}
-         download={file.name}
-         className="ml-2 text-white hover:text-indigo-200 transition"
-         title="Download"
-         target="_blank"
-         rel="noopener noreferrer"
-       >
-         <Download size={18} />
-       </a>
-     </div>
-     <div
-       className="bg-white p-2 cursor-pointer"
-       onClick={() => onPreview(file)}
-       title="Click to preview"
-     >
-       {file.preview_url ? (
-           ext === "pdf" ? (
-             <iframe
-               src={file.preview_url}
-               title={`Preview of ${file.name}`}
-               className="w-full h-32 rounded border"
-               style={{ border: 'none' }}
-               onLoad={() => console.log('PDF loaded successfully')}
-               onError={() => console.log('PDF failed to load:', file.preview_url)}
-             />
-           ) : (
-             <img
-               src={file.preview_url}
-               alt={`Preview of ${file.name}`}
-               className="w-full h-32 object-cover rounded"
-             />
-           )
-         ) : (
-           <div className="w-full h-32 rounded bg-gray-100 flex items-center justify-center text-gray-300">
-             No Preview
-           </div>
-         )}
-     </div>
-     <div className="p-2 flex items-center gap-1 text-xs text-white">
-       <Clock size={14} className="inline-block mr-1" />
-       {file.symptom_file ? (file.expires_at ? formatExpiresAt(file.expires_at) : "Permanent") : formatExpiresAt(file.expires_at)}
-     </div>
-   </div>
- );
+  const ext = file.name?.split(".").pop().toLowerCase() || 'file';
+
+  return (
+    <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden">
+      <div className="p-2 flex justify-between items-center">
+        <div className="flex items-center min-w-0 flex-1">
+          <FileText className="mr-2 text-white flex-shrink-0" />
+          <button
+            type="button"
+            className="text-white text-sm font-medium hover:text-indigo-200 transition truncate text-left"
+            title={file.name}
+            onClick={() => onPreview(file)}
+            style={{ background: "none", border: "none", padding: 0, margin: 0 }}
+          >
+            {truncateFileName(file.name, 24)}
+          </button>
+        </div>
+        <a
+          href={file.file_url}
+          download={file.name}
+          className="ml-2 text-white hover:text-indigo-200 transition"
+          title="Download"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Download size={18} />
+        </a>
+      </div>
+
+      <div
+        className="bg-white p-2 cursor-pointer"
+        onClick={() => onPreview(file)}
+        title="Click to preview"
+      >
+        {file.file_url ? (
+          ext === "pdf" ? (
+            <iframe
+              src={file.file_url}
+              title={`Preview of ${file.name}`}
+              className="w-full h-32 rounded border"
+              style={{ border: 'none' }}
+            />
+          ) : (
+            <img
+              src={file.file_url}
+              alt={`Preview of ${file.name}`}
+              className="w-full h-32 object-cover rounded"
+            />
+          )
+        ) : (
+          <div className="w-full h-32 rounded bg-gray-100 flex items-center justify-center text-gray-300">
+            No Preview
+          </div>
+        )}
+      </div>
+
+      <div className="p-2 flex items-center gap-1 text-xs text-white">
+        <Clock size={14} className="inline-block mr-1" />
+        {file.symptom_file
+          ? (file.expires_at ? formatExpiresAt(file.expires_at) : "Permanent")
+          : formatExpiresAt(file.expires_at)}
+      </div>
+    </div>
+  );
+
 }
 
 
 export default function DoctorsPatientsFolders() {
- const [currentUser, setCurrentUser] = useState(null);
- const [patients, setPatients] = useState([]);
- const [selectedPatient, setSelectedPatient] = useState(null);
- const [sharedFolders, setSharedFolders] = useState([]);
- const [sharedFiles, setSharedFiles] = useState([]);
- const [openedFolder, setOpenedFolder] = useState(null);
- const [folderFiles, setFolderFiles] = useState([]);
- const [previewFile, setPreviewFile] = useState(null);
- const [loading, setLoading] = useState(false);
 
+  const [currentUser, setCurrentUser] = useState(null);
+  const [patients, setPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [sharedFolders, setSharedFolders] = useState([]);
+  const [sharedFiles, setSharedFiles] = useState([]);
+  const [openedFolder, setOpenedFolder] = useState(null);
+  const [folderFiles, setFolderFiles] = useState([]);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
- useEffect(() => {
-   supabase.auth.getUser().then(({ data }) => {
-     setCurrentUser(data?.user || null);
-   });
- }, []);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUser(data?.user || null);
+    });
+  }, []);
 
+  useEffect(() => {
+    if (!currentUser) return;
+    loadPatientsWithInfo();
+    // eslint-disable-next-line
+  }, [currentUser]);
 
- useEffect(() => {
-   if (!currentUser) return;
-   loadPatientsWithInfo();
-   // eslint-disable-next-line
- }, [currentUser]);
+  async function loadSharedSymptomReports(doctorId, patientId) {
+    const nowISOString = new Date().toISOString();
 
+    const { data, error } = await supabase
+      .from('shared_symptoms')
+      .select('*')
+      .eq('shared_with', doctorId)
+      .eq('shared_by', patientId)
+      .or(`expires_at.is.null,expires_at.gt.${nowISOString}`);
 
- // --- Fetch shared symptom report files from shared_symptoms table for this doctor/patient ---
- async function loadSharedSymptomReports(doctorId, patientId) {
-   const nowISOString = new Date().toISOString();
-   const { data, error } = await supabase
-     .from('shared_symptoms')
-     .select('*')
-     .eq('shared_with', doctorId)
-     .eq('shared_by', patientId)
-     .or(`expires_at.is.null,expires_at.gt.${nowISOString}`);
-   console.log("SYMPTOM QUERY doctorId:", doctorId, "patientId:", patientId, "RESULT:", data, "ERROR:", error); // DEBUG
-   if (error) return [];
-   return (data || []).map(report => ({
-     id: `sharedsymptom_${report.id}`,
-     name: report.pdf_filename || 'symptom-report.pdf',
-     file_url: report.report_url || null, // may be null, will get signed URL if needed
-     preview_url: null,
-     expires_at: report.expires_at,
-     symptom_file: true,
-     patient_id: patientId,
-     storage_path: report.pdf_filename,
-     shared_symptom_id: report.id,
-   }));
- }
+    if (error) return [];
 
+    return (data || []).map(report => ({
+      id: `sharedsymptom_${report.id}`,
+      name: report.pdf_filename || 'symptom-report.pdf',
+      file_url: report.report_url || null,
+      preview_url: report.report_url || null,
+      expires_at: report.expires_at,
+      symptom_file: true,
+      patient_id: patientId
+    }));
+  }
 
- // --- Fetch standard files/folders ---
- async function loadPatientsWithInfo() {
-   setLoading(true);
-   const { data: connections, error: connError } = await supabase
-     .from('doctor_connection_details')
-     .select('*')
-     .eq('status', 'accepted');
-   if (connError) {
-     setPatients([]);
-     setLoading(false);
-     return;
-   }
+  async function loadPatientsWithInfo() {
+    setLoading(true);
+    const { data: connections, error: connError } = await supabase
+      .from('doctor_connection_details')
+      .select('*')
+      .eq('status', 'accepted');
+    if (connError) {
+      setPatients([]);
+      setLoading(false);
+      return;
+    }
 
+    const enrichedPatients = await Promise.all(connections.map(async conn => {
+      const { data: shares } = await supabase
+        .from('file_shares')
+        .select(`
+          *,
+          medical_files!file_shares_file_id_fkey (
+            id, name, file_url, preview_url, folder_id, owner_id
+          ),
+          folders!file_shares_folder_id_fkey (
+            id, name, created_at, owner_id
+          )
+        `)
+        .eq('shared_with_id', currentUser.id)
+        .eq('owner_id', conn.patient_id)
+        .eq('is_active', true)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-   const enrichedPatients = await Promise.all(connections.map(async conn => {
-     // Fetch shared folders/files as before
-     const { data: shares } = await supabase
-       .from('file_shares')
-       .select(`
-         *,
-         medical_files!file_shares_file_id_fkey (
-           id, name, file_url, preview_url, folder_id, owner_id
-         ),
-         folders!file_shares_folder_id_fkey (
-           id, name, created_at, owner_id
-         )
-       `)
-       .eq('shared_with_id', currentUser.id)
-       .eq('owner_id', conn.patient_id)
-       .eq('is_active', true)
-       .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+      let folders = [];
+      let files = [];
+      if (shares && shares.length) {
+        for (const share of shares) {
+          if (share.folders && !folders.find(f => f.id === share.folders.id)) {
+            folders.push(share.folders);
+          }
+          // Only add as a file if this share is for a file (file_id is set)
+          if (share.medical_files && share.file_id) {
+            files.push({
+              ...share.medical_files,
+              expires_at: share.expires_at,
+              share_id: share.id
+            });
+          }
+        }
+      }
 
+      const sharedSymptomFiles = await loadSharedSymptomReports(currentUser.id, conn.patient_id);
 
-     let folders = [];
-     let files = [];
-     if (shares && shares.length) {
-       for (const share of shares) {
-         if (share.folders && !folders.find(f => f.id === share.folders.id)) {
-           folders.push(share.folders);
-         }
-         if (share.medical_files && !share.medical_files.folder_id) {
-           files.push({
-             ...share.medical_files,
-             expires_at: share.expires_at,
-             share_id: share.id,
-             share_info: share
-           });
-         }
-       }
-     }
+      return {
+        id: conn.patient_id,
+        name: `${conn.patient_first_name || ''} ${conn.patient_last_name || ''}`.trim() || conn.patient_email || 'Unknown',
+        email: conn.patient_email,
+        folders,
+        files: [...files, ...sharedSymptomFiles],
+      }
+    }));
+    setPatients(enrichedPatients);
+    setLoading(false);
+  }
 
+  async function handleOpenSharedFolder(folder) {
+    setOpenedFolder(folder);
+    setPreviewFile(null);
+    const { data: files } = await supabase
+      .from('medical_files')
+      .select('*')
+      .eq('folder_id', folder.id)
+      .eq('owner_id', selectedPatient.id);
+    setFolderFiles(files || []);
+  }
 
-     // Fetch shared symptom PDF reports via shared_symptoms logic
-     const sharedSymptomFiles = await loadSharedSymptomReports(currentUser.id, conn.patient_id);
+  function handlePreviewFile(file) {
+    setPreviewFile({
+      ...file,
+      preview_url: file.file_url
+    });
+  }
 
+  const handlePatientClick = (patient) => {
+    setSelectedPatient(patient);
+    setSharedFolders(patient.folders);
+    setSharedFiles(patient.files);
+    setOpenedFolder(null);
+    setFolderFiles([]);
+    setPreviewFile(null);
+  };
 
-     return {
-       id: conn.patient_id,
-       name: `${conn.patient_first_name || ''} ${conn.patient_last_name || ''}`.trim() || conn.patient_email || 'Unknown',
-       email: conn.patient_email,
-       folders,
-       files: [...files, ...sharedSymptomFiles],
-     }
-   }));
-   setPatients(enrichedPatients);
-   setLoading(false);
- }
+  return (
+    <div className="p-6 min-h-screen" style={{ background: "none", border: "none", padding: 0, margin: 0 }}>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-[#55A1A4] text-left flex items-center">
+            {selectedPatient
+              ? <>
+                  <button
+                    title="Back"
+                    className="mr-1 text-[#55A1A4] hover:text-[#478384]"
+                    onClick={() => {
+                      if (openedFolder) {
+                        setOpenedFolder(null);
+                        setPreviewFile(null);
+                      } else {
+                        setSelectedPatient(null);
+                        setOpenedFolder(null);
+                        setPreviewFile(null);
+                      }
+                    }}
+                  >
+                    <ArrowLeft size={22} />
+                  </button>
+                  {openedFolder
+                    ? `${openedFolder.name} (from ${selectedPatient.name})`
+                    : `${selectedPatient.name}'s Shared Records`
+                  }
+                </>
+              : "Patients who shared with you"
+            }
+          </h1>
+        </div>
 
+        {!selectedPatient && (
+          loading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#55A1A4]"></div>
+              <p className="text-gray-500 mt-2">Loading patients...</p>
+            </div>
+          ) : patients.length === 0 ? (
+            <div className="text-center py-12">
+              <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No patients found</h3>
+              <p className="text-gray-500 mb-6">No patients have shared folders or files with you.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {patients.map((patient) => (
+                <div
+                  key={patient.id}
+                  className="bg-[#E3F2F3] p-6 rounded-lg shadow hover:bg-[#c7eaea] cursor-pointer transition"
+                  onClick={() => handlePatientClick(patient)}
+                >
+                  <div className="font-bold text-lg mb-2 text-[#55A1A4]">{patient.name}</div>
+                  <div className="text-xs text-gray-500">{patient.email}</div>
+                  <div className="text-sm text-gray-700 mt-2">
+                    {patient.folders.length} folder(s), {patient.files.length} file(s)
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
 
- // --- For opened folders: standard logic ---
- async function handleOpenSharedFolder(folder) {
-   setOpenedFolder(folder);
-   setPreviewFile(null);
-   const { data: files } = await supabase
-     .from('medical_files')
-     .select('*')
-     .eq('folder_id', folder.id)
-     .eq('owner_id', selectedPatient.id);
-   setFolderFiles(files || []);
- }
+        {selectedPatient && !openedFolder && (
+          <div>
+            <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">{selectedPatient.name}'s Shared Folders</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              {sharedFolders.length === 0 && (
+                <div className="col-span-4 text-gray-400">No folders shared.</div>
+              )}
+              {sharedFolders.map(folder => (
+                <FolderCard
+                  key={folder.id}
+                  folder={folder}
+                  onClick={() => handleOpenSharedFolder(folder)}
+                />
+              ))}
+            </div>
+            <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">{selectedPatient.name}'s Shared Files</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {sharedFiles.length === 0 && (
+                <div className="col-span-4 text-gray-400">No files shared.</div>
+              )}
+              {sharedFiles.map(file => (
+                <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
+              ))}
+            </div>
+            {previewFile && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-4 max-w-md w-full relative">
+                  <button
+                    onClick={() => setPreviewFile(null)}
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+                  >
+                    <X size={22} />
+                  </button>
+                  <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
+                  <div className="flex-1 flex items-center justify-center overflow-auto">
+                    {/* For symptom files, show link or preview if supported */}
+                    {previewFile.preview_url ? (
+                      previewFile.name.toLowerCase().endsWith(".pdf") ? (
+                        <iframe
+                          src={previewFile.preview_url}
+                          title={`Preview of ${previewFile.name}`}
+                          className="w-full h-[60vh] rounded border"
+                          style={{ border: 'none' }}
+                          onLoad={() => console.log('PDF loaded successfully:', previewFile.preview_url)}
+                          onError={(e) => {
+                            console.error('PDF failed to load:', previewFile.preview_url);
+                            console.error('Error details:', e);
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src={previewFile.preview_url}
+                          alt={`Preview of ${previewFile.name}`}
+                          className="max-h-[60vh] w-auto rounded"
+                        />
+                      )
+                    ) : (
+                      <div className="text-gray-400">No Preview Available</div>
+                    )}
 
+                  </div>
+                  <div className="mt-4 text-right">
+                    {previewFile.file_url && (
+                      <a
+                        href={previewFile.file_url}
+                        download={previewFile.name}
+                        className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+                      >
+                        Download
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
- // --- For previewing files, get signed URL for symptom report if needed ---
- async function handlePreviewFile(file) {
-   if (!file.symptom_file) {
-     setPreviewFile(file);
-     return;
-   }
-   // For shared_symptom PDF, get signed URL if not already present
-   let signedUrl = file.file_url;
-   if (!signedUrl && file.storage_path) {
-     const { data, error } = await supabase
-       .storage
-       .from('sharedsymptoms')
-       .createSignedUrl(file.storage_path, 60 * 30); // 30 min
-     if (error) {
-       alert("Failed to load preview");
-       return;
-     }
-     signedUrl = data.signedUrl;
-   }
-   setPreviewFile({
-     ...file,
-     file_url: signedUrl,
-     preview_url: signedUrl,
-   });
- }
+        {selectedPatient && openedFolder && (
+          <div>
+            <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">
+              {openedFolder.name} (from {selectedPatient.name})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {folderFiles.length === 0 ? (
+                <div className="col-span-4 text-gray-400">No files in this folder.</div>
+              ) : (
+                folderFiles.map(file => (
+                  <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
+                ))
+              )}
+            </div>
+            {previewFile && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-4 max-w-md w-full relative">
+                  <button
+                    onClick={() => setPreviewFile(null)}
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+                  >
+                    <X size={22} />
+                  </button>
+                  <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
+                  <div className="flex-1 flex items-center justify-center overflow-auto">
+                    {previewFile.preview_url ? (
+                      previewFile.name.toLowerCase().endsWith(".pdf") ? (
+                        <iframe
+                          src={previewFile.preview_url}
+                          title={`Preview of ${previewFile.name}`}
+                          className="w-full h-[60vh] rounded border"
+                        />
+                      ) : (
+                        <img
+                          src={previewFile.preview_url}
+                          alt={`Preview of ${previewFile.name}`}
+                          className="max-h-[60vh] w-auto rounded"
+                        />
+                      )
+                    ) : (
+                      <div className="text-gray-400">No Preview Available</div>
+                    )}
+                  </div>
+                  <div className="mt-4 text-right">
+                    {previewFile.file_url && (
+                      <a
+                        href={previewFile.file_url}
+                        download={previewFile.name}
+                        className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+                      >
+                        Download
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
+      </div>
+    </div>
+  );
 
- const handlePatientClick = (patient) => {
-   setSelectedPatient(patient);
-   setSharedFolders(patient.folders);
-   setSharedFiles(patient.files);
-   setOpenedFolder(null);
-   setFolderFiles([]);
-   setPreviewFile(null);
- };
-
-
- return (
-   <div className="p-6 min-h-screen" style={{ background: "none", border: "none", padding: 0, margin: 0 }}>
-     <div className="max-w-7xl mx-auto">
-       <div className="flex justify-between items-center mb-8">
-         <h1 className="text-3xl font-bold text-[#55A1A4] text-left flex items-center">
-           {selectedPatient
-             ? <>
-                 <button
-                   title="Back"
-                   className="mr-1 text-[#55A1A4] hover:text-[#478384]"
-                   onClick={() => {
-                     if (openedFolder) {
-                       setOpenedFolder(null);
-                       setPreviewFile(null);
-                     } else {
-                       setSelectedPatient(null);
-                       setOpenedFolder(null);
-                       setPreviewFile(null);
-                     }
-                   }}
-                 >
-                   <ArrowLeft size={22} />
-                 </button>
-                 {openedFolder
-                   ? `${openedFolder.name} (from ${selectedPatient.name})`
-                   : `${selectedPatient.name}'s Shared Records`
-                 }
-               </>
-             : "Patients who shared with you"
-           }
-         </h1>
-       </div>
-
-
-       {!selectedPatient && (
-         loading ? (
-           <div className="text-center py-12">
-             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#55A1A4]"></div>
-             <p className="text-gray-500 mt-2">Loading patients...</p>
-           </div>
-         ) : patients.length === 0 ? (
-           <div className="text-center py-12">
-             <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-             <h3 className="text-lg font-medium text-gray-900 mb-2">No patients found</h3>
-             <p className="text-gray-500 mb-6">No patients have shared folders or files with you.</p>
-           </div>
-         ) : (
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             {patients.map((patient) => (
-               <div
-                 key={patient.id}
-                 className="bg-[#E3F2F3] p-6 rounded-lg shadow hover:bg-[#c7eaea] cursor-pointer transition"
-                 onClick={() => handlePatientClick(patient)}
-               >
-                 <div className="font-bold text-lg mb-2 text-[#55A1A4]">{patient.name}</div>
-                 <div className="text-xs text-gray-500">{patient.email}</div>
-                 <div className="text-sm text-gray-700 mt-2">
-                   {patient.folders.length} folder(s), {patient.files.length} file(s)
-                 </div>
-               </div>
-             ))}
-           </div>
-         )
-       )}
-
-
-       {selectedPatient && !openedFolder && (
-         <div>
-           <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">{selectedPatient.name}'s Shared Folders</h2>
-           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-             {sharedFolders.length === 0 && (
-               <div className="col-span-4 text-gray-400">No folders shared.</div>
-             )}
-             {sharedFolders.map(folder => (
-               <FolderCard
-                 key={folder.id}
-                 folder={folder}
-                 onClick={() => handleOpenSharedFolder(folder)}
-               />
-             ))}
-           </div>
-           <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">{selectedPatient.name}'s Shared Files</h2>
-           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-             {sharedFiles.length === 0 && (
-               <div className="col-span-4 text-gray-400">No files shared.</div>
-             )}
-             {sharedFiles.map(file => (
-               <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
-             ))}
-           </div>
-           {previewFile && (
-             <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-               <div className="bg-white rounded-lg p-4 max-w-md w-full relative">
-                 <button
-                   onClick={() => setPreviewFile(null)}
-                   className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
-                 >
-                   <X size={22} />
-                 </button>
-                 <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
-                 <div className="flex-1 flex items-center justify-center overflow-auto">
-                   {/* For symptom files, show link or preview if supported */}
-                   {previewFile.preview_url ? (
-                     previewFile.name.toLowerCase().endsWith(".pdf") ? (
-                       <iframe
-                         src={previewFile.preview_url}
-                         title={`Preview of ${previewFile.name}`}
-                         className="w-full h-[60vh] rounded border"
-                         style={{ border: 'none' }}
-                         onLoad={() => console.log('PDF loaded successfully:', previewFile.preview_url)}
-                         onError={(e) => {
-                           console.error('PDF failed to load:', previewFile.preview_url);
-                           console.error('Error details:', e);
-                         }}
-                       />
-                     ) : (
-                       <img
-                         src={previewFile.preview_url}
-                         alt={`Preview of ${previewFile.name}`}
-                         className="max-h-[60vh] w-auto rounded"
-                       />
-                     )
-                   ) : (
-                     <div className="text-gray-400">No Preview Available</div>
-                   )}
-
-
-                 </div>
-                 <div className="mt-4 text-right">
-                   {previewFile.file_url && (
-                     <a
-                       href={previewFile.file_url}
-                       download={previewFile.name}
-                       className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
-                     >
-                       Download
-                     </a>
-                   )}
-                 </div>
-               </div>
-             </div>
-           )}
-         </div>
-       )}
-
-
-       {selectedPatient && openedFolder && (
-         <div>
-           <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">
-             {openedFolder.name} (from {selectedPatient.name})
-           </h2>
-           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-             {folderFiles.length === 0 ? (
-               <div className="col-span-4 text-gray-400">No files in this folder.</div>
-             ) : (
-               folderFiles.map(file => (
-                 <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
-               ))
-             )}
-           </div>
-           {previewFile && (
-             <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-               <div className="bg-white rounded-lg p-4 max-w-md w-full relative">
-                 <button
-                   onClick={() => setPreviewFile(null)}
-                   className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
-                 >
-                   <X size={22} />
-                 </button>
-                 <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
-                 <div className="flex-1 flex items-center justify-center overflow-auto">
-                   {previewFile.preview_url ? (
-                     previewFile.name.toLowerCase().endsWith(".pdf") ? (
-                       <iframe
-                         src={previewFile.preview_url}
-                         title={`Preview of ${previewFile.name}`}
-                         className="w-full h-[60vh] rounded border"
-                       />
-                     ) : (
-                       <img
-                         src={previewFile.preview_url}
-                         alt={`Preview of ${previewFile.name}`}
-                         className="max-h-[60vh] w-auto rounded"
-                       />
-                     )
-                   ) : (
-                     <div className="text-gray-400">No Preview Available</div>
-                   )}
-                 </div>
-                 <div className="mt-4 text-right">
-                   {previewFile.file_url && (
-                     <a
-                       href={previewFile.file_url}
-                       download={previewFile.name}
-                       className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
-                     >
-                       Download
-                     </a>
-                   )}
-                 </div>
-               </div>
-             </div>
-           )}
-         </div>
-       )}
-
-
-     </div>
-   </div>
- );
 }
