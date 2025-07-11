@@ -48,17 +48,39 @@ const RescheduleModal = ({
     setSelectedTime('');
     
     try {
-      const { data: slots, error: slotsError } = await appointmentService.getAvailableTimeSlots(
-        appointment.doctor_id, 
-        selectedDate
-      );
+      // Fetch both available slots and existing appointments
+      const [slotsResult, appointmentsResult] = await Promise.all([
+        appointmentService.getAvailableTimeSlots(appointment.doctor_id, selectedDate),
+        appointmentService.getAppointments(selectedDate, appointment.doctor_id)
+      ]);
       
-      if (slotsError) {
+      if (slotsResult.error) {
         setError('Failed to load available time slots');
         setAvailableSlots([]);
       } else {
-        setAvailableSlots(slots || []);
-        if (slots?.length === 0) {
+        // Define all possible time slots
+        const allTimeSlots = [
+          '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM',
+          '11:00 AM', '11:30 AM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
+          '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM'
+        ];
+        
+        const availableSlots = slotsResult.data || [];
+        const bookedTimes = appointmentsResult.data ? 
+          appointmentsResult.data
+            .filter(apt => apt.id !== appointment.id) // Exclude current appointment being rescheduled
+            .map(apt => apt.time) : [];
+        
+        // Create slots with status information
+        const slotsWithStatus = allTimeSlots.map(slot => ({
+          time: slot,
+          available: availableSlots.includes(slot),
+          booked: bookedTimes.includes(slot)
+        }));
+        
+        setAvailableSlots(slotsWithStatus);
+        
+        if (slotsWithStatus.filter(slot => slot.available && !slot.booked).length === 0) {
           setError('No available time slots for this date');
         } else {
           setError('');
@@ -81,10 +103,30 @@ const RescheduleModal = ({
       return;
     }
 
+    // Validate that the selected time is still available
+    const selectedSlot = availableSlots.find(slot => slot.time === selectedTime);
+    if (!selectedSlot || selectedSlot.booked || !selectedSlot.available) {
+      setError('Selected time slot is no longer available. Please choose a different time.');
+      await loadAvailableSlots();
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
+      // Final check before submission
+      const { data: currentSlots } = await appointmentService.getAvailableTimeSlots(
+        appointment.doctor_id, 
+        selectedDate
+      );
+      
+      if (!currentSlots || !currentSlots.includes(selectedTime)) {
+        setError('This time slot was just booked by someone else. Please select a different time.');
+        await loadAvailableSlots();
+        return;
+      }
+
       // Update the appointment with new date and time
       const updateData = {
         date: selectedDate,
@@ -203,21 +245,31 @@ const RescheduleModal = ({
             ) : selectedDate ? (
               availableSlots.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                  {availableSlots.map((slot) => (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => setSelectedTime(slot)}
-                      disabled={loading}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                        selectedTime === slot
-                          ? 'bg-teal-600 text-white border-teal-600'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-teal-500 hover:bg-teal-50'
-                      }`}
-                    >
-                      {slot}
-                    </button>
-                  ))}
+                  {availableSlots.map((slot) => {
+                    const isBooked = slot.booked;
+                    const isAvailable = slot.available && !isBooked;
+                    const isSelected = selectedTime === slot.time;
+                    
+                    return (
+                      <button
+                        key={slot.time}
+                        type="button"
+                        onClick={() => isAvailable ? setSelectedTime(slot.time) : null}
+                        disabled={loading || !isAvailable}
+                        className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                          isSelected
+                            ? 'bg-teal-600 text-white border-teal-600'
+                            : isAvailable
+                              ? 'bg-white text-gray-700 border-gray-300 hover:border-teal-500 hover:bg-teal-50'
+                              : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                        }`}
+                      >
+                        {slot.time}
+                        {isBooked && <span className="block text-xs mt-1">Booked</span>}
+                        {!slot.available && !isBooked && <span className="block text-xs mt-1">N/A</span>}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
@@ -231,6 +283,17 @@ const RescheduleModal = ({
               </div>
             )}
           </div>
+
+          {/* Available slots summary */}
+          {selectedDate && !loadingSlots && availableSlots.length > 0 && (
+            <div className="mb-4 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+              <p>
+                {availableSlots.filter(slot => slot.available && !slot.booked).length} available, {' '}
+                {availableSlots.filter(slot => slot.booked).length} booked, {' '}
+                {availableSlots.filter(slot => !slot.available && !slot.booked).length} unavailable
+              </p>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3">

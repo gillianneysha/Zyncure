@@ -1,715 +1,461 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Menu, Grid3X3, List, MoreHorizontal, User, Clock, Calendar, FileText, Download, Eye } from 'lucide-react';
 import { supabase } from '../../client';
+import { X, Folder, FileText, Download, ArrowLeft, User, Clock } from 'lucide-react';
 
-const PatientsPage = () => {
-  // ========================================
-  // STATE MANAGEMENT
-  // ========================================
-  const [patients, setPatients] = useState([]);
-  const [sharedSymptomsFiles, setSharedSymptomsFiles] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingFiles, setIsLoadingFiles] = useState(true);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
-  const [filterType, setFilterType] = useState('all'); // 'all', 'recent', 'active'
-  const [filterHistory, setFilterHistory] = useState('all'); // 'all', 'recent', 'archived'
+
+// Utility for truncating file names
+function truncateFileName(fileName, maxLength = 25) {
+ if (!fileName || fileName.length <= maxLength) return fileName;
+ const lastDot = fileName.lastIndexOf(".");
+ if (lastDot === -1 || lastDot === 0) return fileName.slice(0, maxLength - 3) + "...";
+ const extension = fileName.slice(lastDot + 1);
+ const keep = maxLength - extension.length - 4;
+ if (keep <= 0) return "..." + fileName.slice(lastDot);
+ return fileName.slice(0, keep) + "..." + "." + extension;
+}
+
+
+function formatExpiresAt(expires_at) {
+ if (!expires_at) return "Permanent";
+ const expiresDate = new Date(expires_at);
+ const now = new Date();
+ if (expiresDate < now) return "Expired";
+ const diffMs = expiresDate - now;
+ const diffMins = Math.round(diffMs / (1000 * 60));
+ const diffHrs = Math.floor(diffMins / 60);
+ const diffDays = Math.floor(diffHrs / 24);
+
+
+ if (diffDays > 0) return `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+ if (diffHrs > 0) return `Expires in ${diffHrs} hour${diffHrs > 1 ? 's' : ''}`;
+ if (diffMins > 0) return `Expires in ${diffMins} minute${diffMins > 1 ? 's' : ''}`;
+ return "Expires soon";
+}
+
+
+function FolderCard({ folder, onClick }) {
+ return (
+   <div
+     className="bg-[#55A1A4] text-white p-4 rounded-lg shadow-md flex items-center justify-between cursor-pointer hover:bg-[#478384] transition"
+     onClick={() => onClick(folder)}
+   >
+     <div className="flex items-center">
+       <Folder className="mr-2" />
+       <span className="font-medium">{truncateFileName(folder.name, 20)}</span>
+     </div>
+   </div>
+ );
+}
+
+
+function FileCard({ file, onPreview }) {
+  const ext = file.name?.split(".").pop().toLowerCase() || 'file';
+
+  return (
+    <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden">
+      <div className="p-2 flex justify-between items-center">
+        <div className="flex items-center min-w-0 flex-1">
+          <FileText className="mr-2 text-white flex-shrink-0" />
+          <button
+            type="button"
+            className="text-white text-sm font-medium hover:text-indigo-200 transition truncate text-left"
+            title={file.name}
+            onClick={() => onPreview(file)}
+            style={{ background: "none", border: "none", padding: 0, margin: 0 }}
+          >
+            {truncateFileName(file.name, 24)}
+          </button>
+        </div>
+        <a
+          href={file.file_url}
+          download={file.name}
+          className="ml-2 text-white hover:text-indigo-200 transition"
+          title="Download"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Download size={18} />
+        </a>
+      </div>
+
+      <div
+        className="bg-white p-2 cursor-pointer"
+        onClick={() => onPreview(file)}
+        title="Click to preview"
+      >
+        {file.file_url ? (
+          ext === "pdf" ? (
+            <iframe
+              src={file.file_url}
+              title={`Preview of ${file.name}`}
+              className="w-full h-32 rounded border"
+              style={{ border: 'none' }}
+            />
+          ) : (
+            <img
+              src={file.file_url}
+              alt={`Preview of ${file.name}`}
+              className="w-full h-32 object-cover rounded"
+            />
+          )
+        ) : (
+          <div className="w-full h-32 rounded bg-gray-100 flex items-center justify-center text-gray-300">
+            No Preview
+          </div>
+        )}
+      </div>
+
+      <div className="p-2 flex items-center gap-1 text-xs text-white">
+        <Clock size={14} className="inline-block mr-1" />
+        {file.symptom_file
+          ? (file.expires_at ? formatExpiresAt(file.expires_at) : "Permanent")
+          : formatExpiresAt(file.expires_at)}
+      </div>
+    </div>
+  );
+
+}
+
+
+export default function DoctorsPatientsFolders() {
+
   const [currentUser, setCurrentUser] = useState(null);
-  const [showDropdown, setShowDropdown] = useState(null);
-  const [activeTab, setActiveTab] = useState('patients'); // 'patients' or 'shared-symptoms'
+  const [patients, setPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [sharedFolders, setSharedFolders] = useState([]);
+  const [sharedFiles, setSharedFiles] = useState([]);
+  const [openedFolder, setOpenedFolder] = useState(null);
+  const [folderFiles, setFolderFiles] = useState([]);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // ========================================
-  // INITIALIZATION
-  // ========================================
   useEffect(() => {
-    getCurrentUser();
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUser(data?.user || null);
+    });
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      loadConnectedPatients();
-      loadSharedSymptomsFiles();
-    }
+    if (!currentUser) return;
+    loadPatientsWithInfo();
+    // eslint-disable-next-line
   }, [currentUser]);
 
-  const getCurrentUser = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUser(user);
-    } catch (error) {
-      console.error('Error getting current user:', error);
+  async function loadSharedSymptomReports(doctorId, patientId) {
+    const nowISOString = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('shared_symptoms')
+      .select('*')
+      .eq('shared_with', doctorId)
+      .eq('shared_by', patientId)
+      .or(`expires_at.is.null,expires_at.gt.${nowISOString}`);
+
+    if (error) return [];
+
+    return (data || []).map(report => ({
+      id: `sharedsymptom_${report.id}`,
+      name: report.pdf_filename || 'symptom-report.pdf',
+      file_url: report.report_url || null,
+      preview_url: report.report_url || null,
+      expires_at: report.expires_at,
+      symptom_file: true,
+      patient_id: patientId
+    }));
+  }
+
+  async function loadPatientsWithInfo() {
+    setLoading(true);
+    const { data: connections, error: connError } = await supabase
+      .from('doctor_connection_details')
+      .select('*')
+      .eq('status', 'accepted');
+    if (connError) {
+      setPatients([]);
+      setLoading(false);
+      return;
     }
-  };
 
-  // ========================================
-  // DATA LOADING
-  // ========================================
-  const loadConnectedPatients = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Get all accepted connections for this doctor
-      const { data, error } = await supabase
-        .from('doctor_connection_details')
-        .select('*')
-        .eq('status', 'accepted')  // Only get accepted connections
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Transform connection data into patient folder format
-      const patientFolders = await Promise.all((data || []).map(async connection => {
-        const sharedFiles = await loadSharedFilesForPatient(connection.patient_id);
-        
-        return {
-          id: connection.patient_id,
-          name: `${connection.patient_first_name} ${connection.patient_last_name}`,
-          email: connection.patient_email,
-          connectionId: connection.id,
-          connectedAt: connection.created_at,
-          lastAccessed: connection.updated_at || connection.created_at,
-          status: 'active',
-          avatar: null,
-          recordsCount: sharedFiles.length, // Show count of shared files
-          sharedFiles: sharedFiles, // Store the actual shared files
-          lastVisit: null,
-        };
-      }));
-      
-      console.log('Loaded patient folders:', patientFolders);
-      setPatients(patientFolders);
-      
-    } catch (error) {
-      console.error('Error loading connected patients:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadSharedFilesForPatient = async (patientId) => {
-    try {
-      const { data, error } = await supabase
+    const enrichedPatients = await Promise.all(connections.map(async conn => {
+      const { data: shares } = await supabase
         .from('file_shares')
         .select(`
           *,
           medical_files!file_shares_file_id_fkey (
-            id,
-            filename,
-            file_size,
-            file_type,
-            upload_date,
-            owner_id
+            id, name, file_url, preview_url, folder_id, owner_id
           ),
           folders!file_shares_folder_id_fkey (
-            id,
-            name,
-            created_at,
-            owner_id
+            id, name, created_at, owner_id
           )
         `)
         .eq('shared_with_id', currentUser.id)
+        .eq('owner_id', conn.patient_id)
         .eq('is_active', true)
         .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
-      if (error) throw error;
-      
-      // Filter the results to only include files/folders owned by the specific patient
-      const filteredData = (data || []).filter(share => {
-        if (share.medical_files && share.medical_files.owner_id === patientId) {
-          return true;
+      let folders = [];
+      let files = [];
+      if (shares && shares.length) {
+        for (const share of shares) {
+          if (share.folders && !folders.find(f => f.id === share.folders.id)) {
+            folders.push(share.folders);
+          }
+          // Only add as a file if this share is for a file (file_id is set)
+          if (share.medical_files && share.file_id) {
+            files.push({
+              ...share.medical_files,
+              expires_at: share.expires_at,
+              share_id: share.id
+            });
+          }
         }
-        if (share.folders && share.folders.owner_id === patientId) {
-          return true;
-        }
-        return false;
-      });
-      
-      return filteredData;
-    } catch (error) {
-      console.error('Error loading shared files:', error);
-      return [];
-    }
-  };
+      }
 
-  // ========================================
-  // SHARED SYMPTOMS FILES LOADING
-  // ========================================
-  const loadSharedSymptomsFiles = async () => {
-    try {
-      setIsLoadingFiles(true);
-      
-      const { data, error } = await supabase
-        .storage
-        .from('sharedsymptoms')
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
+      const sharedSymptomFiles = await loadSharedSymptomReports(currentUser.id, conn.patient_id);
 
-      if (error) throw error;
+      return {
+        id: conn.patient_id,
+        name: `${conn.patient_first_name || ''} ${conn.patient_last_name || ''}`.trim() || conn.patient_email || 'Unknown',
+        email: conn.patient_email,
+        folders,
+        files: [...files, ...sharedSymptomFiles],
+      }
+    }));
+    setPatients(enrichedPatients);
+    setLoading(false);
+  }
 
-      // Filter out folders and get only files
-      const files = (data || []).filter(item => item.name && !item.id?.endsWith('/'));
-      
-      console.log('Loaded shared symptoms files:', files);
-      setSharedSymptomsFiles(files);
-      
-    } catch (error) {
-      console.error('Error loading shared symptoms files:', error);
-      setSharedSymptomsFiles([]);
-    } finally {
-      setIsLoadingFiles(false);
-    }
-  };
+  async function handleOpenSharedFolder(folder) {
+    setOpenedFolder(folder);
+    setPreviewFile(null);
+    const { data: files } = await supabase
+      .from('medical_files')
+      .select('*')
+      .eq('folder_id', folder.id)
+      .eq('owner_id', selectedPatient.id);
+    setFolderFiles(files || []);
+  }
 
-  // ========================================
-  // FILE ACTIONS
-  // ========================================
-  const handleDownloadFile = async (fileName) => {
-    try {
-      const { data, error } = await supabase
-        .storage
-        .from('sharedsymptoms')
-        .download(fileName);
-
-      if (error) throw error;
-
-      // Create download link
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      alert('Failed to download file');
-    }
-  };
-
-  const handleViewFile = async (fileName) => {
-    try {
-      const { data, error } = await supabase
-        .storage
-        .from('sharedsymptoms')
-        .createSignedUrl(fileName, 3600); // 1 hour expiry
-
-      if (error) throw error;
-
-      window.open(data.signedUrl, '_blank');
-      
-    } catch (error) {
-      console.error('Error viewing file:', error);
-      alert('Failed to view file');
-    }
-  };
-
-  // ========================================
-  // HELPER FUNCTIONS
-  // ========================================
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+  function handlePreviewFile(file) {
+    setPreviewFile({
+      ...file,
+      preview_url: file.file_url
     });
-  };
+  }
 
-  const getFileIcon = (fileName) => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
-      return '🖼️';
-    }
-    if (['pdf'].includes(extension)) {
-      return '📄';
-    }
-    if (['doc', 'docx'].includes(extension)) {
-      return '📝';
-    }
-    if (['xls', 'xlsx'].includes(extension)) {
-      return '📊';
-    }
-    if (['txt'].includes(extension)) {
-      return '📄';
-    }
-    return '📁';
-  };
-
-  // ========================================
-  // FILTERING SECTION
-  // ========================================
-  const getFilteredPatients = () => {
-    let filtered = [...patients];
-
-    // Apply type filter
-    if (filterType === 'recent') {
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      filtered = filtered.filter(patient => 
-        new Date(patient.lastAccessed) >= oneWeekAgo
-      );
-    }
-
-    // Apply history filter
-    if (filterHistory === 'recent') {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      filtered = filtered.filter(patient => 
-        new Date(patient.connectedAt) >= oneMonthAgo
-      );
-    }
-
-    return filtered;
-  };
-
-  // ========================================
-  // PATIENT FOLDER ACTIONS
-  // ========================================
   const handlePatientClick = (patient) => {
-    console.log('Opening patient folder:', patient);
-    console.log('Shared files:', patient.sharedFiles);
+    setSelectedPatient(patient);
+    setSharedFolders(patient.folders);
+    setSharedFiles(patient.files);
+    setOpenedFolder(null);
+    setFolderFiles([]);
+    setPreviewFile(null);
   };
 
-  const handlePatientMenuAction = (patient, action) => {
-    switch (action) {
-      case 'view':
-        handlePatientClick(patient);
-        break;
-      case 'records':
-        console.log('View records for:', patient.name);
-        // Navigate to patient records
-        break;
-      case 'history':
-        console.log('View history for:', patient.name);
-        // Navigate to patient history
-        break;
-      case 'disconnect':
-        handleDisconnectPatient(patient);
-        break;
-      default:
-        break;
-    }
-    setShowDropdown(null);
-  };
-
-  const handleDisconnectPatient = async (patient) => {
-    if (!confirm(`Are you sure you want to disconnect from ${patient.name}?`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .rpc('remove_connection', {
-          connection_id: patient.connectionId
-        });
-
-      if (error) throw error;
-
-      await loadConnectedPatients();
-      alert('Patient disconnected successfully');
-      
-    } catch (error) {
-      console.error('Error disconnecting patient:', error);
-      alert('Failed to disconnect patient');
-    }
-  };
-
-  // ========================================
-  // UI HELPER FUNCTIONS
-  // ========================================
-  const getPatientInitials = (name) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  // ========================================
-  // RENDER PATIENT CARD
-  // ========================================
-  const renderPatientFolder = (patient) => (
-    <div
-      key={patient.id}
-      className="relative group cursor-pointer"
-      onClick={() => handlePatientClick(patient)}
-    >
-      {/* Folder Icon */}
-      <div className="relative">
-        {/* Folder back part */}
-        <div className="w-20 h-16 bg-blue-500 rounded-t-lg transform rotate-1 absolute top-0 left-2"></div>
-        
-        {/* Main folder */}
-        <div className="w-24 h-20 bg-blue-600 rounded-lg relative overflow-hidden group-hover:bg-blue-700 transition-colors duration-200">
-          {/* Folder tab */}
-          <div className="absolute -top-2 left-2 w-8 h-4 bg-blue-600 rounded-t-md group-hover:bg-blue-700 transition-colors duration-200"></div>
-          
-          {/* Patient initials inside folder */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">
-              {getPatientInitials(patient.name)}
-            </span>
-          </div>
-          
-          {/* Status indicator */}
-          <div className="absolute top-1 right-1">
-            <div className={`w-2 h-2 rounded-full ${
-              patient.status === 'active' ? 'bg-green-400' : 'bg-gray-400'
-            }`}></div>
-          </div>
-        </div>
-        
-        {/* Dropdown menu button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDropdown(showDropdown === patient.id ? null : patient.id);
-          }}
-          className="absolute -top-1 -right-1 p-1 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-50"
-        >
-          <MoreHorizontal className="w-4 h-4 text-gray-600" />
-        </button>
-      </div>
-      
-      {/* Patient info below folder */}
-      <div className="mt-3 text-center">
-        <h3 className="font-medium text-gray-900 text-sm truncate group-hover:text-blue-600 transition-colors">
-          {patient.name}
-        </h3>
-        <p className="text-xs text-gray-500 mt-1">
-          {patient.recordsCount} shared file{patient.recordsCount !== 1 ? 's' : ''}
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Connected {formatDate(patient.connectedAt)}
-        </p>
-      </div>
-
-      {/* Dropdown menu */}
-      {showDropdown === patient.id && (
-        <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setShowDropdown(null)}
-          />
-          <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePatientMenuAction(patient, 'view');
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 rounded-t-lg transition-colors"
-            >
-              <User className="w-4 h-4" />
-              View Profile
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePatientMenuAction(patient, 'records');
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-            >
-              <List className="w-4 h-4" />
-              Medical Records
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePatientMenuAction(patient, 'history');
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-            >
-              <Clock className="w-4 h-4" />
-              Visit History
-            </button>
-            <hr className="my-1" />
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePatientMenuAction(patient, 'disconnect');
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-b-lg transition-colors"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-              Disconnect
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  // ========================================
-  // RENDER SHARED SYMPTOMS FILE AS FOLDER
-  // ========================================
-  const renderSharedSymptomsFile = (file) => (
-    <div
-      key={file.name}
-      className="relative group cursor-pointer"
-      onClick={() => handleViewFile(file.name)}
-    >
-      {/* File Folder Icon */}
-      <div className="relative">
-        {/* Folder back part */}
-        <div className="w-20 h-16 bg-green-500 rounded-t-lg transform rotate-1 absolute top-0 left-2"></div>
-        
-        {/* Main folder */}
-        <div className="w-24 h-20 bg-green-600 rounded-lg relative overflow-hidden group-hover:bg-green-700 transition-colors duration-200">
-          {/* Folder tab */}
-          <div className="absolute -top-2 left-2 w-8 h-4 bg-green-600 rounded-t-md group-hover:bg-green-700 transition-colors duration-200"></div>
-          
-          {/* File icon inside folder */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-white text-2xl">
-              {getFileIcon(file.name)}
-            </span>
-          </div>
-          
-          {/* File type indicator */}
-          <div className="absolute top-1 right-1">
-            <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-          </div>
-        </div>
-        
-        {/* Dropdown menu button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDropdown(showDropdown === file.name ? null : file.name);
-          }}
-          className="absolute -top-1 -right-1 p-1 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-50"
-        >
-          <MoreHorizontal className="w-4 h-4 text-gray-600" />
-        </button>
-      </div>
-      
-      {/* File info below folder */}
-      <div className="mt-3 text-center">
-        <h3 className="font-medium text-gray-900 text-sm truncate group-hover:text-green-600 transition-colors">
-          {file.name}
-        </h3>
-        <p className="text-xs text-gray-500 mt-1">
-          {formatFileSize(file.metadata?.size || 0)}
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
-          {formatDate(file.created_at)}
-        </p>
-      </div>
-
-      {/* Dropdown menu */}
-      {showDropdown === file.name && (
-        <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setShowDropdown(null)}
-          />
-          <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleViewFile(file.name);
-                setShowDropdown(null);
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 rounded-t-lg transition-colors"
-            >
-              <Eye className="w-4 h-4" />
-              View File
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDownloadFile(file.name);
-                setShowDropdown(null);
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 rounded-b-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Download File
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  // ========================================
-  // RENDER COMPONENT
-  // ========================================
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-teal-600">
-            {activeTab === 'patients' ? 'Patients' : 'Shared Symptoms'}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {activeTab === 'patients' 
-              ? `${patients.length} connected patient${patients.length !== 1 ? 's' : ''}`
-              : `${sharedSymptomsFiles.length} shared file${sharedSymptomsFiles.length !== 1 ? 's' : ''}`
+    <div className="p-6 min-h-screen" style={{ background: "none", border: "none", padding: 0, margin: 0 }}>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-[#55A1A4] text-left flex items-center">
+            {selectedPatient
+              ? <>
+                  <button
+                    title="Back"
+                    className="mr-1 text-[#55A1A4] hover:text-[#478384]"
+                    onClick={() => {
+                      if (openedFolder) {
+                        setOpenedFolder(null);
+                        setPreviewFile(null);
+                      } else {
+                        setSelectedPatient(null);
+                        setOpenedFolder(null);
+                        setPreviewFile(null);
+                      }
+                    }}
+                  >
+                    <ArrowLeft size={22} />
+                  </button>
+                  {openedFolder
+                    ? `${openedFolder.name} (from ${selectedPatient.name})`
+                    : `${selectedPatient.name}'s Shared Records`
+                  }
+                </>
+              : "Patients who shared with you"
             }
-          </p>
+          </h1>
         </div>
-        
-        <div className="flex items-center space-x-4">
-          {activeTab === 'patients' && (
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'grid' ? 'bg-teal-100 text-teal-600' : 'text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                <Grid3X3 className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'list' ? 'bg-teal-100 text-teal-600' : 'text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                <List className="w-5 h-5" />
-              </button>
+
+        {!selectedPatient && (
+          loading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#55A1A4]"></div>
+              <p className="text-gray-500 mt-2">Loading patients...</p>
             </div>
-          )}
-          
-          {activeTab === 'patients' && (
-            <button className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors">
-              <Plus className="w-4 h-4" />
-              Add Patient
-            </button>
-          )}
-          
-          <button className="p-2 text-gray-400 hover:text-gray-600">
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+          ) : patients.length === 0 ? (
+            <div className="text-center py-12">
+              <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No patients found</h3>
+              <p className="text-gray-500 mb-6">No patients have shared folders or files with you.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {patients.map((patient) => (
+                <div
+                  key={patient.id}
+                  className="bg-[#E3F2F3] p-6 rounded-lg shadow hover:bg-[#c7eaea] cursor-pointer transition"
+                  onClick={() => handlePatientClick(patient)}
+                >
+                  <div className="font-bold text-lg mb-2 text-[#55A1A4]">{patient.name}</div>
+                  <div className="text-xs text-gray-500">{patient.email}</div>
+                  <div className="text-sm text-gray-700 mt-2">
+                    {patient.folders.length} folder(s), {patient.files.length} file(s)
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
 
-      {/* Tabs */}
-      <div className="flex space-x-1 mb-6">
-        <button
-          onClick={() => setActiveTab('patients')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'patients'
-              ? 'bg-teal-100 text-teal-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Patients
-        </button>
-        <button
-          onClick={() => setActiveTab('shared-symptoms')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'shared-symptoms'
-              ? 'bg-teal-100 text-teal-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Shared Symptoms
-        </button>
-      </div>
+        {selectedPatient && !openedFolder && (
+          <div>
+            <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">{selectedPatient.name}'s Shared Folders</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              {sharedFolders.length === 0 && (
+                <div className="col-span-4 text-gray-400">No folders shared.</div>
+              )}
+              {sharedFolders.map(folder => (
+                <FolderCard
+                  key={folder.id}
+                  folder={folder}
+                  onClick={() => handleOpenSharedFolder(folder)}
+                />
+              ))}
+            </div>
+            <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">{selectedPatient.name}'s Shared Files</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {sharedFiles.length === 0 && (
+                <div className="col-span-4 text-gray-400">No files shared.</div>
+              )}
+              {sharedFiles.map(file => (
+                <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
+              ))}
+            </div>
+            {previewFile && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-4 max-w-md w-full relative">
+                  <button
+                    onClick={() => setPreviewFile(null)}
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+                  >
+                    <X size={22} />
+                  </button>
+                  <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
+                  <div className="flex-1 flex items-center justify-center overflow-auto">
+                    {/* For symptom files, show link or preview if supported */}
+                    {previewFile.preview_url ? (
+                      previewFile.name.toLowerCase().endsWith(".pdf") ? (
+                        <iframe
+                          src={previewFile.preview_url}
+                          title={`Preview of ${previewFile.name}`}
+                          className="w-full h-[60vh] rounded border"
+                          style={{ border: 'none' }}
+                          onLoad={() => console.log('PDF loaded successfully:', previewFile.preview_url)}
+                          onError={(e) => {
+                            console.error('PDF failed to load:', previewFile.preview_url);
+                            console.error('Error details:', e);
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src={previewFile.preview_url}
+                          alt={`Preview of ${previewFile.name}`}
+                          className="max-h-[60vh] w-auto rounded"
+                        />
+                      )
+                    ) : (
+                      <div className="text-gray-400">No Preview Available</div>
+                    )}
 
-      {/* Filters - only show for patients tab */}
-      {activeTab === 'patients' && (
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">Type:</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="all">All Patients</option>
-              <option value="recent">Recently Accessed</option>
-            </select>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">History:</label>
-            <select
-              value={filterHistory}
-              onChange={(e) => setFilterHistory(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="all">All Time</option>
-              <option value="recent">Last Month</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      {/* Content based on active tab */}
-      {activeTab === 'patients' ? (
-        // Patient Grid/List
-        isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-            <p className="text-gray-500 mt-2">Loading patients...</p>
-          </div>
-        ) : getFilteredPatients().length > 0 ? (
-          <div className={viewMode === 'grid' 
-            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6"
-            : "space-y-4"
-          }>
-            {getFilteredPatients().map(renderPatientFolder)}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No patients found</h3>
-            <p className="text-gray-500 mb-6">
-              {patients.length === 0 
-                ? "Connect with patients to see them here"
-                : "No patients match your current filters"
-              }
-            </p>
-            {patients.length === 0 && (
-              <button 
-                onClick={() => {/* Navigate to connections page */}}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-              >
-                Manage Connections
-              </button>
+                  </div>
+                  <div className="mt-4 text-right">
+                    {previewFile.file_url && (
+                      <a
+                        href={previewFile.file_url}
+                        download={previewFile.name}
+                        className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+                      >
+                        Download
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-        )
-      ) : (
-        // Shared Symptoms Files
-        isLoadingFiles ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-            <p className="text-gray-500 mt-2">Loading shared symptoms files...</p>
+        )}
+
+        {selectedPatient && openedFolder && (
+          <div>
+            <h2 className="text-xl font-bold mb-3 text-[#55A1A4]">
+              {openedFolder.name} (from {selectedPatient.name})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {folderFiles.length === 0 ? (
+                <div className="col-span-4 text-gray-400">No files in this folder.</div>
+              ) : (
+                folderFiles.map(file => (
+                  <FileCard key={file.id} file={file} onPreview={handlePreviewFile} />
+                ))
+              )}
+            </div>
+            {previewFile && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-4 max-w-md w-full relative">
+                  <button
+                    onClick={() => setPreviewFile(null)}
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+                  >
+                    <X size={22} />
+                  </button>
+                  <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
+                  <div className="flex-1 flex items-center justify-center overflow-auto">
+                    {previewFile.preview_url ? (
+                      previewFile.name.toLowerCase().endsWith(".pdf") ? (
+                        <iframe
+                          src={previewFile.preview_url}
+                          title={`Preview of ${previewFile.name}`}
+                          className="w-full h-[60vh] rounded border"
+                        />
+                      ) : (
+                        <img
+                          src={previewFile.preview_url}
+                          alt={`Preview of ${previewFile.name}`}
+                          className="max-h-[60vh] w-auto rounded"
+                        />
+                      )
+                    ) : (
+                      <div className="text-gray-400">No Preview Available</div>
+                    )}
+                  </div>
+                  <div className="mt-4 text-right">
+                    {previewFile.file_url && (
+                      <a
+                        href={previewFile.file_url}
+                        download={previewFile.name}
+                        className="inline-block px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+                      >
+                        Download
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        ) : sharedSymptomsFiles.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6">
-            {sharedSymptomsFiles.map(renderSharedSymptomsFile)}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No shared symptoms files found</h3>
-            <p className="text-gray-500 mb-6">
-              No files are currently available in the shared symptoms bucket
-            </p>
-          </div>
-        )
-      )}
+        )}
+
+      </div>
     </div>
   );
-};
 
-export default PatientsPage;
+}

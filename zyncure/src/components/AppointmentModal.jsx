@@ -384,23 +384,6 @@ const AppointmentModal = ({
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Appointment Type
-            </label>
-            <select
-              value={newAppointment.type}
-              onChange={(e) => setNewAppointment({...newAppointment, type: e.target.value})}
-              className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-lg"
-              disabled={isLoading}
-            >
-              <option value="Consultation">Consultation</option>
-              <option value="Checkup">Checkup</option>
-              <option value="Follow-up">Follow-up</option>
-              <option value="Emergency">Emergency</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
               Reason for Visit *
             </label>
             <textarea

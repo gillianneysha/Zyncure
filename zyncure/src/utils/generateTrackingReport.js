@@ -162,32 +162,19 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
             return true;
         } catch (error) {
             console.error(`Error capturing chart "${title}":`, error);
-
-            // Add placeholder text
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...COLORS.teal);
-            doc.text(`Chart "${title}" could not be captured`, margin, y);
-            y += 15;
-
             return false;
         }
     };
 
     try {
-        // Charts Section
-        doc.setFontSize(13);
-        doc.setTextColor(...COLORS.brown);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Visual Analytics', margin, y);
-        y += 8;
-
         // Wait for charts to be fully rendered
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Capture charts from the DOM
         const chartContainers = document.querySelectorAll('.chart-container');
         const rechartsContainers = document.querySelectorAll('.recharts-wrapper');
+
+        let chartsAdded = false;
 
         if (rechartsContainers.length > 0) {
             // Define chart titles based on the order they appear in PatientCharts
@@ -200,29 +187,79 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
                 'Food Cravings Pattern'
             ];
 
+            // Add Charts Section header only if we have charts
+            let sectionHeaderAdded = false;
+
             for (let i = 0; i < Math.min(rechartsContainers.length, chartTitles.length); i++) {
                 const chartElement = rechartsContainers[i];
                 const title = chartTitles[i];
 
                 if (chartElement && chartElement.offsetParent !== null) {
-                    await addChartToPDF(chartElement, title);
+                    // Add section header only once and only if we have charts
+                    if (!sectionHeaderAdded) {
+                        doc.setFontSize(13);
+                        doc.setTextColor(...COLORS.brown);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('Visual Analytics', margin, y);
+                        y += 8;
+                        sectionHeaderAdded = true;
+                    }
+
+                    const success = await addChartToPDF(chartElement, title);
+                    if (success) {
+                        chartsAdded = true;
+                    }
                 }
             }
         } else if (chartContainers.length > 0) {
+            // Add Charts Section header only if we have charts
+            let sectionHeaderAdded = false;
+
             // Process identified chart containers
             for (let i = 0; i < chartContainers.length; i++) {
                 const chartContainer = chartContainers[i];
                 const title = chartContainer.getAttribute('data-chart-title') || `Chart ${i + 1}`;
-                await addChartToPDF(chartContainer, title);
+
+                if (chartContainer && chartContainer.offsetParent !== null) {
+                    // Add section header only once and only if we have charts
+                    if (!sectionHeaderAdded) {
+                        doc.setFontSize(13);
+                        doc.setTextColor(...COLORS.brown);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('Visual Analytics', margin, y);
+                        y += 8;
+                        sectionHeaderAdded = true;
+                    }
+
+                    const success = await addChartToPDF(chartContainer, title);
+                    if (success) {
+                        chartsAdded = true;
+                    }
+                }
             }
-        } else {
-            // No charts found
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...COLORS.teal);
-            doc.text('Charts are not available in this report.', margin, y);
-            doc.text('Please ensure you have symptom data logged to generate visual analytics.', margin, y + 8);
-            y += 20;
+        }
+
+        // Only add the "no charts" message if we're on a page that should have charts
+        // (i.e., if there are chart containers but they couldn't be captured)
+        if (!chartsAdded && (rechartsContainers.length > 0 || chartContainers.length > 0)) {
+            // Check if any chart containers exist but are hidden or failed to capture
+            const hasHiddenCharts = Array.from(rechartsContainers).some(el => el.offsetParent === null) ||
+                Array.from(chartContainers).some(el => el.offsetParent === null);
+
+            if (hasHiddenCharts) {
+                doc.setFontSize(13);
+                doc.setTextColor(...COLORS.brown);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Visual Analytics', margin, y);
+                y += 8;
+
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...COLORS.teal);
+                doc.text('Charts are not available in this report.', margin, y);
+                doc.text('Please ensure you have symptom data logged to generate visual analytics.', margin, y + 8);
+                y += 20;
+            }
         }
 
         // Recent Entries
@@ -344,7 +381,7 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
 
         // Generate filename with timestamp
         const fileName = `zyncure-tracker-report-${new Date().toISOString().slice(0, 10)}.pdf`;
-        
+
         // Return blob if requested, otherwise save/download
         if (returnBlob) {
             return {

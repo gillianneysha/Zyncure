@@ -355,6 +355,139 @@ export { Security as SecurityPage }
 
 export { Notification as NotificationPage }
 
+export function ContactInformationPage({ onBack }) {
+  const [contactData, setContactData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    mobileNumber: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchContactInfo() {
+      setLoading(true);
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          setError("Failed to authenticate user");
+          setLoading(false);
+          return;
+        }
+
+        // Get user type from profiles table
+        let { data: profileData, error: _profileError } = await supabase
+          .from("profiles")
+          .select("user_type")
+          .eq("id", user.id)
+          .single();
+
+        let currentUserType = profileData?.user_type || user.user_metadata?.user_type;
+
+        if (!currentUserType) {
+          setError("User type not found");
+          setLoading(false);
+          return;
+        }
+
+        // Determine which table to query based on user type
+        const tableName = currentUserType === 'patient' ? 'patients' : 'medicalprofessionals';
+        const idColumn = currentUserType === 'patient' ? 'patient_id' : 'med_id';
+
+        // Fetch user data from the appropriate table
+        let { data: userData, error: userDataError } = await supabase
+          .from(tableName)
+          .select("*")
+          .eq(idColumn, user.id)
+          .single();
+
+        if (userDataError && userDataError.code !== 'PGRST116') {
+          console.error(`Error fetching from ${tableName}:`, userDataError);
+          setError(`Failed to fetch user data from ${tableName}`);
+          setLoading(false);
+          return;
+        }
+
+        let profile = userData || user.user_metadata || {};
+
+        const formattedData = {
+          firstName: profile.first_name || "",
+          lastName: profile.last_name || "",
+          email: user.email || profile.email || "",
+          mobileNumber: profile.contact_no || "",
+        };
+
+        setContactData(formattedData);
+        setLoading(false);
+      } catch (err) {
+        console.error("Unexpected error in fetchContactInfo:", err);
+        setError("An unexpected error occurred");
+        setLoading(false);
+      }
+    }
+    fetchContactInfo();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-profileBg rounded-xl p-8 h-[700px] flex items-center justify-center">
+        <div className="text-mySidebar">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-profileBg rounded-xl p-8 h-[700px]">
+      <button
+        onClick={onBack}
+        className="flex items-center text-mySidebar mb-6 hover:underline"
+      >
+        <ArrowLeft className="mr-2" size={20} /> Back to Billing
+      </button>
+
+      <h2 className="text-4xl text-profileHeader font-bold mb-6 flex items-center gap-3">
+        <Smartphone className="w-9 h-9 text-profileHeader" />
+        Contact Information
+      </h2>
+
+      {error && <div className="text-red-500 mb-4">{error}</div>}
+
+      <div className="space-y-6">
+        <div>
+          <label className="block text-mySidebar mb-2 font-semibold">Full Name</label>
+          <div className="w-full p-3 border border-mySidebar rounded-xl bg-profileBg text-mySidebar">
+            {contactData.firstName && contactData.lastName
+              ? `${contactData.firstName} ${contactData.lastName}`
+              : "Not provided"
+            }
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-mySidebar mb-2 font-semibold">Email Address</label>
+          <div className="w-full p-3 border border-mySidebar rounded-xl bg-profileBg text-mySidebar">
+            {contactData.email || "Not provided"}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-mySidebar mb-2 font-semibold">Mobile Number</label>
+          <div className="w-full p-3 border border-mySidebar rounded-xl bg-profileBg text-mySidebar">
+            {contactData.mobileNumber || "Not provided"}
+          </div>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+          <p className="text-blue-800 text-sm">
+            <strong>Note:</strong> To update your contact information, please go to the Personal Information section in your profile settings.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function BillingPage() {
   const [showPlans, setShowPlans] = useState(false);
@@ -364,6 +497,7 @@ export function BillingPage() {
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [error, setError] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
+  const [showContactInfo, setShowContactInfo] = useState(false);
 
   // Check for payment success/failure in URL params
   useEffect(() => {
@@ -422,10 +556,11 @@ export function BillingPage() {
   }, []);
 
   const handleOptionClick = (option) => {
-    if (option === "Subscriptions") setShowPlans(true);
-    else if (option === "Contact Information") {
-      // Add logic for Contact Information if needed
-    }
+
+    if (option === "Subscriptions" || option === "Manage Subscription") setShowPlans(true);
+    // else if (option === "Contact Information") {
+      
+    // }
   };
 
   // Create PayMongo Checkout Session with improved error handling
@@ -537,6 +672,40 @@ export function BillingPage() {
     const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription`;
 
     createCheckoutSession(amount, description);
+  };
+
+  // Handle plan upgrade/downgrade
+  const handlePlanChange = () => {
+    if (!selectedTier) {
+      setError('Please select a new subscription tier');
+      return;
+    }
+
+    const amount = tierPricing[selectedTier];
+    const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription (Plan Change)`;
+
+    createCheckoutSession(amount, description);
+  };
+
+  // Handle cancellation
+  const handleCancelSubscription = async () => {
+    if (!currentSubscription) return;
+
+    if (confirm('Are you sure you want to cancel your subscription? This action cannot be undone.')) {
+      try {
+        const { error } = await supabase
+          .from('subscriptions')
+          .update({ status: 'cancelled' })
+          .eq('id', currentSubscription.id);
+
+        if (error) throw error;
+
+        setCurrentSubscription({ ...currentSubscription, status: 'cancelled' });
+        setPaymentStatus('Your subscription has been cancelled successfully.');
+      } catch (error) {
+        setError(`Failed to cancel subscription: ${error.message}`);
+      }
+    }
   };
 
   // Handle payment success (call this when user returns from PayMongo)
@@ -669,10 +838,27 @@ export function BillingPage() {
     }
   }, []);
 
-  // Rest of your component remains the same...
+  // Helper function to check if user has active subscription
+  const hasActiveSubscription = () => {
+    return currentSubscription && currentSubscription.status === 'active';
+  };
+
+  // Helper function to get current tier
+  const getCurrentTier = () => {
+    if (!hasActiveSubscription()) return 'free';
+    return currentSubscription.tier;
+  };
+
+  // Helper function to check if subscription is expired
+  const isSubscriptionExpired = () => {
+    if (!currentSubscription) return false;
+    return currentSubscription.expires_at && new Date(currentSubscription.expires_at) < new Date();
+  };
+
+
   const SecurityOption = ({ title, onClick }) => (
     <div
-      className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-50 transition-colors"
+      className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
       onClick={() => onClick(title)}
     >
       <span className="text-mySidebar">{title}</span>
@@ -680,27 +866,264 @@ export function BillingPage() {
     </div>
   );
 
-  // Show current subscription status
-  const renderSubscriptionStatus = () => {
-    if (!currentSubscription) return null;
+
+  // Fetch subscription helper
+  const fetchSubscription = async () => {
+    if (!user) return;
+    const { data: subscription, error: subError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!subError && subscription) {
+      setCurrentSubscription(subscription);
+    }
+  };
+
+  const reactivateSubscription = async () => {
+    try {
+      // Update subscription status to active
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ 
+          status: 'active',
+          started_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      // Refresh subscription data
+      await fetchSubscription();
+      
+      // Show success message
+      alert('Subscription reactivated successfully!');
+    } catch (error) {
+      console.error('Error reactivating subscription:', error);
+      alert('Failed to reactivate subscription. Please try again.');
+    }
+  };
+
+// Handle refund request
+const handleRefundRequest = async (paymentId) => {
+  try {
+    setIsProcessing(true);
+    setError("");
+
+    const {  error: refundError } = await supabase.functions.invoke('request-refund', {
+      body: { payment_id: paymentId }
+    });
+
+    if (refundError) {
+      throw new Error(`Refund request failed: ${refundError.message}`);
+    }
+
+    setPaymentStatus("Refund request submitted successfully. You will receive an email confirmation.");
+    
+    // Refresh subscription data
+    await fetchSubscription();
+    
+  } catch (error) {
+    console.error('Refund request error:', error);
+    setError(`Refund request failed: ${error.message}`);
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+// Get recent payments for refund eligibility
+const getRecentPayments = async () => {
+  if (!user) return [];
+  
+  const { data: payments, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('status', 'paid')
+    .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching payments:', error);
+    return [];
+  }
+
+  return payments || [];
+};
+
+ // --- ADD REFUND BUTTON COMPONENT HERE ---
+  const RefundButton = () => {
+    const [showRefundModal, setShowRefundModal] = useState(false);
+    const [recentPayments, setRecentPayments] = useState([]);
+
+    const checkRefundEligibility = async () => {
+      const payments = await getRecentPayments();
+      setRecentPayments(payments);
+      setShowRefundModal(true);
+    };
+
+    if (showRefundModal) {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Request Refund</h3>
+            
+            {recentPayments.length === 0 ? (
+              <p className="text-gray-600 mb-4">
+                No recent payments eligible for refund. Refunds are only available for payments made within the last 7 days.
+              </p>
+            ) : (
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  Select a payment to refund (only payments from last 7 days):
+                </p>
+                {recentPayments.map((payment) => (
+                  <div key={payment.id} className="border rounded p-3 mb-2">
+                    <p className="font-medium">₱{payment.amount / 100}</p>
+                    <p className="text-sm text-gray-600">
+                      {new Date(payment.created_at).toLocaleDateString()}
+                    </p>
+                    <p className="text-sm text-gray-600 capitalize">{payment.tier} plan</p>
+                    <button
+                      onClick={() => {
+                        handleRefundRequest(payment.id);
+                        setShowRefundModal(false);
+                      }}
+                      className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition"
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? 'Processing...' : 'Request Refund'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRefundModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-        <h3 className="text-green-800 font-semibold">Current Subscription</h3>
-        <p className="text-green-600">
-          {currentSubscription.tier.charAt(0).toUpperCase() + currentSubscription.tier.slice(1)} Plan
-        </p>
-        {currentSubscription.expires_at && (
-          <p className="text-green-600 text-sm">
-            Expires: {new Date(currentSubscription.expires_at).toLocaleDateString()}
-          </p>
-        )}
-        <p className="text-green-600 text-sm">
-          Status: {currentSubscription.status.charAt(0).toUpperCase() + currentSubscription.status.slice(1)}
-        </p>
-      </div>
+      <button
+        onClick={checkRefundEligibility}
+        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition text-sm"
+      >
+        Request Refund
+      </button>
     );
   };
+
+  // Enhanced subscription status display
+  const renderSubscriptionStatus = () => {
+  if (!currentSubscription) return null;
+
+  const isActive = currentSubscription.status === 'active';
+  const isExpired = isSubscriptionExpired();
+  const isCancelled = currentSubscription.status === 'cancelled';
+
+
+  let statusText = 'Active';
+  let bgColor = 'bg-green-50 border-green-200';
+  let textColor = 'text-green-800';
+  let statusIcon = '✓';
+
+  if (isCancelled) {
+    
+    statusText = 'Cancelled';
+    bgColor = 'bg-red-50 border-red-200';
+    textColor = 'text-red-800';
+    statusIcon = '✗';
+  } else if (isExpired) {
+    
+    statusText = 'Expired';
+    bgColor = 'bg-orange-50 border-orange-200';
+    textColor = 'text-orange-800';
+    statusIcon = '⚠';
+  }
+
+  return (
+    <div className={`${bgColor} border rounded-lg p-6 mb-6`}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className={`${textColor} font-semibold text-lg flex items-center gap-2`}>
+          <span className="text-xl">{statusIcon}</span>
+          Current Subscription
+        </h3>
+        {isActive && !isExpired && (
+          <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+            {statusText}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <p className={`${textColor} font-medium`}>
+            Plan: {currentSubscription.tier.charAt(0).toUpperCase() + currentSubscription.tier.slice(1)}
+          </p>
+          <p className={`${textColor} text-sm`}>
+            Monthly fee: ₱{tierPricing[currentSubscription.tier] || 0}
+          </p>
+        </div>
+        
+        <div>
+          {currentSubscription.expires_at && (
+            <p className={`${textColor} text-sm`}>
+              Expires: {new Date(currentSubscription.expires_at).toLocaleDateString()}
+            </p>
+          )}
+          {currentSubscription.started_at && (
+            <p className={`${textColor} text-sm`}>
+              Started: {new Date(currentSubscription.started_at).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {isActive && !isExpired && (
+        <div className="mt-4 flex gap-3 flex-wrap">
+          <button
+            onClick={() => setShowPlans(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+          >
+            Change Plan
+          </button>
+          <button
+            onClick={handleCancelSubscription}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+          >
+            Cancel Subscription
+          </button>
+          <RefundButton />
+        </div>
+      )}
+
+      {(isExpired || isCancelled) && (
+        <div className="mt-4">
+          <button
+            onClick={reactivateSubscription}
+            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
+          >
+            Reactivate Subscription
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
   // Payment status message component
   const renderPaymentStatus = () => {
@@ -755,25 +1178,28 @@ export function BillingPage() {
 
     if (!isTestEnvironment) return null;
 
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-        <h3 className="text-yellow-800 font-semibold">🧪 Testing Mode</h3>
-        <p className="text-yellow-700 text-sm">
-          This is sandbox mode - no real payments will be processed.
-          <br />
-          Use test card numbers provided by PayMongo for testing.
-        </p>
-      </div>
-    );
+    // return (
+    //   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+    //     <h3 className="text-yellow-800 font-semibold">🧪 Testing Mode</h3>
+    //     <p className="text-yellow-700 text-sm">
+    //       This is sandbox mode - no real payments will be processed.
+    //       <br />
+    //       Use test card numbers provided by PayMongo for testing.
+    //     </p>
+    //   </div>
+    // );
   };
 
-  // Subscriptions page
+  // Enhanced subscriptions page
   if (showPlans) {
+    const currentTier = getCurrentTier();
+    const isUpgrading = hasActiveSubscription();
+
     return (
       <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
         <button
           onClick={() => setShowPlans(false)}
-          className="flex items-center text-gray-600 mb-6 hover:underline"
+          className="flex items-center text-mySidebar mb-6 hover:underline"
         >
           <ArrowLeft className="mr-2" size={20} /> Back to Billing
         </button>
@@ -783,16 +1209,27 @@ export function BillingPage() {
         {renderError()}
         {renderSubscriptionStatus()}
 
-        <h2 className="text-4xl text-teal-600 font-bold mb-2">Upgrade to Premium</h2>
-        <p className="text-teal-600 mb-8">Enjoy an enhanced experience</p>
+        <h2 className="text-4xl text-teal-600 font-bold mb-2">
+          {isUpgrading ? 'Change Your Plan' : 'Upgrade to Premium'}
+        </h2>
+        <p className="text-teal-600 mb-8">
+          {isUpgrading ? 'Select a new plan to switch to' : 'Enjoy an enhanced experience'}
+        </p>
 
         <div className="flex gap-6">
           {/* Tier 1 - Free */}
-          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
-            <h3 className="font-bold text-orange-600 mb-2">
+          <div className={`rounded-2xl p-6 flex-1 relative ${
+            currentTier === 'free' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+          }`}>
+            {currentTier === 'free' && (
+              <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Current Plan
+              </div>
+            )}
+            <h3 className={`font-bold mb-2 ${currentTier === 'free' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 1: Free <span className="font-normal text-sm">(Basic Access)</span>
             </h3>
-            <ul className="text-orange-600 text-sm space-y-2">
+            <ul className={`text-sm space-y-2 ${currentTier === 'free' ? 'text-teal-600' : 'text-orange-600'}`}>
               <li>✓ View and manage personal health records.</li>
               <li>✓ Upload and store up to 2GB of medical files.</li>
               <li>✓ Share records with up to 3 healthcare providers.</li>
@@ -801,24 +1238,43 @@ export function BillingPage() {
               <li>✓ Access to a health dashboard.</li>
               <li>✓ Ability to export health records in a standard format (e.g., PDF).</li>
             </ul>
+            {currentTier !== 'free' && hasActiveSubscription() && (
+              <button
+                onClick={handleCancelSubscription}
+                className="mt-4 w-full bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition text-sm"
+              >
+                Downgrade to Free
+              </button>
+            )}
           </div>
 
           {/* Tier 2 - Premium */}
-          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
-            <input
-              type="radio"
-              name="subscriptionTier"
-              value="premium"
-              checked={selectedTier === "premium"}
-              onChange={() => setSelectedTier("premium")}
-              className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-              aria-label="Select Premium"
-            />
-            <h3 className="font-bold text-orange-600 mb-2">
+          <div className={`rounded-2xl p-6 flex-1 relative ${
+            currentTier === 'premium' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+          }`}>
+            {currentTier === 'premium' && (
+              <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Current Plan
+              </div>
+            )}
+            {currentTier !== 'premium' && (
+              <input
+                type="radio"
+                name="subscriptionTier"
+                value="premium"
+                checked={selectedTier === "premium"}
+                onChange={() => setSelectedTier("premium")}
+                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+                aria-label="Select Premium"
+              />
+            )}
+            <h3 className={`font-bold mb-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 2: Premium <span className="font-normal text-sm">(Enhanced Access)</span>
             </h3>
-            <p className="text-orange-600 font-bold mb-2">₱299/month</p>
-            <ul className="text-orange-600 text-sm space-y-2">
+            <p className={`font-bold mb-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
+              ₱299/month
+            </p>
+            <ul className={`text-sm space-y-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
               <li>✓ All features in the Free tier</li>
               <li>✓ Increased storage capacity up to 5GB.</li>
               <li>✓ Track all predefined symptoms and custom symptoms.</li>
@@ -827,21 +1283,32 @@ export function BillingPage() {
           </div>
 
           {/* Tier 3 - Pro */}
-          <div className="bg-orange-50 rounded-2xl p-6 flex-1 relative">
-            <input
-              type="radio"
-              name="subscriptionTier"
-              value="pro"
-              checked={selectedTier === "pro"}
-              onChange={() => setSelectedTier("pro")}
-              className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-              aria-label="Select Pro"
-            />
-            <h3 className="font-bold text-orange-600 mb-2">
+          <div className={`rounded-2xl p-6 flex-1 relative ${
+            currentTier === 'pro' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+          }`}>
+            {currentTier === 'pro' && (
+              <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Current Plan
+              </div>
+            )}
+            {currentTier !== 'pro' && (
+              <input
+                type="radio"
+                name="subscriptionTier"
+                value="pro"
+                checked={selectedTier === "pro"}
+                onChange={() => setSelectedTier("pro")}
+                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+                aria-label="Select Pro"
+              />
+            )}
+            <h3 className={`font-bold mb-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 3: Pro <span className="font-normal text-sm">(Comprehensive Access)</span>
             </h3>
-            <p className="text-orange-600 font-bold mb-2">₱599/month</p>
-            <ul className="text-orange-600 text-sm space-y-2">
+            <p className={`font-bold mb-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
+              ₱599/month
+            </p>
+            <ul className={`text-sm space-y-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
               <li>✓ All features in the Premium tier</li>
               <li>✓ Priority support for technical issues</li>
               <li>✓ Early access to future feature expansions and integrations.</li>
@@ -851,18 +1318,33 @@ export function BillingPage() {
         </div>
 
         <div className="flex justify-center mt-8">
-          <button
-            className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
-            disabled={!selectedTier || isProcessing || !user}
-            onClick={handleSubscribe}
-          >
-            {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
-          </button>
+          {!hasActiveSubscription() ? (
+            <button
+              className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
+              disabled={!selectedTier || isProcessing || !user}
+              onClick={handleSubscribe}
+            >
+              {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
+            </button>
+          ) : (
+            <button
+              className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
+              disabled={!selectedTier || isProcessing || !user || selectedTier === currentTier}
+              onClick={handlePlanChange}
+            >
+              {isProcessing ? 'Processing...' : 
+               !user ? 'Please log in' : 
+               selectedTier === currentTier ? 'Current Plan' : 'Change Plan'}
+            </button>
+          )}
         </div>
 
         <div className="text-center mt-4">
           <p className="text-sm text-gray-600">
-            You'll be redirected to PayMongo to complete your payment securely.
+            {isUpgrading ? 
+              'Your plan will be changed immediately upon successful payment.' :
+              'You\'ll be redirected to PayMongo to complete your payment securely.'
+            }
             <br />
             All major payment methods are supported (Cards, GCash, Maya, etc.)
           </p>
@@ -878,7 +1360,13 @@ export function BillingPage() {
     );
   }
 
+
   // Default Billing Home
+  if (showContactInfo) {
+    return <ContactInformationPage onBack={() => setShowContactInfo(false)} />;
+  }
+
+
   return (
     <div className="bg-profileBg rounded-xl p-8 h-[700px]">
       <div className="mb-6">
@@ -887,7 +1375,10 @@ export function BillingPage() {
           Billing
         </h2>
         <p className="text-zyncureOrange text-left mt-3">
-          Manage your subscriptions and billing information
+          {hasActiveSubscription() ? 
+            'Manage your active subscription and billing information' :
+            'Manage your subscriptions and billing information'
+          }
         </p>
       </div>
 
@@ -898,7 +1389,7 @@ export function BillingPage() {
 
       <div className="mt-8">
         <SecurityOption
-          title="Subscriptions"
+          title={hasActiveSubscription() ? "Manage Subscription" : "Subscriptions"}
           onClick={handleOptionClick}
         />
         <SecurityOption
@@ -1041,7 +1532,7 @@ export function TermsOfServicePage({ onBack }) {
         <ul className="list-disc ml-6">
           <li>ZynCure reserves the right to amend these Terms and Conditions at any time.</li>
           <li>Users will be notified of significant changes through email or in-app notifications.</li>
-          <li>For questions or concerns, contact ZynCure Support at <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a>.</li>
+          <li>For questions or concerns, contact ZynCure Support at <a className="underline" href="mailto:zyncure2025@gmail.com">zyncure2025@gmail.com</a>.</li>
         </ul>
         <p>
           By using ZynCure, you acknowledge and agree to these Terms and Conditions. If you do not agree, please discontinue use immediately.
@@ -1124,7 +1615,7 @@ export function PrivacyPolicyPage({ onBack }) {
           </li>
         </ul>
         <p>
-          To exercise these rights, please contact us at <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a>.
+          To exercise these rights, please contact us at <a className="underline" href="mailto:zyncure2025@gmail.com">zyncure2025@gmail.com</a>.
         </p>
         <h3 className="font-bold text-lg mt-4 mb-2">VI. Data Retention</h3>
         <p>
@@ -1137,8 +1628,8 @@ export function PrivacyPolicyPage({ onBack }) {
         <h3 className="font-bold text-lg mt-4 mb-2">VIII. Contact Us</h3>
         <p>
           If you have any questions, concerns, or requests regarding this Privacy Agreement or your data, please contact us at:<br />
-          <b>Email:</b> <a className="underline" href="mailto:ZynCure@gmail.com">ZynCure@gmail.com</a><br />
-          <b>Phone:</b> +63 (2) 1234-5678
+          <b>Email:</b> <a className="underline" href="mailto:zyncure2025@gmail.com">zyncure2025@gmail.com</a><br />
+          <b>Phone:</b> +63 921 642 4770
 
         </p>
         <p>
@@ -1194,10 +1685,6 @@ export function PoliciesPage() {
         />
         <SecurityOption
           title="Privacy Policy"
-          onClick={handleOptionClick}
-        />
-        <SecurityOption
-          title="Community Standards"
           onClick={handleOptionClick}
         />
       </div>
@@ -1276,7 +1763,7 @@ export function DeleteAccountPage() {
         window.location.href = "/register";
       }, 1000);
 
-    } catch (error) {
+    } catch {
       setError("An unexpected error occurred.");
       setLoading(false);
     }
