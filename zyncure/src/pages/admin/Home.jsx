@@ -22,23 +22,41 @@ export default function AdminHome() {
 
   useEffect(() => {
     async function fetchTotalUsers() {
-      const { count, error } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true });
-      if (!error) setTotalUsers(count || 0);
+      try {
+        // Get count from patients table
+        const { count: patientsCount, error: patientsError } = await supabase
+          .from("patients")
+          .select("*", { count: "exact", head: true });
+
+        // Get count from medicalprofessionals table
+        const { count: professionalsCount, error: professionalsError } = await supabase
+          .from("medicalprofessionals")
+          .select("*", { count: "exact", head: true });
+
+        if (!patientsError && !professionalsError) {
+          const totalCount = (patientsCount || 0) + (professionalsCount || 0);
+          setTotalUsers(totalCount);
+        } else {
+          console.error('Error fetching users:', patientsError || professionalsError);
+          setTotalUsers(0);
+        }
+      } catch (error) {
+        console.error('Error fetching total users:', error);
+        setTotalUsers(0);
+      }
     }
     async function fetchPendingVerification() {
       const { count, error } = await supabase
-        .from("doctor_verifications")
+        .from("support_tickets")
         .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
+        .eq("status", "Open");
       if (!error) setPendingVerification(count || 0);
     }
     async function fetchReportsForReview() {
       const { count, error } = await supabase
-        .from("reports")
+        .from("bug_reports")
         .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
+        .eq("status", "In Progress");
       if (!error) setReportsForReview(count || 0);
     }
     fetchTotalUsers();
@@ -48,41 +66,41 @@ export default function AdminHome() {
   }, []);
 
   async function handleAddAnnouncement(e) {
-  e.preventDefault();
-  setLoading(true);
-  
-  const { error } = await supabase.from("announcements").insert([{
-    title: newAnnouncement.title,
-    content: newAnnouncement.content,
-    type: newAnnouncement.type
-  }]);
-  
-  if (!error) {
-    // Notify all users about the new announcement
-    const { error: notifyError } = await supabase.rpc('notify_all_users_announcement', {
-      announcement_title: newAnnouncement.title,
-      announcement_content: newAnnouncement.content,
-      announcement_type: newAnnouncement.type || 'info'
-    });
-    
-    if (notifyError) {
-      console.error('Failed to send notifications:', notifyError);
-      // You might want to show a warning that the announcement was created but notifications failed
+    e.preventDefault();
+    setLoading(true);
+
+    const { error } = await supabase.from("announcements").insert([{
+      title: newAnnouncement.title,
+      content: newAnnouncement.content,
+      type: newAnnouncement.type
+    }]);
+
+    if (!error) {
+      // Notify all users about the new announcement
+      const { error: notifyError } = await supabase.rpc('notify_all_users_announcement', {
+        announcement_title: newAnnouncement.title,
+        announcement_content: newAnnouncement.content,
+        announcement_type: newAnnouncement.type || 'info'
+      });
+
+      if (notifyError) {
+        console.error('Failed to send notifications:', notifyError);
+        // You might want to show a warning that the announcement was created but notifications failed
+      }
+
+      setShowModal(false);
+      setNewAnnouncement({ title: "", content: "", type: "" });
+      fetchMessages();
+    } else {
+      alert("Failed to add announcement: " + error.message);
     }
-    
-    setShowModal(false);
-    setNewAnnouncement({ title: "", content: "", type: "" });
-    fetchMessages();
-  } else {
-    alert("Failed to add announcement: " + error.message);
+
+    setLoading(false);
   }
-  
-  setLoading(false);
-}
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">Key Stats Overview</h1>
+      <h1 className="text-4xl font-bold mb-6 text-[#55A1A4]">Key Stats Overview</h1>
       <div className="grid grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl p-6 shadow flex flex-col items-center">
           <span className="text-xl font-semibold mb-2">Total Users</span>
@@ -93,7 +111,7 @@ export default function AdminHome() {
           <span className="text-4xl font-bold text-[#F46B5D]">{pendingVerification}</span>
         </div>
         <div className="bg-white rounded-xl p-6 shadow flex flex-col items-center">
-          <span className="text-xl font-semibold mb-2">Reports For Review</span>
+          <span className="text-xl font-semibold mb-2">Reports for Review</span>
           <span className="text-4xl font-bold text-[#F46B5D]">{reportsForReview}</span>
         </div>
       </div>

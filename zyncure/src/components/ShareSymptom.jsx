@@ -443,7 +443,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
 
 
             <div>
-              <label className="block text-sm font-semibold mb-1">Report data duration</label>
+              <label className="block text-sm font-semibold mb-1">Symptom Duration</label>
               <select
                 value={symptomsDuration}
                 onChange={(e) => setSymptomsDuration(e.target.value)}
