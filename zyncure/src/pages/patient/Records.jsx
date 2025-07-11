@@ -1,6 +1,18 @@
 import {
-  SquarePlus, FolderPlus, FilePlus, LayoutGrid, Rows3, MoreVertical, FileText, Share,
-  Cross, ChevronDown, ArrowLeft, Edit, Trash2, X
+  SquarePlus,
+  FolderPlus,
+  FilePlus,
+  LayoutGrid,
+  Rows3,
+  MoreVertical,
+  FileText,
+  Share,
+  Cross,
+  ChevronDown,
+  ArrowLeft,
+  Edit,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "../../client";
@@ -30,11 +42,17 @@ const ALL_FILTERS = [
   { label: "Shared with Others", value: "shared_with_others" },
 ];
 
+
+
 // --- Helper hooks & functions ---
 function useMaxFileNameLength() {
-  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  const [width, setWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200
+  );
   useEffect(() => {
-    function handleResize() { setWidth(window.innerWidth); }
+    function handleResize() {
+      setWidth(window.innerWidth);
+    }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -46,17 +64,18 @@ function useMaxFileNameLength() {
 function truncateFileName(fileName, maxLength = 25) {
   if (!fileName || fileName.length <= maxLength) return fileName;
   const lastDot = fileName.lastIndexOf(".");
-  if (lastDot === -1 || lastDot === 0) return fileName.slice(0, maxLength - 3) + "...";
+  if (lastDot === -1 || lastDot === 0)
+    return fileName.slice(0, maxLength - 3) + "...";
   const extension = fileName.slice(lastDot + 1);
   const keep = maxLength - extension.length - 4;
   if (keep <= 0) return "..." + fileName.slice(lastDot);
   return fileName.slice(0, keep) + "..." + "." + extension;
 }
 
-function getFileExtension(name) {
-  if (!name) return "";
-  return name.split(".").pop().toLowerCase();
-}
+// function getFileExtension(name) {
+//   if (!name) return "";
+//   return name.split(".").pop().toLowerCase();
+// }
 
 function fileMatchesHistoryFilter(file, historyFilter) {
   if (!historyFilter || !file.created_at) return true;
@@ -64,7 +83,7 @@ function fileMatchesHistoryFilter(file, historyFilter) {
   const now = new Date();
   switch (historyFilter) {
     case "recent":
-      return (now - fileDate) < 3 * 24 * 60 * 60 * 1000;
+      return now - fileDate < 3 * 24 * 60 * 60 * 1000;
     case "3d": {
       const threeDaysAgo = new Date(now);
       const sevenDaysAgo = new Date(now);
@@ -95,10 +114,10 @@ function useDoctorIds() {
   useEffect(() => {
     async function fetchDoctorIds() {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'doctor');
-      if (!error && data) setDoctorIds(data.map(d => d.id));
+        .from("profiles")
+        .select("id")
+        .eq("role", "doctor");
+      if (!error && data) setDoctorIds(data.map((d) => d.id));
     }
     fetchDoctorIds();
   }, []);
@@ -106,13 +125,15 @@ function useDoctorIds() {
 }
 
 // --- FILTER for ALL ---
-function fileMatchesAllFilter(file, allFilter, currentUserId, doctorIds) {
+function fileMatchesAllFilter(file, allFilter, currentUserId) {
   if (!allFilter || allFilter === "all") return true;
   switch (allFilter) {
     case "mine":
       return file.owner_id === currentUserId;
     case "shared_with_me":
-      return file.shared_with_ids && file.shared_with_ids.includes(currentUserId);
+      return (
+        file.shared_with_ids && file.shared_with_ids.includes(currentUserId)
+      );
     case "shared_with_others":
       return (
         file.owner_id === currentUserId &&
@@ -154,7 +175,11 @@ function FolderCard({
       className="bg-[#55A1A4] text-white p-4 rounded-lg shadow-md flex justify-between items-center relative cursor-pointer"
       ref={cardRef}
     >
-      <div className="flex items-center" onClick={onOpenFolder} title="Open Folder">
+      <div
+        className="flex items-center"
+        onClick={onOpenFolder}
+        title="Open Folder"
+      >
         <div className="mr-2 text-white">
           <Cross className="mr-2 text-white" />
         </div>
@@ -223,13 +248,28 @@ function FolderCard({
 }
 
 // --- FileCard ---
-function FileCard({ file, onRename, onDelete, maxFileNameLength, onPreview, onShare }) {
+function FileCard({
+  file,
+  onRename,
+  onDelete,
+  maxFileNameLength,
+  onPreview,
+  onShare,
+}) {
   const [dropdown, setDropdown] = useState(false);
   const dropdownRef = useRef(null);
-  const { name, preview_url: previewUrl, created_at: createdAt, id, file_path: filePath } = file;
+  const {
+    name,
+    preview_url: previewUrl,
+    created_at: createdAt,
+    id,
+    file_path: filePath,
+  } = file;
 
   const ext = name.split(".").pop().toLowerCase();
-  const formattedDate = createdAt ? new Date(createdAt).toLocaleDateString() : "";
+  const formattedDate = createdAt
+    ? new Date(createdAt).toLocaleDateString()
+    : "";
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -255,7 +295,12 @@ function FileCard({ file, onRename, onDelete, maxFileNameLength, onPreview, onSh
             className="text-white text-sm font-medium hover:text-indigo-200 transition truncate text-left"
             title={name}
             onClick={() => onPreview(file)}
-            style={{ background: "none", border: "none", padding: 0, margin: 0 }}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              margin: 0,
+            }}
           >
             {truncateFileName(name, maxFileNameLength)}
           </button>
@@ -289,7 +334,8 @@ function FileCard({ file, onRename, onDelete, maxFileNameLength, onPreview, onSh
               <button
                 onClick={() => {
                   setDropdown(false);
-                  if (onShare) onShare({ id: file.id, name: file.name, type: "file" });
+                  if (onShare)
+                    onShare({ id: file.id, name: file.name, type: "file" });
                 }}
                 className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-teal-50 transition-colors"
               >
@@ -311,7 +357,7 @@ function FileCard({ file, onRename, onDelete, maxFileNameLength, onPreview, onSh
               src={previewUrl}
               title={`Preview of ${name}`}
               className="w-full h-40 rounded border"
-              style={{ border: 'none' }}
+              style={{ border: "none" }}
             />
           ) : (
             <img
@@ -337,13 +383,28 @@ function FileCard({ file, onRename, onDelete, maxFileNameLength, onPreview, onSh
 }
 
 // --- FileListItem ---
-function FileListItem({ file, onRename, onDelete, maxFileNameLength, onPreview, onShare }) {
+function FileListItem({
+  file,
+  onRename,
+  onDelete,
+  maxFileNameLength,
+  onPreview,
+  onShare,
+}) {
   const [dropdown, setDropdown] = useState(false);
   const dropdownRef = useRef(null);
-  const { name, preview_url: previewUrl, created_at: createdAt, id, file_path: filePath } = file;
+  const {
+    name,
+    preview_url: previewUrl,
+    created_at: createdAt,
+    id,
+    file_path: filePath,
+  } = file;
 
   const ext = name.split(".").pop().toLowerCase();
-  const formattedDate = createdAt ? new Date(createdAt).toLocaleDateString() : "";
+  const formattedDate = createdAt
+    ? new Date(createdAt).toLocaleDateString()
+    : "";
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -372,7 +433,7 @@ function FileListItem({ file, onRename, onDelete, maxFileNameLength, onPreview, 
                 src={previewUrl}
                 title={`Preview of ${name}`}
                 className="w-full h-full rounded border"
-                style={{ border: 'none' }}
+                style={{ border: "none" }}
               />
             ) : (
               <img
@@ -396,7 +457,12 @@ function FileListItem({ file, onRename, onDelete, maxFileNameLength, onPreview, 
                 className="text-white text-sm font-medium hover:text-indigo-200 transition truncate text-left"
                 title={name}
                 onClick={() => onPreview(file)}
-                style={{ background: "none", border: "none", padding: 0, margin: 0 }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  margin: 0,
+                }}
               >
                 {truncateFileName(name, maxFileNameLength)}
               </button>
@@ -430,7 +496,8 @@ function FileListItem({ file, onRename, onDelete, maxFileNameLength, onPreview, 
                   <button
                     onClick={() => {
                       setDropdown(false);
-                      if (onShare) onShare({ id: file.id, name: file.name, type: "file" });
+                      if (onShare)
+                        onShare({ id: file.id, name: file.name, type: "file" });
                     }}
                     className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-teal-50 transition-colors"
                   >
@@ -458,6 +525,8 @@ export default function Records({ currentUserId: propUserId }) {
   const [currentUserId, setCurrentUserId] = useState(propUserId || null);
   const doctorIds = useDoctorIds();
 
+   const [storageInfo, setStorageInfo] = useState(null);
+
   useEffect(() => {
     if (!propUserId) {
       supabase.auth.getUser().then(({ data }) => {
@@ -466,6 +535,24 @@ export default function Records({ currentUserId: propUserId }) {
       });
     }
   }, [propUserId]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchStorageInfo();
+    }
+  }, [currentUserId]);
+
+  const fetchStorageInfo = async () => {
+    const { data, error } = await supabase
+      .from('user_tier_status')
+      .select('current_tier, storage_limit_mb, storage_used_mb, can_upload_files')
+      .eq('user_id', currentUserId)
+      .single();
+    
+    if (!error && data) {
+      setStorageInfo(data);
+    }
+  };
 
   const fileInputRef = useRef(null);
   const folderFileInputRef = useRef(null);
@@ -530,7 +617,7 @@ export default function Records({ currentUserId: propUserId }) {
     name: "",
     filePath: null,
   });
-  const [successModal, setSuccessModal] = useState({
+  const [setSuccessModal] = useState({
     open: false,
     title: "",
     message: "",
@@ -569,19 +656,88 @@ export default function Records({ currentUserId: propUserId }) {
       .order("created_at", { ascending: true });
     if (error) setFiles([]);
     else setFiles(data || []);
+
+     await fetchStorageInfo();
     setLoading(false);
   }
+
+  const checkTierLimits = async (newFileSize) => {
+    try {
+      // Get user's current tier status
+      const { data: tierStatus, error } = await supabase
+        .from("user_tier_status")
+        .select("*")
+        .eq("user_id", currentUserId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching tier status:", error);
+        return { allowed: false, message: "Unable to verify storage limits." };
+      }
+
+      // Check if user can upload files at all
+      if (!tierStatus.can_upload_files) {
+        return {
+          allowed: false,
+          message: `Storage limit reached! You've used ${tierStatus.storage_used_mb.toFixed(
+            1
+          )}MB of your ${
+            tierStatus.storage_limit_mb
+          }MB limit. Please upgrade your plan or delete some files.`,
+        };
+      }
+
+      // Check if this specific file would exceed the limit
+      const newFileSizeMB = newFileSize / (1024 * 1024);
+      const totalAfterUpload = tierStatus.storage_used_mb + newFileSizeMB;
+
+      if (
+        tierStatus.storage_limit_mb !== -1 &&
+        totalAfterUpload > tierStatus.storage_limit_mb
+      ) {
+        const remainingMB =
+          tierStatus.storage_limit_mb - tierStatus.storage_used_mb;
+        return {
+          allowed: false,
+          message: `File too large! You have ${remainingMB.toFixed(
+            1
+          )}MB remaining. This file is ${newFileSizeMB.toFixed(
+            1
+          )}MB. Please upgrade your plan or delete some files.`,
+        };
+      }
+
+      return { allowed: true };
+    } catch (error) {
+      console.error("Error checking tier limits:", error);
+      return { allowed: false, message: "Unable to verify storage limits." };
+    }
+  };
 
   // --- File/folder CRUD handlers ---
   const handleFileChange = async (e, folder_id = null) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!currentUserId) { alert("User not authenticated"); return; }
+    if (!currentUserId) {
+      alert("User not authenticated");
+      return;
+    }
+
+    const canUpload = await checkTierLimits(file.size);
+    if (!canUpload.allowed) {
+      alert(canUpload.message);
+      e.target.value = "";
+      return;
+    }
+
     setFileName(file.name);
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("medical-files")
       .upload(`files/${currentUserId}/${Date.now()}_${file.name}`, file);
-    if (uploadError) { alert("Upload error: " + uploadError.message); return; }
+    if (uploadError) {
+      alert("Upload error: " + uploadError.message);
+      return;
+    }
     const { data: publicUrlData } = supabase.storage
       .from("medical-files")
       .getPublicUrl(uploadData.path);
@@ -598,7 +754,9 @@ export default function Records({ currentUserId: propUserId }) {
         shared_with_ids: [],
       },
     ]);
-    if (insertError) { alert("DB error: " + insertError.message); }
+    if (insertError) {
+      alert("DB error: " + insertError.message);
+    }
     setFileName("");
     await fetchFiles();
     e.target.value = "";
@@ -653,7 +811,7 @@ export default function Records({ currentUserId: propUserId }) {
 
     // ---------- FILE RENAME ----------
     if (renameModal.type === "file") {
-      const file = files.find(f => f.id === renameModal.id);
+      const file = files.find((f) => f.id === renameModal.id);
       if (!file || file.owner_id !== currentUserId) {
         setRenameModal({ open: false, type: null, id: null, currentName: "" });
         setSuccessModal({
@@ -700,7 +858,7 @@ export default function Records({ currentUserId: propUserId }) {
 
     // ---------- FOLDER RENAME ----------
     else if (renameModal.type === "folder") {
-      const folder = folders.find(f => f.id === renameModal.id);
+      const folder = folders.find((f) => f.id === renameModal.id);
       if (!folder || folder.owner_id !== currentUserId) {
         setRenameModal({ open: false, type: null, id: null, currentName: "" });
         setSuccessModal({
@@ -737,9 +895,15 @@ export default function Records({ currentUserId: propUserId }) {
   const doDelete = async () => {
     if (!deleteModal.open) return;
     if (deleteModal.type === "file") {
-      const file = files.find(f => f.id === deleteModal.id);
+      const file = files.find((f) => f.id === deleteModal.id);
       if (!file || file.owner_id !== currentUserId) {
-        setDeleteModal({ open: false, type: null, id: null, name: "", filePath: null });
+        setDeleteModal({
+          open: false,
+          type: null,
+          id: null,
+          name: "",
+          filePath: null,
+        });
         setSuccessModal({
           open: true,
           title: "Delete Failed",
@@ -748,7 +912,9 @@ export default function Records({ currentUserId: propUserId }) {
         return;
       }
       if (deleteModal.filePath) {
-        await supabase.storage.from("medical-files").remove([deleteModal.filePath]);
+        await supabase.storage
+          .from("medical-files")
+          .remove([deleteModal.filePath]);
       }
       const { error: dbError } = await supabase
         .from("medical_files")
@@ -763,17 +929,24 @@ export default function Records({ currentUserId: propUserId }) {
         });
       } else {
         await fetchFiles();
+        await fetchStorageInfo(); 
         setSuccessModal({
           open: true,
           title: "Deleted!",
           message: `Deleted "${deleteModal.name}".`,
         });
       }
-      setPreviewFile(pf => (pf && pf.id === deleteModal.id ? null : pf));
+      setPreviewFile((pf) => (pf && pf.id === deleteModal.id ? null : pf));
     } else if (deleteModal.type === "folder") {
-      const folder = folders.find(f => f.id === deleteModal.id);
+      const folder = folders.find((f) => f.id === deleteModal.id);
       if (!folder || folder.owner_id !== currentUserId) {
-        setDeleteModal({ open: false, type: null, id: null, name: "", filePath: null });
+        setDeleteModal({
+          open: false,
+          type: null,
+          id: null,
+          name: "",
+          filePath: null,
+        });
         setSuccessModal({
           open: true,
           title: "Delete Failed",
@@ -781,10 +954,17 @@ export default function Records({ currentUserId: propUserId }) {
         });
         return;
       }
-      const filesInFolder = files.filter(file => file.folder_id === deleteModal.id && file.owner_id === currentUserId);
+      const filesInFolder = files.filter(
+        (file) =>
+          file.folder_id === deleteModal.id && file.owner_id === currentUserId
+      );
       for (const file of filesInFolder) {
         await supabase.storage.from("medical-files").remove([file.file_path]);
-        await supabase.from("medical_files").delete().eq("id", file.id).eq("owner_id", currentUserId);
+        await supabase
+          .from("medical_files")
+          .delete()
+          .eq("id", file.id)
+          .eq("owner_id", currentUserId);
       }
       const { error } = await supabase
         .from("folders")
@@ -800,7 +980,7 @@ export default function Records({ currentUserId: propUserId }) {
       } else {
         await fetchFolders();
         await fetchFiles();
-        setActiveFolderId(af => (af === deleteModal.id ? null : af));
+        setActiveFolderId((af) => (af === deleteModal.id ? null : af));
         setSuccessModal({
           open: true,
           title: "Deleted!",
@@ -808,7 +988,13 @@ export default function Records({ currentUserId: propUserId }) {
         });
       }
     }
-    setDeleteModal({ open: false, type: null, id: null, name: "", filePath: null });
+    setDeleteModal({
+      open: false,
+      type: null,
+      id: null,
+      name: "",
+      filePath: null,
+    });
   };
 
   // --- Share handler for both files and folders ---
@@ -817,11 +1003,13 @@ export default function Records({ currentUserId: propUserId }) {
   }
 
   // --- Render logic ---
-  const displayedFiles = (activeFolderId
-    ? files.filter((file) => file.folder_id === activeFolderId)
-    : files.filter((file) => !file.folder_id)
-  ).filter(file => {
-    const canSeeFile = file.owner_id === currentUserId ||
+  const displayedFiles = (
+    activeFolderId
+      ? files.filter((file) => file.folder_id === activeFolderId)
+      : files.filter((file) => !file.folder_id)
+  ).filter((file) => {
+    const canSeeFile =
+      file.owner_id === currentUserId ||
       (file.shared_with_ids && file.shared_with_ids.includes(currentUserId));
     if (!canSeeFile) return false;
     if (fileTypeFilter) {
@@ -833,7 +1021,8 @@ export default function Records({ currentUserId: propUserId }) {
       }
     }
     if (!fileMatchesHistoryFilter(file, historyFilter)) return false;
-    if (!fileMatchesAllFilter(file, allFilter, currentUserId, doctorIds)) return false;
+    if (!fileMatchesAllFilter(file, allFilter, currentUserId, doctorIds))
+      return false;
     return true;
   });
 
@@ -843,7 +1032,9 @@ export default function Records({ currentUserId: propUserId }) {
   if (!currentUserId) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">Please log in to view your medical records.</div>
+        <div className="text-gray-500">
+          Please log in to view your medical records.
+        </div>
       </div>
     );
   }
@@ -895,77 +1086,99 @@ export default function Records({ currentUserId: propUserId }) {
                   onClick={() => {
                     setDropdownOpen(false);
                     setCreateFolderModalOpen(true);
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
+                    }}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
+                  >
+                    <FolderPlus size={18} className="text-emerald-500" />
+                    Create Folder
+                  </button>
+                  )}
+                </div>
+                )}
+                <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => handleFileChange(e, activeFolderId || null)}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                />
+                <input
+                type="file"
+                ref={folderFileInputRef}
+                className="hidden"
+                onChange={handleFolderFileChange}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                />
+                <button
+                title="List View"
+                onClick={() => setViewMode("list")}
+                className={`flex items-center gap-2 px-2 py-2 rounded-md hover:bg-indigo-200 transition-colors ${
+                  viewMode === "list"
+                  ? "bg-indigo-200 text-mySidebar"
+                  : "text-mySidebar"
+                }`}
                 >
-                  <FolderPlus size={18} className="text-emerald-500" />
-                  Create Folder
+                <Rows3 size={20} />
                 </button>
-              )}
-            </div>
-          )}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={e => handleFileChange(e, activeFolderId || null)}
-            className="hidden"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-          />
-          <input
-            type="file"
-            ref={folderFileInputRef}
-            className="hidden"
-            onChange={handleFolderFileChange}
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-          />
-          <button
-            title="List View"
-            onClick={() => setViewMode("list")}
-            className={`flex items-center gap-2 px-2 py-2 rounded-md hover:bg-indigo-200 transition-colors ${
-              viewMode === "list"
-                ? "bg-indigo-200 text-mySidebar"
-                : "text-mySidebar"
-            }`}
-          >
-            <Rows3 size={20} />
-          </button>
-          <button
-            title="Grid View"
-            onClick={() => setViewMode("grid")}
-            className={`flex items-center gap-2 px-2 py-2 rounded-md hover:bg-indigo-200 transition-colors ${
-              viewMode === "grid"
-                ? "bg-indigo-200 text-mySidebar"
-                : "text-mySidebar"
-            }`}
-          >
-            <LayoutGrid size={20} />
-          </button>
-        </div>
-      </div>
-      {fileName && (
-        <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
-          <span className="font-medium">Selected file:</span>
-          <span className="ml-2">{fileName}</span>
-        </div>
-      )}
+                <button
+                title="Grid View"
+                onClick={() => setViewMode("grid")}
+                className={`flex items-center gap-2 px-2 py-2 rounded-md hover:bg-indigo-200 transition-colors ${
+                  viewMode === "grid"
+                  ? "bg-indigo-200 text-mySidebar"
+                  : "text-mySidebar"
+                }`}
+                >
+                <LayoutGrid size={20} />
+                </button>
+              </div>
+              </div>
 
-      <div className="flex-1 flex gap-4 overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
-          {!activeFolderId && (
-            <>
-              {/* Filter Row */}
+              {storageInfo && (
+  <div className="inline-flex items-center gap-2 text-xs text-gray-500">
+    <div className="w-12 h-1 bg-gray-200 rounded-full overflow-hidden">
+      <div 
+        className="h-full bg-blue-500 transition-all duration-300"
+        style={{ width: `${storageInfo.storage_limit_mb === -1 ? 0 : Math.min((storageInfo.storage_used_mb / storageInfo.storage_limit_mb) * 100, 100)}%` }}
+      />
+    </div>
+    <span>
+      {(storageInfo.storage_used_mb / 1024).toFixed(1)}GB
+      {storageInfo.storage_limit_mb !== -1 && 
+        ` of ${(storageInfo.storage_limit_mb / 1024).toFixed(1)}GB used`
+      }
+    </span>
+  </div>
+)}
+
+              {fileName && (
+              <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
+                <span className="font-medium">Selected file:</span>
+                <span className="ml-2">{fileName}</span>
+              </div>
+              )}
+
+              <div className="flex-1 flex gap-4 overflow-hidden">
+              <div className="flex-1 overflow-y-auto">
+                {!activeFolderId && (
+                <>
+                  {/* Filter Row */}
               <div className="flex flex-row flex-wrap gap-1 mb-4 items-stretch">
                 {/* --- Type Filter Dropdown --- */}
                 <div className="relative flex" ref={typeDropdownRef}>
                   <button
                     className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center hover:border-[#549294] transition-colors"
                     onClick={() =>
-                      setOpenFilterDropdown(openFilterDropdown === "type" ? null : "type")
+                      setOpenFilterDropdown(
+                        openFilterDropdown === "type" ? null : "type"
+                      )
                     }
                   >
                     <span>
                       {fileTypeFilter
-                        ? (FILE_TYPE_FILTERS.find(f => f.value === fileTypeFilter)?.label ?? "Type")
+                        ? FILE_TYPE_FILTERS.find(
+                            (f) => f.value === fileTypeFilter
+                          )?.label ?? "Type"
                         : "Type"}
                     </span>
                     <ChevronDown size={15} className="ml-1 text-[#e37859]" />
@@ -978,7 +1191,9 @@ export default function Records({ currentUserId: propUserId }) {
                           setFileTypeFilter(null);
                           setOpenFilterDropdown(null);
                         }}
-                      >All</button>
+                      >
+                        All
+                      </button>
                       {FILE_TYPE_FILTERS.map(({ label, value }) => (
                         <button
                           key={value}
@@ -999,12 +1214,15 @@ export default function Records({ currentUserId: propUserId }) {
                   <button
                     className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center hover:border-[#549294] transition-colors"
                     onClick={() =>
-                      setOpenFilterDropdown(openFilterDropdown === "history" ? null : "history")
+                      setOpenFilterDropdown(
+                        openFilterDropdown === "history" ? null : "history"
+                      )
                     }
                   >
                     <span>
                       {historyFilter
-                        ? (HISTORY_FILTERS.find(f => f.value === historyFilter)?.label ?? "History")
+                        ? HISTORY_FILTERS.find((f) => f.value === historyFilter)
+                            ?.label ?? "History"
                         : "History"}
                     </span>
                     <ChevronDown size={15} className="ml-1 text-[#e37859]" />
@@ -1017,7 +1235,9 @@ export default function Records({ currentUserId: propUserId }) {
                           setHistoryFilter(null);
                           setOpenFilterDropdown(null);
                         }}
-                      >All</button>
+                      >
+                        All
+                      </button>
                       {HISTORY_FILTERS.map(({ label, value }) => (
                         <button
                           key={value}
@@ -1038,12 +1258,15 @@ export default function Records({ currentUserId: propUserId }) {
                   <button
                     className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center hover:border-[#549294] transition-colors"
                     onClick={() =>
-                      setOpenFilterDropdown(openFilterDropdown === "all" ? null : "all")
+                      setOpenFilterDropdown(
+                        openFilterDropdown === "all" ? null : "all"
+                      )
                     }
                   >
                     <span>
                       {allFilter
-                        ? (ALL_FILTERS.find(f => f.value === allFilter)?.label ?? "All")
+                        ? ALL_FILTERS.find((f) => f.value === allFilter)
+                            ?.label ?? "All"
                         : "All"}
                     </span>
                     <ChevronDown size={15} className="ml-1 text-[#e37859]" />
@@ -1161,7 +1384,9 @@ export default function Records({ currentUserId: propUserId }) {
             >
               <X size={22} />
             </button>
-            <div className="mb-2 font-semibold truncate">{previewFile.name}</div>
+            <div className="mb-2 font-semibold truncate">
+              {previewFile.name}
+            </div>
             <div className="flex-1 flex items-center justify-center overflow-auto my-4">
               {previewFile.preview_url ? (
                 previewFile.name.toLowerCase().endsWith(".pdf") ? (
@@ -1199,9 +1424,13 @@ export default function Records({ currentUserId: propUserId }) {
         open={renameModal.open}
         currentName={renameModal.currentName}
         onRename={doRename}
-        onClose={() => setRenameModal({ open: false, type: null, id: null, currentName: "" })}
+        onClose={() =>
+          setRenameModal({ open: false, type: null, id: null, currentName: "" })
+        }
         label={renameModal.type === "file" ? "Rename File" : "Rename Folder"}
-        placeholder={renameModal.type === "file" ? "New file name" : "New folder name"}
+        placeholder={
+          renameModal.type === "file" ? "New file name" : "New folder name"
+        }
       />
 
       {/* --- Delete Confirmation Modal --- */}
@@ -1212,7 +1441,15 @@ export default function Records({ currentUserId: propUserId }) {
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={doDelete}
-        onCancel={() => setDeleteModal({ open: false, type: null, id: null, name: "", filePath: null })}
+        onCancel={() =>
+          setDeleteModal({
+            open: false,
+            type: null,
+            id: null,
+            name: "",
+            filePath: null,
+          })
+        }
       />
 
       {/* --- Create Folder Modal --- */}
@@ -1224,7 +1461,9 @@ export default function Records({ currentUserId: propUserId }) {
             alert("User not authenticated");
             return;
           }
-          const { error } = await supabase.from("folders").insert([{ name: folderName, owner_id: currentUserId }]);
+          const { error } = await supabase
+            .from("folders")
+            .insert([{ name: folderName, owner_id: currentUserId }]);
           if (error) {
             alert("DB error: " + error.message);
           } else {
