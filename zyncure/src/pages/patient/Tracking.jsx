@@ -11,6 +11,9 @@ import { supabase } from '../../client';
 import ShareSymptom from '../../components/ShareSymptom';
 import { generatePDF } from '../../utils/generateTrackingReport';
 
+
+
+
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Feelings');
   const [selectedValues, setSelectedValues] = useState({
@@ -35,6 +38,9 @@ const PeriodTracker = () => {
   const skipNextUpdate = useRef(false);
   const lastUpdateDate = useRef(null);
 
+
+
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userInfo, setUserInfo] = useState({
     name: '',
@@ -42,10 +48,16 @@ const PeriodTracker = () => {
     birthdate: ''
   });
 
+
+
+
   // Function to load selected values for a specific date
   const loadSelectedValuesForDate = (targetDate, entries) => {
     const normalizedDate = new Date(targetDate);
     normalizedDate.setHours(0, 0, 0, 0);
+
+
+
 
     // Find all entries for the selected date
     const entriesForDate = entries.filter(entry => {
@@ -54,17 +66,21 @@ const PeriodTracker = () => {
     return entryDate.getTime() === normalizedDate.getTime();
   });
 
-  const newSelectedValues = {
-    Feelings: [],
-    Cravings: [],
-    'Period Flow': [],
-    'Symptoms': [],
-    Energy: [],
-    Weight: '',
-    Custom: ''
-  };
 
-  entriesForDate.forEach(entry => {
+
+
+ const newSelectedValues = {
+  Feelings: [],
+  Cravings: [],
+  'Period Flow': [],
+  'Symptoms': [],
+  Energy: [],
+  Weight: '',
+  Custom: ''
+};
+
+
+entriesForDate.forEach(entry => {
     if (entry.symptoms && entry.severity) {
       // For Weight and Custom, keep as single values
       if (entry.symptoms === 'Weight' || entry.symptoms === 'Custom') {
@@ -76,26 +92,14 @@ const PeriodTracker = () => {
         }
       }
     }
-
-    const newSelectedValues = {
-      Feelings: '',
-      Cravings: '',
-      'Period Flow': '',
-      'Symptoms': '',
-      Energy: '',
-      Weight: '',
-      Custom: ''
-    };
   });
-  
-    entriesForDate.forEach(entry => {
-      if (entry.symptoms && entry.severity) {
-        newSelectedValues[entry.symptoms] = entry.severity;
-      }
-    });
 
-    return newSelectedValues;
-  };
+
+  return newSelectedValues;
+};
+
+
+
 
   // Handle symptom selection (always in multi-select mode)
   const handleSymptomToggle = (category, value) => {
@@ -111,6 +115,9 @@ const PeriodTracker = () => {
     setSelectedSymptoms(newSelected);
   };
 
+
+
+
   // Save multiple symptoms at once
   const handleMultiSave = async () => {
     if (selectedSymptoms.size === 0) {
@@ -119,6 +126,9 @@ const PeriodTracker = () => {
       return;
     }
 
+
+
+
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       setModalContent({ title: 'Error', message: 'You must be logged in to save.', isError: true });
@@ -126,15 +136,27 @@ const PeriodTracker = () => {
       return;
     }
 
+
+
+
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
+
+
+
 
     const now = new Date();
     const dateWithCurrentTime = new Date(date);
     dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
 
+
+
+
     const savePromises = [];
     const savedSymptoms = [];
+
+
+
 
     for (const symptomKey of selectedSymptoms) {
       const [category, value] = symptomKey.split(':');
@@ -146,12 +168,18 @@ const PeriodTracker = () => {
         return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === category;
       });
 
+
+
+
       const dataToSave = {
         symptoms: category,
         severity: value,
         date_logged: dateWithCurrentTime.toISOString(),
         patients_id: user.id,
       };
+
+
+
 
       if (existingEntry) {
         // Update existing entry
@@ -175,6 +203,9 @@ const PeriodTracker = () => {
       savedSymptoms.push(`${category}: ${value}`);
     }
 
+
+
+
     try {
       const results = await Promise.all(savePromises);
       const hasError = results.some(result => result.error);
@@ -185,8 +216,14 @@ const PeriodTracker = () => {
         return;
       }
 
+
+
+
       // Skip the next useEffect update
       skipNextUpdate.current = true;
+
+
+
 
       // Update the selected values with all saved symptoms
       const newSelectedValues = { ...selectedValues };
@@ -204,12 +241,18 @@ for (const symptomKey of selectedSymptoms) {
 }
 setSelectedValues(newSelectedValues);
 
+
+
+
       // Refresh data from Supabase
       const { data, error: fetchError } = await supabase
         .from('symptomlog')
         .select('date_logged, symptoms, severity')
         .eq('patients_id', user.id)
         .order('date_logged', { ascending: false });
+
+
+
 
       if (!fetchError) {
         const normalized = data.map(entry => ({
@@ -219,6 +262,9 @@ setSelectedValues(newSelectedValues);
         setLoggedDates(normalized);
       }
 
+
+
+
       const formattedDate = normalizedDate.toDateString();
       const formattedTime = now.toLocaleTimeString();
      
@@ -227,6 +273,9 @@ setSelectedValues(newSelectedValues);
         message: `${savedSymptoms.length} symptoms saved on ${formattedDate} at ${formattedTime}:\n${savedSymptoms.join('\n')}`,
         isError: false
       });
+
+
+
 
       setShowModal(true);
      
@@ -239,6 +288,9 @@ setSelectedValues(newSelectedValues);
     }
   };
 
+
+
+
   useEffect(() => {
     const fetchAndStoreUserData = async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -248,6 +300,9 @@ setSelectedValues(newSelectedValues);
         return;
       }
 
+
+
+
       // Fetch profile info from your patients table using patient_id
       const { data: profile, error: profileError } = await supabase
         .from('patients')
@@ -255,16 +310,25 @@ setSelectedValues(newSelectedValues);
         .eq('patient_id', user.id)
         .maybeSingle();
 
+
+
+
       if (profileError || !profile) {
         console.error('Profile fetch error:', profileError?.message || 'No matching patient found');
         return;
       }
+
+
+
 
       setUserInfo({
         name: `${profile.first_name} ${profile.last_name}`,
         email: profile.email,
         birthdate: profile.birthdate
       });
+
+
+
 
       // Always fetch fresh data from Supabase instead of using localStorage
       const { data, error } = await supabase
@@ -273,16 +337,25 @@ setSelectedValues(newSelectedValues);
         .eq('patients_id', user.id)
         .order('date_logged', { ascending: false });
 
+
+
+
       if (error) {
         console.error('Supabase fetch error:', error.message);
         return;
       }
+
+
+
 
       // Normalize the data - ensure dates are properly formatted
       const normalized = data.map(entry => ({
         ...entry,
         date_logged: new Date(entry.date_logged),
       }));
+
+
+
 
       setLoggedDates(normalized);
      
@@ -293,8 +366,14 @@ setSelectedValues(newSelectedValues);
       setCustomInput(initialValues.Custom || '');
     };
 
+
+
+
     fetchAndStoreUserData();
   }, []);
+
+
+
 
   // Effect to update selected values when date changes (but not when data refreshes after save)
   useEffect(() => {
@@ -304,23 +383,35 @@ setSelectedValues(newSelectedValues);
       return;
     }
 
+
+
+
     // Only update if the date actually changed
     const currentDateString = date.toDateString();
     if (lastUpdateDate.current === currentDateString) {
       return;
     }
 
+
+
+
     lastUpdateDate.current = currentDateString;
+
+
+
 
     const newSelectedValues = loadSelectedValuesForDate(date, loggedDates);
     setSelectedValues(newSelectedValues);
     setWeightInput(newSelectedValues.Weight || '');
     setCustomInput(newSelectedValues.Custom || '');
-    
+   
     // Reset selections when date changes
     setSelectedSymptoms(new Set());
-    
+   
   }, [date, loggedDates]);
+
+
+
 
   const handleSave = async () => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -330,7 +421,13 @@ setSelectedValues(newSelectedValues);
       return;
     }
 
+
+
+
     let valueToSave = selectedValues[selectedTab];
+
+
+
 
     if (selectedTab === 'Weight' && !weightInput.trim()) {
       setModalContent({ title: 'Error', message: 'Please enter your weight.', isError: true });
@@ -338,11 +435,17 @@ setSelectedValues(newSelectedValues);
       return;
     }
 
+
+
+
     if (selectedTab === 'Custom' && !customInput.trim()) {
       setModalContent({ title: 'Error', message: 'Please enter custom data.', isError: true });
       setShowModal(true);
       return;
     }
+
+
+
 
     if (!valueToSave && selectedTab !== 'Weight' && selectedTab !== 'Custom') {
   setModalContent({ title: 'Error', message: `Please select a ${selectedTab.toLowerCase()} option.`, isError: true });
@@ -352,8 +455,14 @@ setSelectedValues(newSelectedValues);
     if (selectedTab === 'Weight') valueToSave = weightInput;
     if (selectedTab === 'Custom') valueToSave = customInput;
 
+
+
+
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
+
+
+
 
     // Check if entry exists for this date and symptom type
     const existingEntry = loggedDates.find(entry => {
@@ -362,10 +471,16 @@ setSelectedValues(newSelectedValues);
       return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === selectedTab;
     });
 
+
+
+
     // Use the selected date but with current time for timestamp
     const now = new Date();
     const dateWithCurrentTime = new Date(date);
     dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+
+
+
 
     const dataToSave = {
       symptoms: selectedTab,
@@ -374,7 +489,13 @@ setSelectedValues(newSelectedValues);
       patients_id: user.id,
     };
 
+
+
+
     let supabaseError;
+
+
+
 
     if (existingEntry) {
       // Update existing entry
@@ -388,6 +509,9 @@ setSelectedValues(newSelectedValues);
         .eq('symptoms', selectedTab)
         .eq('date_logged', existingEntry.date_logged.toISOString());
 
+
+
+
       supabaseError = error;
     } else {
       // Insert new entry
@@ -395,14 +519,23 @@ setSelectedValues(newSelectedValues);
       supabaseError = error;
     }
 
+
+
+
     if (supabaseError) {
       setModalContent({ title: 'Error', message: `Failed to save: ${supabaseError.message}`, isError: true });
       setShowModal(true);
       return;
     }
 
+
+
+
     // Skip the next useEffect update since we're manually updating the state
     skipNextUpdate.current = true;
+
+
+
 
     // Update the selected values immediately with the saved value
     setSelectedValues(prev => {
@@ -417,12 +550,18 @@ setSelectedValues(newSelectedValues);
   return newValues;
 });
 
+
+
+
     // Refresh data from Supabase after successful save
     const { data, error: fetchError } = await supabase
       .from('symptomlog')
       .select('date_logged, symptoms, severity')
       .eq('patients_id', user.id)
       .order('date_logged', { ascending: false });
+
+
+
 
     if (!fetchError) {
       const normalized = data.map(entry => ({
@@ -432,6 +571,9 @@ setSelectedValues(newSelectedValues);
       setLoggedDates(normalized);
     }
 
+
+
+
     const formattedDate = normalizedDate.toDateString();
     const formattedTime = now.toLocaleTimeString();
     setModalContent({
@@ -440,8 +582,14 @@ setSelectedValues(newSelectedValues);
       isError: false
     });
 
+
+
+
     setShowModal(true);
   };
+
+
+
 
   const handleDownload = async () => {
     if (!userInfo.name) {
@@ -462,7 +610,13 @@ setSelectedValues(newSelectedValues);
     setShowModal(true);
   };
 
+
+
+
   const handleShare = () => setShowShareSymptom(true);
+
+
+
 
   const tabConfigs = {
     'Period Flow': {
@@ -527,7 +681,13 @@ setSelectedValues(newSelectedValues);
     }
   };
 
+
+
+
   const currentConfig = tabConfigs[selectedTab];
+
+
+
 
   const renderContent = () => {
     if (selectedTab === 'Weight') {
@@ -553,6 +713,9 @@ setSelectedValues(newSelectedValues);
       );
     }
 
+
+
+
     if (selectedTab === 'Custom') {
       return (
         <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-6 rounded-2xl w-full">
@@ -576,14 +739,17 @@ setSelectedValues(newSelectedValues);
       );
     }
 
+
+
+
     return (
       <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 rounded-2xl w-full">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {currentConfig.options.map(({ name, icon, size, color }) => {
             const IconComponent = icon;
             const isSelected = selectedSymptoms.has(`${selectedTab}:${name}`);
-const isFromPreviousLog = selectedValues[selectedTab] && 
-  (Array.isArray(selectedValues[selectedTab]) 
+const isFromPreviousLog = selectedValues[selectedTab] &&
+  (Array.isArray(selectedValues[selectedTab])
     ? selectedValues[selectedTab].includes(name)
     : selectedValues[selectedTab] === name);
             return (
@@ -619,10 +785,16 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
     );
   };
 
+
+
+
   // Handler for calendar date select
   const handleDateSelect = (date) => {
     setDate(date);
   };
+
+
+
 
   // Handler for month navigation
   const handleMonthNavigate = (direction) => {
@@ -633,9 +805,15 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
     });
   };
 
+
+
+
   const handleMonthYearChange = (month, year) => {
     setCurrentDate(new Date(year, month, 1));
   };
+
+
+
 
   return (
     <div className="calendar-container min-h-[100vh] w-full relative">
@@ -648,6 +826,9 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
           onMonthNavigate={handleMonthNavigate}
           onMonthYearChange={handleMonthYearChange}
         />
+
+
+
 
         {/* Tab Navigation */}
         <div className="flex flex-wrap gap-2 justify-center w-full">
@@ -662,13 +843,16 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
               }`}
             >
               {tab}
-              {((Array.isArray(selectedValues[tab]) && selectedValues[tab].length > 0) || 
+              {((Array.isArray(selectedValues[tab]) && selectedValues[tab].length > 0) ||
   (!Array.isArray(selectedValues[tab]) && selectedValues[tab])) && (
   <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#3BA4A0] rounded-full"></div>
 )}
             </button>
           ))}
         </div>
+
+
+
 
         {/* Selection counter */}
         {selectedSymptoms.size > 0 && (
@@ -679,8 +863,14 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
           </div>
         )}
 
+
+
+
         {/* Content Area */}
         {renderContent()}
+
+
+
 
         {/* Save Button */}
         <div className="flex gap-4 w-full justify-center">
@@ -709,6 +899,9 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
           )}
         </div>
 
+
+
+
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 px-4">
@@ -726,6 +919,9 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
             </div>
           </div>
         )}
+
+
+
 
         {/* Download and Share Buttons */}
         <div className="w-full flex justify-end">
@@ -749,9 +945,23 @@ const isFromPreviousLog = selectedValues[selectedTab] &&
         </div>
       </div>
     </div>
-     </div>   
+     </div>  
   );
 };
 
 
+
+
+
+
+
+
 export default PeriodTracker;
+
+
+
+
+
+
+
+
