@@ -1,7 +1,7 @@
-
+July 12 (Adjusted modal with Active Share Management)
 
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle, FileText } from 'lucide-react';
+import { X, CheckCircle, FileText, User, Clock, Trash2, XCircle } from 'lucide-react';
 import { supabase } from '../client';
 
 
@@ -12,36 +12,132 @@ const ShareSymptom = ({ isOpen, onClose }) => {
   const [accessDuration, setAccessDuration] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showRevokeModal, setShowRevokeModal] = useState(false);
+  const [activeShares, setActiveShares] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
 
   useEffect(() => {
-    const fetchConnections = async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.error('Error fetching user:', userError?.message);
-        return;
-      }
-
-
-      const { data, error } = await supabase
-        .from('patient_connection_details')
-        .select('*')
-        .eq('status', 'accepted')
-        .eq('patient_id', user.id);
-
-
-      if (error) {
-        console.error('Error fetching connections:', error.message);
-      } else {
-        setConnections(data);
+    const fetchUserAndData = async () => {
+      console.log('useEffect triggered, isOpen:', isOpen);
+     
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.error('Error fetching user:', userError?.message);
+          return;
+        }
+       
+        console.log('Current user:', user.id);
+        setCurrentUserId(user.id);
+       
+        if (isOpen) {
+          console.log('Modal is open, fetching data...');
+          await Promise.all([
+            fetchConnections(user.id),
+            fetchActiveShares(user.id)
+          ]);
+        }
+      } catch (error) {
+        console.error('Error in useEffect:', error);
       }
     };
 
 
-    if (isOpen) {
-      fetchConnections();
-    }
+    fetchUserAndData();
   }, [isOpen]);
+
+
+  const fetchConnections = async (userId) => {
+    console.log('Fetching connections for user:', userId);
+   
+    try {
+      const { data, error } = await supabase
+        .from('patient_connection_details')
+        .select('*')
+        .eq('status', 'accepted')
+        .eq('patient_id', userId);
+
+
+      console.log('Connections query result:', { data, error });
+
+
+      if (error) {
+        console.error('Error fetching connections:', error.message);
+        setConnections([]);
+      } else {
+        console.log('Found connections:', data);
+        setConnections(data || []);
+      }
+    } catch (error) {
+      console.error('Error in fetchConnections:', error);
+      setConnections([]);
+    }
+  };
+
+
+  const fetchActiveShares = async (userId) => {
+    try {
+      console.log('Fetching active shares for user:', userId);
+     
+      // First, let's try a simpler query to see if the table exists
+      const { data, error } = await supabase
+        .from('shared_symptoms')
+        .select('*')
+        .eq('shared_by', userId)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false });
+
+
+      console.log('Active shares query result:', { data, error });
+
+
+      if (error) {
+        console.error('Error fetching active shares:', error);
+        // Don't set activeShares if there's an error, keep it empty
+        return;
+      }
+
+
+      // If we have data, try to enrich it with doctor info
+      if (data && data.length > 0) {
+        const enrichedShares = await Promise.all(
+          data.map(async (share) => {
+            try {
+              // Try to get doctor info from the connections table
+              const { data: doctorData, error: doctorError } = await supabase
+                .from('patient_connection_details')
+                .select('doctor_first_name, doctor_last_name, doctor_email')
+                .eq('med_id', share.shared_with)
+                .single();
+
+
+              if (!doctorError && doctorData) {
+                return {
+                  ...share,
+                  shared_with_doctor: {
+                    first_name: doctorData.doctor_first_name,
+                    last_name: doctorData.doctor_last_name,
+                    email: doctorData.doctor_email
+                  }
+                };
+              }
+              return share;
+            } catch (enrichError) {
+              console.error('Error enriching share with doctor info:', enrichError);
+              return share;
+            }
+          })
+        );
+        setActiveShares(enrichedShares);
+      } else {
+        setActiveShares([]);
+      }
+    } catch (error) {
+      console.error('Error fetching active shares:', error);
+      setActiveShares([]);
+    }
+  };
 
 
   const fetchSymptomData = async (userId, duration) => {
@@ -126,6 +222,79 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       email: data.email || '',
       birthdate: data.birthdate || ''
     };
+  };
+
+
+  const handleRevokeShare = async (shareId) => {
+    try {
+      setLoading(true);
+     
+      // Set expires_at to current time to effectively revoke the share
+      const { error } = await supabase
+        .from('shared_symptoms')
+        .update({
+          expires_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', shareId)
+        .eq('shared_by', currentUserId);
+
+
+      if (error) throw error;
+
+
+      // Refresh active shares
+      await fetchActiveShares(currentUserId);
+      setShowRevokeModal(true);
+    } catch (error) {
+      console.error('Error revoking share:', error);
+      alert('Failed to revoke share');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const formatExpirationDate = (dateString) => {
+    if (!dateString) return "No expiration";
+    const date = new Date(dateString);
+    const now = new Date();
+
+
+    if (date < now) return "Expired";
+
+
+    const diffMs = date - now;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+
+    if (diffDays > 0) {
+      return `Expires in ${diffDays} day${diffDays > 1 ? "s" : ""}`;
+    } else if (diffHours > 0) {
+      return `Expires in ${diffHours} hour${diffHours > 1 ? "s" : ""}`;
+    } else {
+      return "Expires soon";
+    }
+  };
+
+
+  const formatDoctorName = (share) => {
+    // Check if we have doctor info from the enriched data
+    if (share.shared_with_doctor?.first_name && share.shared_with_doctor?.last_name) {
+      return `${share.shared_with_doctor.first_name} ${share.shared_with_doctor.last_name}`;
+    }
+    if (share.shared_with_doctor?.email) {
+      return share.shared_with_doctor.email;
+    }
+   
+    // Fallback: try to find doctor info from connections
+    const connection = connections.find(conn => conn.med_id === share.shared_with);
+    if (connection?.doctor_first_name && connection?.doctor_last_name) {
+      return `${connection.doctor_first_name} ${connection.doctor_last_name}`;
+    }
+   
+    return 'Unknown Doctor';
   };
 
 
@@ -231,6 +400,9 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         setSelectedConnection('');
         setAccessDuration('');
         setShowSuccessModal(true);
+       
+        // Refresh active shares after successful share
+        await fetchActiveShares(user.id);
       }
 
 
@@ -250,7 +422,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-2xl w-full max-w-md p-6 relative">
+        <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 relative">
           <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
             <X size={24} />
           </button>
@@ -335,11 +507,54 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 {loading ? 'Generating...' : 'Generate & Share'}
               </button>
             </div>
+
+
+            {/* Active shares section */}
+            {activeShares.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  Active Shares
+                </h3>
+                <div className="space-y-2">
+                  {activeShares.map((share) => (
+                    <div
+                      key={share.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                    >
+                      <div className="flex items-center gap-2">
+                        <User size={16} className="text-gray-500" />
+                        <div>
+                          <div className="text-sm font-medium">
+                            {formatDoctorName(share)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {share.symptom_duration} report
+                          </div>
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <Clock size={12} />
+                            {formatExpirationDate(share.expires_at)}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRevokeShare(share.id)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Revoke access"
+                        disabled={loading}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
 
+      {/* Success Modal for Report Sharing */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center">
@@ -355,9 +570,28 @@ const ShareSymptom = ({ isOpen, onClose }) => {
           </div>
         </div>
       )}
+
+
+      {/* Revoke Success Modal */}
+      {showRevokeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center">
+            <XCircle className="text-red-500 mx-auto mb-2" size={48} />
+            <h3 className="text-lg font-semibold mb-2">Access Revoked Successfully!</h3>
+            <p className="text-gray-600 mb-4">The doctor's access to your symptoms report has been revoked and they can no longer view it.</p>
+            <button
+              onClick={() => setShowRevokeModal(false)}
+              className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 };
 
 
 export default ShareSymptom;
+

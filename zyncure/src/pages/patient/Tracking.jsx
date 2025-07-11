@@ -11,6 +11,7 @@ import { supabase } from '../../client';
 import ShareSymptom from '../../components/ShareSymptom';
 import { generatePDF } from '../../utils/generateTrackingReport';
 
+
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Feelings');
   const FREE_TIER_CATEGORIES = ['Period Flow', 'Symptoms', 'Feelings'];
@@ -30,6 +31,7 @@ const PeriodTracker = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
   const [showShareSymptom, setShowShareSymptom] = useState(false);
+
   const [selectedSymptoms, setSelectedSymptoms] = useState(new Set());
   
   // New state for tier management
@@ -41,10 +43,12 @@ const PeriodTracker = () => {
     can_add_symptoms: true
   });
   // Removed unused showUpgradeModal state
+
  
   // Use ref to track if we should skip the next useEffect update
   const skipNextUpdate = useRef(false);
   const lastUpdateDate = useRef(null);
+
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userInfo, setUserInfo] = useState({
@@ -313,6 +317,42 @@ const handleSymptomToggle = (category, value) => {
     }
   };
 
+  // Function to load selected values for a specific date
+  // const loadSelectedValuesForDate = (targetDate, entries) => {
+  //   const normalizedDate = new Date(targetDate);
+  //   normalizedDate.setHours(0, 0, 0, 0);
+
+
+  //   // Find all entries for the selected date
+  //   const entriesForDate = entries.filter(entry => {
+  //     const entryDate = new Date(entry.date_logged);
+  //     entryDate.setHours(0, 0, 0, 0);
+  //     return entryDate.getTime() === normalizedDate.getTime();
+  //   });
+
+
+  //   const newSelectedValues = {
+  //     Feelings: '',
+  //     Cravings: '',
+  //     'Period Flow': '',
+  //     'Symptoms': '',
+  //     Energy: '',
+  //     Weight: '',
+  //     Custom: ''
+  //   };
+
+
+  //   entriesForDate.forEach(entry => {
+  //     if (entry.symptoms && entry.severity) {
+  //       newSelectedValues[entry.symptoms] = entry.severity;
+  //     }
+  //   });
+
+
+  //   return newSelectedValues;
+  // };
+
+
   useEffect(() => {
     const fetchAndStoreUserData = async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -374,7 +414,7 @@ const handleSymptomToggle = (category, value) => {
     fetchAndStoreUserData();
   }, []);
 
-  // Effect to update selected values when date changes
+
   useEffect(() => {
     // Skip this update if we just saved data
     if (skipNextUpdate.current) {
@@ -382,11 +422,17 @@ const handleSymptomToggle = (category, value) => {
       return;
     }
 
+
+
     // Only update if the date actually changed
     const currentDateString = date.toDateString();
     if (lastUpdateDate.current === currentDateString) {
       return;
     }
+
+
+    lastUpdateDate.current = currentDateString;
+
 
     lastUpdateDate.current = currentDateString;
 
@@ -509,6 +555,17 @@ const handleSymptomToggle = (category, value) => {
       }
       return newValues;
     });
+
+    // Skip the next useEffect update since we're manually updating the state
+    skipNextUpdate.current = true;
+
+
+    // Update the selected values immediately with the saved value
+    setSelectedValues(prev => ({
+      ...prev,
+      [selectedTab]: valueToSave
+    }));
+
 
     // Refresh data from Supabase after successful save
     const { data, error: fetchError } = await supabase
@@ -900,11 +957,3 @@ const handleSymptomToggle = (category, value) => {
 
 
 export default PeriodTracker;
-
-
-
-
-
-
-
-
