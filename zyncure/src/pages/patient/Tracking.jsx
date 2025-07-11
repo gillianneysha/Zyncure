@@ -318,39 +318,39 @@ const handleSymptomToggle = (category, value) => {
   };
 
   // Function to load selected values for a specific date
-  const loadSelectedValuesForDate = (targetDate, entries) => {
-    const normalizedDate = new Date(targetDate);
-    normalizedDate.setHours(0, 0, 0, 0);
+  // const loadSelectedValuesForDate = (targetDate, entries) => {
+  //   const normalizedDate = new Date(targetDate);
+  //   normalizedDate.setHours(0, 0, 0, 0);
 
 
-    // Find all entries for the selected date
-    const entriesForDate = entries.filter(entry => {
-      const entryDate = new Date(entry.date_logged);
-      entryDate.setHours(0, 0, 0, 0);
-      return entryDate.getTime() === normalizedDate.getTime();
-    });
+  //   // Find all entries for the selected date
+  //   const entriesForDate = entries.filter(entry => {
+  //     const entryDate = new Date(entry.date_logged);
+  //     entryDate.setHours(0, 0, 0, 0);
+  //     return entryDate.getTime() === normalizedDate.getTime();
+  //   });
 
 
-    const newSelectedValues = {
-      Feelings: '',
-      Cravings: '',
-      'Period Flow': '',
-      'Symptoms': '',
-      Energy: '',
-      Weight: '',
-      Custom: ''
-    };
+  //   const newSelectedValues = {
+  //     Feelings: '',
+  //     Cravings: '',
+  //     'Period Flow': '',
+  //     'Symptoms': '',
+  //     Energy: '',
+  //     Weight: '',
+  //     Custom: ''
+  //   };
 
 
-    entriesForDate.forEach(entry => {
-      if (entry.symptoms && entry.severity) {
-        newSelectedValues[entry.symptoms] = entry.severity;
-      }
-    });
+  //   entriesForDate.forEach(entry => {
+  //     if (entry.symptoms && entry.severity) {
+  //       newSelectedValues[entry.symptoms] = entry.severity;
+  //     }
+  //   });
 
 
-    return newSelectedValues;
-  };
+  //   return newSelectedValues;
+  // };
 
 
   useEffect(() => {
