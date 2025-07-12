@@ -104,7 +104,8 @@ if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
       p_med_id: appointmentData.doctor_id,
       p_appointment_date: fullDateTime,
       p_reason: appointmentData.reason,
-      p_status: appointmentData.status || 'confirmed'
+      p_status: appointmentData.status || 'confirmed',
+      p_created_at: appointmentData.created_at || new Date().toISOString()
     });
 
     if (error) {
@@ -139,7 +140,8 @@ if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
         reason,
         patient_id,
         med_id,
-        medicalprofessionals!inner(first_name, last_name, user_type)
+        medicalprofessionals!inner(first_name, last_name, user_type),
+        created_at
       `)
       .eq('appointment_id', appointmentId)
       .single();
@@ -156,7 +158,7 @@ if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
           time: appointmentData.time,
           status: appointmentData.status || 'confirmed',
           reason: appointmentData.reason,
-          type: appointmentData.type || 'Consultation'
+          created_at: new Date().toISOString()
         }],
         error: null
       };
@@ -172,9 +174,9 @@ if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
       time,
       status: appointmentDetails.status,
       reason: appointmentDetails.reason,
-      type: appointmentData.type || 'Consultation',
       doctor_name: `Dr. ${appointmentDetails.medicalprofessionals.first_name} ${appointmentDetails.medicalprofessionals.last_name}`,
-      specialty: appointmentDetails.medicalprofessionals.user_type
+      specialty: appointmentDetails.medicalprofessionals.user_type,
+      created_at: appointmentDetails.created_at
     }];
 
     return { data: transformedData, error: null };
@@ -235,7 +237,7 @@ async getAppointments(date, doctorId = null) {
         reason: apt.reason,
         type: 'Consultation',
         doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
-        specialty: apt.medicalprofessionals.user_type
+        created_at: apt.created_at 
       };
     });
 
@@ -287,7 +289,7 @@ async getAppointments(date, doctorId = null) {
           reason: apt.reason,
           type: 'Consultation',
           doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
-          specialty: apt.medicalprofessionals.user_type
+          created_at: apt.created_at 
         };
       });
 
@@ -334,7 +336,6 @@ async getConnectedDoctors() {
     const transformedData = data.map(connection => ({
       id: connection.med_id,
       name: `Dr. ${connection.doctor_first_name} ${connection.doctor_last_name}`,
-      specialty: connection.doctor_type,
       email: connection.doctor_email,
       available: true,
       shortId: connection.doctor_short_id
@@ -449,7 +450,8 @@ return { data: availableSlots12h, error: null };
           time,
           status: apt.status,
           reason: apt.reason,
-          doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`
+          doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
+          created_at: apt.created_at 
         };
       });
 
