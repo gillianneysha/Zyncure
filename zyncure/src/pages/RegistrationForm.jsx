@@ -22,9 +22,8 @@ const FormField = memo(
   }) => (
     <div className="mb-3">
       <label
-        className={`block w-4/5 mx-auto mb-1 text-left ${
-          labelClassName || "text-[#F5E0D9]"
-        }`}
+        className={`block w-4/5 mx-auto mb-1 text-left ${labelClassName || "text-[#F5E0D9]"
+          }`}
       >
         {label}:
       </label>
@@ -35,15 +34,14 @@ const FormField = memo(
           placeholder={placeholder}
           value={value}
           onChange={onChange}
-          className={`w-4/5 block mx-auto mb-1 p-2 border-none rounded-[15.5px] ${
-            inputClassName || "bg-[#FFEDE7]"
-          } ${error ? "ring-2 ring-red-400" : ""}`}
+          className={`w-4/5 block mx-auto mb-1 p-2 border-none rounded-[15.5px] ${inputClassName || "bg-[#F5E0D9]"
+            } ${error ? "ring-2 ring-red-400" : ""}`}
           required={required}
           disabled={disabled}
         />
       )}
       {error && (
-        <p className="w-4/5 mx-auto mb-2 text-sm text-red-300">{error}</p>
+        <p className="w-4/5 mx-auto mb-2 text-sm text-[#F5E0D9]">{error}</p>
       )}
     </div>
   )
@@ -75,6 +73,30 @@ export default function RegistrationForm() {
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState(false);
 
+  const checkEmailExists = useCallback(async (email) => {
+    try {
+      // Check in both patients and medicalprofessionals tables
+      const [patientsResponse, doctorsResponse] = await Promise.all([
+        supabase
+          .from('patients')
+          .select('email')
+          .eq('email', email)
+          .maybeSingle(),
+        supabase
+          .from('medicalprofessionals')
+          .select('email')
+          .eq('email', email)
+          .maybeSingle()
+      ]);
+
+      // If either query returns data, email exists
+      return patientsResponse.data || doctorsResponse.data;
+    } catch (error) {
+      console.error('Error checking email:', error);
+      return false; // On error, allow the form to proceed
+    }
+  }, []);
+
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({
@@ -83,7 +105,7 @@ export default function RegistrationForm() {
     }));
   }, []);
 
-  const validateForm = useCallback(() => {
+  const validateForm = useCallback(async () => {
     const newErrors = {};
 
     // Required fields
@@ -106,6 +128,12 @@ export default function RegistrationForm() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
+    } else if (formData.email && emailRegex.test(formData.email)) {
+      // Check if email already exists
+      const emailExists = await checkEmailExists(formData.email);
+      if (emailExists) {
+        newErrors.email = "An account with this email address already exists";
+      }
     }
 
     // Password validation
@@ -144,7 +172,7 @@ export default function RegistrationForm() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy]);
+  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy, checkEmailExists]);
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -164,96 +192,97 @@ export default function RegistrationForm() {
   // Main form submission handler
   // Updated handleSubmit function for your RegistrationForm component
 
-const handleSubmit = useCallback(async (event) => {
-  event.preventDefault();
+  const handleSubmit = useCallback(async (event) => {
+    event.preventDefault();
 
-  if (!validateForm()) return;
+    const isValid = await validateForm();
+    if (!isValid) return;
 
-  setIsLoading(true);
-  setErrors({});
-  setSuccessMessage("");
+    setIsLoading(true);
+    setErrors({});
+    setSuccessMessage("");
 
-  try {
-    // Step 1: Create the user account
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          contact_number: formData.contactNumber,
-          birthdate: formData.birthdate,
-          user_type: formData.userType,
-        },
-        emailRedirectTo: `${window.location.origin}/dashboard`
-      },
-    });
-
-    if (authError) throw authError;
-
-    // Step 2: Insert user data into appropriate table based on user type
-    if (authData.user) {
-      const userData = {
-        med_id: authData.user.id, // Use auth user ID as foreign key
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        user_type: formData.userType,
-        birthdate: formData.birthdate,
-        contact_no: formData.contactNumber,
+    try {
+      // Step 1: Create the user account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
-        status: 'active' // or whatever default status you want
-      };
-
-      let insertError;
-
-      if (formData.userType === 'patient') {
-        // Insert into patients table
-        const { error } = await supabase
-          .from('patients')
-          .insert([{
-            patient_id: authData.user.id, // Use auth user ID as patient_id
+        password: formData.password,
+        options: {
+          data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
-            user_type: formData.userType,
+            contact_number: formData.contactNumber,
             birthdate: formData.birthdate,
-            contact_no: formData.contactNumber,
-            email: formData.email,
-            status: 'active'
-          }]);
-        
-        insertError = error;
-      } else if (formData.userType === 'doctor') {
-        // Insert into medicalprofessionals table
-        const { error } = await supabase
-          .from('medicalprofessionals')
-          .insert([userData]);
-        
-        insertError = error;
+            user_type: formData.userType,
+          },
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        },
+      });
+
+      if (authError) throw authError;
+
+      // Step 2: Insert user data into appropriate table based on user type
+      if (authData.user) {
+        const userData = {
+          med_id: authData.user.id, // Use auth user ID as foreign key
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          user_type: formData.userType,
+          birthdate: formData.birthdate,
+          contact_no: formData.contactNumber,
+          email: formData.email,
+          status: 'active' // or whatever default status you want
+        };
+
+        let insertError;
+
+        if (formData.userType === 'patient') {
+          // Insert into patients table
+          const { error } = await supabase
+            .from('patients')
+            .insert([{
+              patient_id: authData.user.id, // Use auth user ID as patient_id
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              user_type: formData.userType,
+              birthdate: formData.birthdate,
+              contact_no: formData.contactNumber,
+              email: formData.email,
+              status: 'active'
+            }]);
+
+          insertError = error;
+        } else if (formData.userType === 'doctor') {
+          // Insert into medicalprofessionals table
+          const { error } = await supabase
+            .from('medicalprofessionals')
+            .insert([userData]);
+
+          insertError = error;
+        }
+
+        if (insertError) {
+          console.error('Database insertion error:', insertError);
+          // If database insertion fails, we might want to clean up the auth user
+          // but for now, we'll just log the error and continue
+          throw new Error(`Failed to create user profile: ${insertError.message}`);
+        }
       }
 
-      if (insertError) {
-        console.error('Database insertion error:', insertError);
-        // If database insertion fails, we might want to clean up the auth user
-        // but for now, we'll just log the error and continue
-        throw new Error(`Failed to create user profile: ${insertError.message}`);
-      }
+      setSuccessMessage(
+        "Registration successful! Please check your email and click the confirmation link to activate your account."
+      );
+      resetForm();
+
+    } catch (error) {
+      console.error("Registration error:", error);
+      setErrors({
+        submit: `Registration failed: ${error.message}`,
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    setSuccessMessage(
-      "Registration successful! Please check your email and click the confirmation link to activate your account."
-    );
-    resetForm();
-
-  } catch (error) {
-    console.error("Registration error:", error);
-    setErrors({
-      submit: `Registration failed: ${error.message}`,
-    });
-  } finally {
-    setIsLoading(false);
-  }
-}, [formData, hasAcceptedTerms, hasAcceptedPrivacy, validateForm, resetForm]);
+  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy, validateForm, resetForm]);
 
   const handleGoogleSignUp = useCallback(async () => {
     if (!hasAcceptedTerms) {
@@ -390,9 +419,8 @@ const handleSubmit = useCallback(async (event) => {
               name="userType"
               value={formData.userType}
               onChange={handleChange}
-              className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${
-                errors.userType ? "ring-2 ring-red-400" : ""
-              }`}
+              className={`appearance-none w-full mb-1 p-2 bg-[#FFEDE7] border-none rounded-[15.5px] text-[#b0b0b0] ${errors.userType ? "ring-2 ring-red-400" : ""
+                }`}
               required
               disabled={isLoading}
             >
@@ -465,11 +493,10 @@ const handleSubmit = useCallback(async (event) => {
         <button
           type="submit"
           disabled={isLoading}
-          className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${
-            isLoading
+          className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${isLoading
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#55A1A4] hover:bg-[#368487]"
-          }`}
+            }`}
         >
           {isLoading ? "Creating Account..." : "Sign Up"}
         </button>
@@ -518,7 +545,7 @@ const handleSubmit = useCallback(async (event) => {
             </div>
           </div>
           {errors.terms && (
-            <p className="mt-1 text-sm text-red-300">{errors.terms}</p>
+            <p className="mt-1 text-sm text-[#F5E0D9]">{errors.terms}</p>
           )}
         </div>
 

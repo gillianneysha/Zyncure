@@ -49,7 +49,7 @@ export default function PasswordInput({
         {showPassword ? <Eye size={22} /> : <EyeClosed size={22} />}
       </button>
       {error && (
-        <p className="mb-2 text-sm text-red-300">{error}</p>
+        <p className="mb-2 text-sm text-[#F5E0D9]">{error}</p>
       )}
     </div>
   );
