@@ -447,16 +447,11 @@ export function ContactInformationPage({ onBack }) {
         <ArrowLeft className="mr-2" size={20} /> Back to Billing
       </button>
 
-      <h2 className="text-4xl text-profileHeader font-bold mb-6 flex items-center gap-3">
-        <Smartphone className="w-9 h-9 text-profileHeader" />
-        Contact Information
-      </h2>
-
       {error && <div className="text-red-500 mb-4">{error}</div>}
 
       <div className="space-y-6">
         <div>
-          <label className="block text-mySidebar mb-2 font-semibold">Full Name</label>
+          <label className="block text-mySidebar mb-2 font-semibold">Name</label>
           <div className="w-full p-3 border border-mySidebar rounded-xl bg-profileBg text-mySidebar">
             {contactData.firstName && contactData.lastName
               ? `${contactData.firstName} ${contactData.lastName}`
@@ -556,11 +551,8 @@ export function BillingPage() {
   }, []);
 
   const handleOptionClick = (option) => {
-
     if (option === "Subscriptions" || option === "Manage Subscription") setShowPlans(true);
-    // else if (option === "Contact Information") {
-      
-    // }
+    else if (option === "Contact Information") setShowContactInfo(true); // <-- Fix: make Contact Information clickable
   };
 
   // Create PayMongo Checkout Session with improved error handling
@@ -888,7 +880,7 @@ export function BillingPage() {
       // Update subscription status to active
       const { error } = await supabase
         .from('subscriptions')
-        .update({ 
+        .update({
           status: 'active',
           started_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
@@ -897,10 +889,10 @@ export function BillingPage() {
         .eq('user_id', user.id);
 
       if (error) throw error;
-      
+
       // Refresh subscription data
       await fetchSubscription();
-      
+
       // Show success message
       alert('Subscription reactivated successfully!');
     } catch (error) {
@@ -909,54 +901,54 @@ export function BillingPage() {
     }
   };
 
-// Handle refund request
-const handleRefundRequest = async (paymentId) => {
-  try {
-    setIsProcessing(true);
-    setError("");
+  // Handle refund request
+  const handleRefundRequest = async (paymentId) => {
+    try {
+      setIsProcessing(true);
+      setError("");
 
-    const {  error: refundError } = await supabase.functions.invoke('request-refund', {
-      body: { payment_id: paymentId }
-    });
+      const { error: refundError } = await supabase.functions.invoke('request-refund', {
+        body: { payment_id: paymentId }
+      });
 
-    if (refundError) {
-      throw new Error(`Refund request failed: ${refundError.message}`);
+      if (refundError) {
+        throw new Error(`Refund request failed: ${refundError.message}`);
+      }
+
+      setPaymentStatus("Refund request submitted successfully. You will receive an email confirmation.");
+
+      // Refresh subscription data
+      await fetchSubscription();
+
+    } catch (error) {
+      console.error('Refund request error:', error);
+      setError(`Refund request failed: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Get recent payments for refund eligibility
+  const getRecentPayments = async () => {
+    if (!user) return [];
+
+    const { data: payments, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'paid')
+      .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching payments:', error);
+      return [];
     }
 
-    setPaymentStatus("Refund request submitted successfully. You will receive an email confirmation.");
-    
-    // Refresh subscription data
-    await fetchSubscription();
-    
-  } catch (error) {
-    console.error('Refund request error:', error);
-    setError(`Refund request failed: ${error.message}`);
-  } finally {
-    setIsProcessing(false);
-  }
-};
+    return payments || [];
+  };
 
-// Get recent payments for refund eligibility
-const getRecentPayments = async () => {
-  if (!user) return [];
-  
-  const { data: payments, error } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'paid')
-    .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching payments:', error);
-    return [];
-  }
-
-  return payments || [];
-};
-
- // --- ADD REFUND BUTTON COMPONENT HERE ---
+  // --- ADD REFUND BUTTON COMPONENT HERE ---
   const RefundButton = () => {
     const [showRefundModal, setShowRefundModal] = useState(false);
     const [recentPayments, setRecentPayments] = useState([]);
@@ -972,7 +964,7 @@ const getRecentPayments = async () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">Request Refund</h3>
-            
+
             {recentPayments.length === 0 ? (
               <p className="text-gray-600 mb-4">
                 No recent payments eligible for refund. Refunds are only available for payments made within the last 7 days.
@@ -1029,101 +1021,101 @@ const getRecentPayments = async () => {
 
   // Enhanced subscription status display
   const renderSubscriptionStatus = () => {
-  if (!currentSubscription) return null;
+    if (!currentSubscription) return null;
 
-  const isActive = currentSubscription.status === 'active';
-  const isExpired = isSubscriptionExpired();
-  const isCancelled = currentSubscription.status === 'cancelled';
+    const isActive = currentSubscription.status === 'active';
+    const isExpired = isSubscriptionExpired();
+    const isCancelled = currentSubscription.status === 'cancelled';
 
 
-  let statusText = 'Active';
-  let bgColor = 'bg-green-50 border-green-200';
-  let textColor = 'text-green-800';
-  let statusIcon = '✓';
+    let statusText = 'Active';
+    let bgColor = 'bg-green-50 border-green-200';
+    let textColor = 'text-green-800';
+    let statusIcon = '✓';
 
-  if (isCancelled) {
-    
-    statusText = 'Cancelled';
-    bgColor = 'bg-red-50 border-red-200';
-    textColor = 'text-red-800';
-    statusIcon = '✗';
-  } else if (isExpired) {
-    
-    statusText = 'Expired';
-    bgColor = 'bg-orange-50 border-orange-200';
-    textColor = 'text-orange-800';
-    statusIcon = '⚠';
-  }
+    if (isCancelled) {
 
-  return (
-    <div className={`${bgColor} border rounded-lg p-6 mb-6`}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className={`${textColor} font-semibold text-lg flex items-center gap-2`}>
-          <span className="text-xl">{statusIcon}</span>
-          Current Subscription
-        </h3>
+      statusText = 'Cancelled';
+      bgColor = 'bg-red-50 border-red-200';
+      textColor = 'text-red-800';
+      statusIcon = '✗';
+    } else if (isExpired) {
+
+      statusText = 'Expired';
+      bgColor = 'bg-orange-50 border-orange-200';
+      textColor = 'text-orange-800';
+      statusIcon = '⚠';
+    }
+
+    return (
+      <div className={`${bgColor} border rounded-lg p-6 mb-6`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`${textColor} font-semibold text-lg flex items-center gap-2`}>
+            <span className="text-xl">{statusIcon}</span>
+            Current Subscription
+          </h3>
+          {isActive && !isExpired && (
+            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+              {statusText}
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className={`${textColor} font-medium`}>
+              Plan: {currentSubscription.tier.charAt(0).toUpperCase() + currentSubscription.tier.slice(1)}
+            </p>
+            <p className={`${textColor} text-sm`}>
+              Monthly fee: ₱{tierPricing[currentSubscription.tier] || 0}
+            </p>
+          </div>
+
+          <div>
+            {currentSubscription.expires_at && (
+              <p className={`${textColor} text-sm`}>
+                Expires: {new Date(currentSubscription.expires_at).toLocaleDateString()}
+              </p>
+            )}
+            {currentSubscription.started_at && (
+              <p className={`${textColor} text-sm`}>
+                Started: {new Date(currentSubscription.started_at).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        </div>
+
         {isActive && !isExpired && (
-          <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-            {statusText}
-          </span>
+          <div className="mt-4 flex gap-3 flex-wrap">
+            <button
+              onClick={() => setShowPlans(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+            >
+              Change Plan
+            </button>
+            <button
+              onClick={handleCancelSubscription}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+            >
+              Cancel Subscription
+            </button>
+            <RefundButton />
+          </div>
+        )}
+
+        {(isExpired || isCancelled) && (
+          <div className="mt-4">
+            <button
+              onClick={reactivateSubscription}
+              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
+            >
+              Reactivate Subscription
+            </button>
+          </div>
         )}
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <p className={`${textColor} font-medium`}>
-            Plan: {currentSubscription.tier.charAt(0).toUpperCase() + currentSubscription.tier.slice(1)}
-          </p>
-          <p className={`${textColor} text-sm`}>
-            Monthly fee: ₱{tierPricing[currentSubscription.tier] || 0}
-          </p>
-        </div>
-        
-        <div>
-          {currentSubscription.expires_at && (
-            <p className={`${textColor} text-sm`}>
-              Expires: {new Date(currentSubscription.expires_at).toLocaleDateString()}
-            </p>
-          )}
-          {currentSubscription.started_at && (
-            <p className={`${textColor} text-sm`}>
-              Started: {new Date(currentSubscription.started_at).toLocaleDateString()}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {isActive && !isExpired && (
-        <div className="mt-4 flex gap-3 flex-wrap">
-          <button
-            onClick={() => setShowPlans(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
-          >
-            Change Plan
-          </button>
-          <button
-            onClick={handleCancelSubscription}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-          >
-            Cancel Subscription
-          </button>
-          <RefundButton />
-        </div>
-      )}
-
-      {(isExpired || isCancelled) && (
-        <div className="mt-4">
-          <button
-            onClick={reactivateSubscription}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
-          >
-            Reactivate Subscription
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
+    );
+  };
 
   // Payment status message component
   const renderPaymentStatus = () => {
@@ -1218,9 +1210,8 @@ const getRecentPayments = async () => {
 
         <div className="flex gap-6">
           {/* Tier 1 - Free */}
-          <div className={`rounded-2xl p-6 flex-1 relative ${
-            currentTier === 'free' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
-          }`}>
+          <div className={`rounded-2xl p-6 flex-1 relative ${currentTier === 'free' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+            }`}>
             {currentTier === 'free' && (
               <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                 Current Plan
@@ -1249,9 +1240,8 @@ const getRecentPayments = async () => {
           </div>
 
           {/* Tier 2 - Premium */}
-          <div className={`rounded-2xl p-6 flex-1 relative ${
-            currentTier === 'premium' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
-          }`}>
+          <div className={`rounded-2xl p-6 flex-1 relative ${currentTier === 'premium' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+            }`}>
             {currentTier === 'premium' && (
               <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                 Current Plan
@@ -1283,9 +1273,8 @@ const getRecentPayments = async () => {
           </div>
 
           {/* Tier 3 - Pro */}
-          <div className={`rounded-2xl p-6 flex-1 relative ${
-            currentTier === 'pro' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
-          }`}>
+          <div className={`rounded-2xl p-6 flex-1 relative ${currentTier === 'pro' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
+            }`}>
             {currentTier === 'pro' && (
               <div className="absolute -top-3 left-4 bg-teal-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                 Current Plan
@@ -1332,16 +1321,16 @@ const getRecentPayments = async () => {
               disabled={!selectedTier || isProcessing || !user || selectedTier === currentTier}
               onClick={handlePlanChange}
             >
-              {isProcessing ? 'Processing...' : 
-               !user ? 'Please log in' : 
-               selectedTier === currentTier ? 'Current Plan' : 'Change Plan'}
+              {isProcessing ? 'Processing...' :
+                !user ? 'Please log in' :
+                  selectedTier === currentTier ? 'Current Plan' : 'Change Plan'}
             </button>
           )}
         </div>
 
         <div className="text-center mt-4">
           <p className="text-sm text-gray-600">
-            {isUpgrading ? 
+            {isUpgrading ?
               'Your plan will be changed immediately upon successful payment.' :
               'You\'ll be redirected to PayMongo to complete your payment securely.'
             }
@@ -1375,7 +1364,7 @@ const getRecentPayments = async () => {
           Billing
         </h2>
         <p className="text-zyncureOrange text-left mt-3">
-          {hasActiveSubscription() ? 
+          {hasActiveSubscription() ?
             'Manage your active subscription and billing information' :
             'Manage your subscriptions and billing information'
           }
@@ -1810,7 +1799,7 @@ export function DeleteAccountPage() {
           >
             {showPassword ? <Eye size={22} /> : <EyeClosed size={22} />}
           </button>
-        </div>
+               </div>
 
         <div className="flex justify-center py-5">
           <button
