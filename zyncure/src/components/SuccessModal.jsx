@@ -22,4 +22,3 @@ function SuccessModal({ open, title, message, onClose }) {
 
 
 export default SuccessModal;
-
