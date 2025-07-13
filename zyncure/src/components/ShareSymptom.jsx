@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, FileText, User, Clock, Trash2, XCircle } from 'lucide-react';
 import { supabase } from '../client';
@@ -441,7 +442,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
 
 
             <div>
-              <label className="block text-sm font-semibold mb-1">Report data duration</label>
+              <label className="block text-sm font-semibold mb-1">Symptom Duration</label>
               <select
                 value={symptomsDuration}
                 onChange={(e) => setSymptomsDuration(e.target.value)}

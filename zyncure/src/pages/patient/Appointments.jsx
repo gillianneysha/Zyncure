@@ -262,36 +262,42 @@ const PersonalAppointmentTracker = () => {
   };
 
   const handleCancelRequest = async (appointment) => {
-    if (!window.confirm('Are you sure you want to cancel this appointment?')) {
-      return;
-    }
+  // Check if cancellation is allowed
+  if (!canCancelAppointment(appointment)) {
+    setError('Appointments can only be cancelled up to 24 hours before the scheduled time.');
+    return;
+  }
+
+  if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+    return;
+  }
+  
+  setLoading(true);
+  try {
+    const { error: cancelError } = await appointmentService.updateAppointment(
+      appointment.id, 
+      { status: 'cancelled' }
+    );
     
-    setLoading(true);
-    try {
-      const { error: cancelError } = await appointmentService.updateAppointment(
-        appointment.id, 
-        { status: 'cancelled' }
+    if (cancelError) {
+      setError(`Failed to cancel appointment: ${cancelError}`);
+    } else {
+      // Update local state
+      setAppointments(prevAppointments => 
+        prevAppointments.map(apt => 
+          apt.id === appointment.id 
+            ? { ...apt, status: 'cancelled' }
+            : apt
+        )
       );
-      
-      if (cancelError) {
-        setError(`Failed to cancel appointment: ${cancelError}`);
-      } else {
-        // Update local state
-        setAppointments(prevAppointments => 
-          prevAppointments.map(apt => 
-            apt.id === appointment.id 
-              ? { ...apt, status: 'cancelled' }
-              : apt
-          )
-        );
-      }
-    } catch (err) {
-      console.error('Error cancelling appointment:', err);
-      setError('Failed to cancel appointment. Please try again.');
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (err) {
+    console.error('Error cancelling appointment:', err);
+    setError('Failed to cancel appointment. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Handle permanent removal of appointment from the list
   const handlePermanentRemove = (removedAppointment) => {
@@ -319,6 +325,15 @@ const PersonalAppointmentTracker = () => {
     setAppointmentToReschedule(null);
     setError('');
   };
+
+const canCancelAppointment = (appointment) => {
+  const now = new Date();
+  const appointmentCreatedAt = new Date(appointment.created_at);
+  const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
+  
+  // Allow cancellation only if within 24 hours of creation AND appointment is confirmed
+  return appointment.status === 'confirmed' && hoursFromCreation <= 24;
+};
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -360,14 +375,15 @@ const PersonalAppointmentTracker = () => {
         {/* Right Appointments Section */}
         <div className="flex-1">
           <AppointmentList
-            selectedDate={selectedDate}
-            appointments={appointments}
-            doctors={doctors}
-            onRescheduleRequest={handleRescheduleRequest}
-            onCancelRequest={handleCancelRequest}
-            onPermanentRemove={handlePermanentRemove}
-            onRefresh={refreshAppointments}
-          />
+  selectedDate={selectedDate}
+  appointments={appointments}
+  doctors={doctors}
+  onRescheduleRequest={handleRescheduleRequest}
+  onCancelRequest={handleCancelRequest}
+  onPermanentRemove={handlePermanentRemove}
+  onRefresh={refreshAppointments}
+  canCancelAppointment={canCancelAppointment}  // Add this line
+/>
         </div>
       </div>
 
