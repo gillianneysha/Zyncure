@@ -252,9 +252,14 @@ function FileCard({
   maxFileNameLength,
   onPreview,
   onShare,
+  isPatient,
 }) {
+  // HOOKS FIRST!
   const [dropdown, setDropdown] = useState(false);
   const dropdownRef = useRef(null);
+
+  if (!file) return null;
+
   const {
     name,
     preview_url: previewUrl,
@@ -378,20 +383,7 @@ function FileCard({
           <div className="text-xs">Date: {formattedDate}</div>
         </div>
       </div>
-      {/* --- Hide notes for doctor-note- PDFs --- */}
-      {consultation_notes.length > 0 && !hideNotes && (
-        <div className="bg-white p-2 mt-1 rounded">
-          <div className="font-semibold text-[#55A1A4] mb-1">Consultation Notes:</div>
-          {consultation_notes.map((note, idx) => (
-            <div key={note.id || idx} className="mb-2">
-              <div className="text-xs text-gray-500">
-                By {note.doctor_id} on {new Date(note.created_at).toLocaleString()}
-              </div>
-              <div className="text-sm">{note.note}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* REMOVE notes rendering from here */}
     </div>
   );
 }
@@ -404,9 +396,9 @@ function FileListItem({
   maxFileNameLength,
   onPreview,
   onShare,
+  isPatient,
 }) {
-  const [dropdown, setDropdown] = useState(false);
-  const dropdownRef = useRef(null);
+  if (!file) return null;
   const {
     name,
     preview_url: previewUrl,
@@ -434,6 +426,9 @@ function FileListItem({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [dropdown]);
+
+  const [dropdown, setDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   // --- hide consultation notes for doctor-note PDFs
   const hideNotes = name && name.startsWith('doctor-note-');
@@ -533,8 +528,8 @@ function FileListItem({
           </div>
         </div>
       </div>
-      {/* --- Hide notes for doctor-note- PDFs --- */}
-      {consultation_notes.length > 0 && !hideNotes && (
+      {/* --- Hide notes for doctor-note- PDFs and for patients --- 
+      {consultation_notes.length > 0 && !hideNotes && !isPatient && (
         <div className="bg-white p-2 mt-1 rounded">
           <div className="font-semibold text-[#55A1A4] mb-1">Consultation Notes:</div>
           {consultation_notes.map((note, idx) => (
@@ -546,9 +541,28 @@ function FileListItem({
             </div>
           ))}
         </div>
-      )}
+      )}*/}
     </div>
   );
+}
+
+// --- Fetch doctor names by IDs for consultation notes ---
+async function fetchDoctorsMap(doctorIds) {
+  if (!doctorIds.length) return {};
+  const { data, error } = await supabase
+    .from("medicalprofessionals")
+    .select("med_id, first_name, last_name")
+    .in("med_id", doctorIds);
+  if (error || !data) return {};
+  const map = {};
+  for (const doc of data) {
+    let name = "";
+    if (doc.first_name || doc.last_name) {
+      name = [doc.first_name, doc.last_name].filter(Boolean).join(" ");
+    }
+    map[doc.med_id] = name || doc.med_id; // fallback to med_id for debug
+  }
+  return map;
 }
 
 // --- Fetch consultation notes for all files ---
@@ -569,7 +583,9 @@ async function fetchConsultationNotes(fileIds) {
 }
 
 // --- Main Records Component ---
-export default function Records({ currentUserId: propUserId }) {
+export default function Records({ currentUserId: propUserId, isPatient: propIsPatient }) {
+  const [doctorMap, setDoctorMap] = useState({});
+  const isPatient = typeof propIsPatient !== "undefined" ? propIsPatient : true;
   const [currentUserId, setCurrentUserId] = useState(propUserId || null);
   const [storageInfo, setStorageInfo] = useState(null);
   const fileInputRef = useRef(null);
@@ -666,6 +682,26 @@ export default function Records({ currentUserId: propUserId }) {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [folderHeaderDropdown]);
+
+  useEffect(() => {
+    async function getDoctorNames() {
+      if (!previewFile || !previewFile.consultation_notes) {
+        setDoctorMap({});
+        return;
+      }
+      const doctorIds = [
+        ...new Set(previewFile.consultation_notes.map(n => n.doctor_id).filter(Boolean))
+      ];
+      if (doctorIds.length) {
+        const docMap = await fetchDoctorsMap(doctorIds);
+        setDoctorMap(docMap);
+      } else {
+        setDoctorMap({});
+      }
+    }
+    getDoctorNames();
+    // eslint-disable-next-line
+  }, [previewFile]);
 
   const fetchStorageInfo = async () => {
     const { data, error } = await supabase
@@ -1437,6 +1473,7 @@ export default function Records({ currentUserId: propUserId }) {
                   maxFileNameLength={maxFileNameLength}
                   onPreview={setPreviewFile}
                   onShare={handleShare}
+                  isPatient={isPatient}
                 />
               ))}
             </div>
@@ -1454,6 +1491,7 @@ export default function Records({ currentUserId: propUserId }) {
                   maxFileNameLength={maxFileNameLength}
                   onPreview={setPreviewFile}
                   onShare={handleShare}
+                  isPatient={isPatient}
                 />
               ))}
             </div>
@@ -1476,9 +1514,13 @@ export default function Records({ currentUserId: propUserId }) {
       />
 
       {/* --- FILE PREVIEW MODAL --- */}
-      {previewFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg p-4 max-w-lg w-full relative shadow-2xl border">
+      {previewFile && (() => {
+    const isLoneNotePdf = previewFile?.name?.startsWith('doctor-note-');
+    const showNotesSidebar = !isLoneNotePdf && previewFile.consultation_notes && previewFile.consultation_notes.length > 0;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+        <div className={`bg-white rounded-lg w-full relative shadow-2xl border flex flex-col ${showNotesSidebar ? "max-w-4xl md:flex-row" : "max-w-md"}`}>
+          <div className="flex-1 min-w-0 p-4 flex flex-col">
             <button
               onClick={() => setPreviewFile(null)}
               className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
@@ -1508,20 +1550,6 @@ export default function Records({ currentUserId: propUserId }) {
                 <div className="text-gray-400">No Preview Available</div>
               )}
             </div>
-            {/* --- CONSULTATION NOTES --- */}
-            {previewFile.consultation_notes && previewFile.consultation_notes.length > 0 && (
-              <div className="bg-gray-50 p-3 rounded mb-2 border">
-                <div className="font-semibold text-[#55A1A4] mb-1">Consultation Notes:</div>
-                {previewFile.consultation_notes.map((note, idx) => (
-                  <div key={note.id || idx} className="mb-2">
-                    <div className="text-xs text-gray-500">
-                      {note.doctor_id ? `Doctor: ${note.doctor_id}` : ""} {note.created_at ? `on ${new Date(note.created_at).toLocaleString()}` : ""}
-                    </div>
-                    <div className="text-sm whitespace-pre-line">{note.note}</div>
-                  </div>
-                ))}
-              </div>
-            )}
             <div className="mt-4 text-right">
               <a
                 href={previewFile.preview_url}
@@ -1532,8 +1560,28 @@ export default function Records({ currentUserId: propUserId }) {
               </a>
             </div>
           </div>
+          {showNotesSidebar && (
+            <div className="w-full md:w-96 border-l bg-gray-50 p-4 flex-shrink-0 overflow-y-auto">
+              <div className="font-semibold text-[#55A1A4] mb-2">Consultation Notes</div>
+              {previewFile.consultation_notes.map((note, idx) => (
+                <div key={note.id || idx} className="mb-4">
+                  <div className="text-xs text-gray-500 mb-1">
+                    {note.doctor_id ? (
+                      <>
+                        Doctor {doctorMap[note.doctor_id] ? doctorMap[note.doctor_id] : `Unknown (${note.doctor_id})`}
+                      </>
+                    ) : ""}
+                    {note.created_at ? ` on ${new Date(note.created_at).toLocaleString()}` : ""}
+                  </div>
+                  <div className="text-sm whitespace-pre-line">{note.note}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
+    );
+  })()}
 
       {/* --- Rename Modal --- */}
       <RenameModal
