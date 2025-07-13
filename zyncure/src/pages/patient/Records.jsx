@@ -1132,18 +1132,17 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
 
  // --- Files: Only show files in selected folder if folder is owned by current user.
  let displayedFiles = [];
- if (activeFolderId) {
-   const folder = folders.find(f => f.id === activeFolderId);
-   if (folder && folder.owner_id === currentUserId) {
-     displayedFiles = files.filter(
-       (file) => file.folder_id === activeFolderId && file.owner_id === currentUserId
-     );
-   } else {
-     displayedFiles = [];
-   }
- } else {
-   displayedFiles = files.filter((file) => !file.folder_id);
- }
+
+if (activeFolderId) {
+  displayedFiles = files.filter(
+    (file) => file.folder_id === activeFolderId
+  );
+} else {
+  displayedFiles = files.filter(
+    (file) => !file.folder_id
+  );
+}
+
 
 
  displayedFiles = displayedFiles.filter((file) => {
