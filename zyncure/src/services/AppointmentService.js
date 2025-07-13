@@ -82,13 +82,14 @@ async createAppointment(appointmentData) {
   try {
     const user = await getCurrentUser();
   
-if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
-  throw new Error('You can only create appointments for yourself.');
-}
+    if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
+      throw new Error('You can only create appointments for yourself.');
+    }
+
     const time24h = convertTo24Hour(appointmentData.time);
     const fullDateTime = `${appointmentData.date}T${time24h}`;
 
-
+    // Check slot availability
     const { data: availableSlots } = await this.getAvailableTimeSlots(
       appointmentData.doctor_id, 
       appointmentData.date
@@ -98,15 +99,28 @@ if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
       throw new Error('This time slot is no longer available. Please select a different time.');
     }
 
-
-    const { data: appointmentId, error } = await supabase.rpc('create_appointment_simple', {
-      p_patient_id: user.id,
-      p_med_id: appointmentData.doctor_id,
-      p_appointment_date: fullDateTime,
-      p_reason: appointmentData.reason,
-      p_status: appointmentData.status || 'confirmed',
-      p_created_at: appointmentData.created_at || new Date().toISOString()
-    });
+    // Direct table insertion instead of RPC
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert({
+        patient_id: user.id,
+        med_id: appointmentData.doctor_id,
+        appointment_date: fullDateTime,
+        reason: appointmentData.reason,
+        status: appointmentData.status || 'confirmed',
+        created_at: appointmentData.created_at || new Date().toISOString()
+      })
+      .select(`
+        appointment_id,
+        appointment_date,
+        status,
+        reason,
+        patient_id,
+        med_id,
+        medicalprofessionals!inner(first_name, last_name, user_type),
+        created_at
+      `)
+      .single();
 
     if (error) {
       console.error('Error creating appointment:', error);
@@ -126,57 +140,22 @@ if (appointmentData.patient_id && appointmentData.patient_id !== user.id) {
       throw new Error(error.message || 'Failed to create appointment. Please try again.');
     }
 
-    if (!appointmentId) {
+    if (!data) {
       throw new Error('Appointment creation failed. Please try again.');
     }
 
-
-    const { data: appointmentDetails, error: fetchError } = await supabase
-      .from('appointments')
-      .select(`
-        appointment_id,
-        appointment_date,
-        status,
-        reason,
-        patient_id,
-        med_id,
-        medicalprofessionals!inner(first_name, last_name, user_type),
-        created_at
-      `)
-      .eq('appointment_id', appointmentId)
-      .single();
-
-    if (fetchError || !appointmentDetails) {
-      console.warn('Could not fetch created appointment details:', fetchError);
-
-      return {
-        data: [{
-          id: appointmentId,
-          patient_id: user.id,
-          doctor_id: appointmentData.doctor_id,
-          date: appointmentData.date,
-          time: appointmentData.time,
-          status: appointmentData.status || 'confirmed',
-          reason: appointmentData.reason,
-          created_at: new Date().toISOString()
-        }],
-        error: null
-      };
-    }
-
-
-    const { date, time } = formatAppointmentDateTime(appointmentDetails.appointment_date);
+    const { date, time } = formatAppointmentDateTime(data.appointment_date);
     const transformedData = [{
-      id: appointmentDetails.appointment_id,
-      patient_id: appointmentDetails.patient_id,
-      doctor_id: appointmentDetails.med_id,
+      id: data.appointment_id,
+      patient_id: data.patient_id,
+      doctor_id: data.med_id,
       date,
       time,
-      status: appointmentDetails.status,
-      reason: appointmentDetails.reason,
-      doctor_name: `Dr. ${appointmentDetails.medicalprofessionals.first_name} ${appointmentDetails.medicalprofessionals.last_name}`,
-      specialty: appointmentDetails.medicalprofessionals.user_type,
-      created_at: appointmentDetails.created_at
+      status: data.status,
+      reason: data.reason,
+      doctor_name: `Dr. ${data.medicalprofessionals.first_name} ${data.medicalprofessionals.last_name}`,
+      specialty: data.medicalprofessionals.user_type,
+      created_at: data.created_at
     }];
 
     return { data: transformedData, error: null };
@@ -235,7 +214,6 @@ async getAppointments(date, doctorId = null) {
         time,
         status: apt.status,
         reason: apt.reason,
-        type: 'Consultation',
         doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
         created_at: apt.created_at 
       };
@@ -287,7 +265,6 @@ async getAppointments(date, doctorId = null) {
           time,
           status: apt.status,
           reason: apt.reason,
-          type: 'Consultation',
           doctor_name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
           created_at: apt.created_at 
         };
