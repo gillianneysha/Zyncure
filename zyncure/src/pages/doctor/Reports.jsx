@@ -303,7 +303,7 @@ export default function DoctorsPatientsFolders() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
 
-  // Fetch doctor names for preview sidebar
+  // For doctor name sidebar in preview modal
   useEffect(() => {
     async function getDoctorNames() {
       if (!previewFile || !previewFile.consultation_notes) {
@@ -485,13 +485,131 @@ export default function DoctorsPatientsFolders() {
     setDropdownOpen(v => !v);
   }
 
-  const isLoneNotePdf = (file) =>
-    file && file.name && file.name.startsWith('doctor-note-');
+  // Save consultation notes (PDF for lone notes, text for attached)
+  async function handleSaveNote(noteText) {
+    if (!currentUser || !selectedPatient) return;
+    const isLoneNote = !notesFileTarget;
+    let file_id = null;
+    let now = new Date();
 
-  // Modal with max-w-4xl for sidebar, max-w-md otherwise, and doctor name (not email) in sidebar
+    if (isLoneNote) {
+      // 1. Generate PDF
+      let doctorName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email || "Doctor";
+      let formattedDateTime = now.toLocaleString();
+      let doc;
+      try {
+        doc = new jsPDF();
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text(doctorName, 105, 20, { align: "center" });
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "italic");
+        doc.text(formattedDateTime, 105, 30, { align: "center" });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(14);
+        doc.text("Consultation Notes:", 20, 50);
+        doc.setFontSize(13);
+        doc.text(doc.splitTextToSize(noteText, 170), 20, 60);
+      } catch (err) {
+        alert("Failed to create PDF. jsPDF error: " + err.message);
+        return;
+      }
+      let pdfBlob;
+      try {
+        pdfBlob = doc.output("blob");
+      } catch (err) {
+        alert("Failed to convert PDF to blob: " + err.message);
+        return;
+      }
+      // 2. Upload to Supabase storage
+      const filename = `doctor-note-${selectedPatient.id}-${Date.now()}.pdf`;
+      const storagePath = `doctor-notes/${selectedPatient.id}/${filename}`;
+      let uploadResponse = await supabase.storage
+        .from("medical-files")
+        .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: true });
+      if (uploadResponse.error) {
+        alert("Upload failed: " + uploadResponse.error.message);
+        return;
+      }
+      // 3. Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from("medical-files")
+        .getPublicUrl(storagePath);
+      if (!publicUrlData?.publicUrl) {
+        alert("Failed to get public URL for uploaded PDF.");
+        return;
+      }
+      // 4. Insert into medical_files
+      const { data: insertedFiles, error: fileInsertError } = await supabase
+        .from("medical_files")
+        .insert([{
+          name: filename,
+          file_path: storagePath,
+          file_url: publicUrlData.publicUrl,
+          preview_url: publicUrlData.publicUrl,
+          owner_id: currentUser.id,
+          folder_id: notesFolderTarget?.id ?? null,
+          mime_type: "application/pdf"
+        }])
+        .select();
+      if (fileInsertError || !insertedFiles || !insertedFiles[0]) {
+        alert("Failed to insert file: " + (fileInsertError?.message || "Unknown error"));
+        return;
+      }
+      file_id = insertedFiles[0].id;
+      // 5. Share with the patient
+      const { error: shareErr } = await supabase.from("file_shares").insert([{
+        file_id,
+        owner_id: currentUser.id,
+        shared_with_id: selectedPatient.id,
+        share_type: "file",
+        is_active: true
+      }]);
+      if (shareErr) {
+        alert("Failed to share file: " + shareErr.message);
+        return;
+      }
+      // 6. Insert consultation_notes with file_id
+      const { error: noteInsertErr } = await supabase.from("consultation_notes").insert([{
+        file_id,
+        folder_id: notesFolderTarget?.id ?? null,
+        patient_id: selectedPatient.id,
+        doctor_id: currentUser.id,
+        note: noteText,
+        created_at: now.toISOString()
+      }]);
+      if (noteInsertErr) {
+        alert("Failed to insert consultation note: " + noteInsertErr.message);
+        return;
+      }
+    } else {
+      // Regular note on a file
+      const { error } = await supabase.from('consultation_notes').insert([
+        {
+          file_id: notesFileTarget.id,
+          folder_id: notesFileTarget.folder_id || null,
+          patient_id: selectedPatient.id,
+          doctor_id: currentUser.id,
+          note: noteText,
+          created_at: new Date().toISOString()
+        }
+      ]);
+      if (error) {
+        alert("Failed to insert consultation note: " + error.message);
+        return;
+      }
+    }
+
+    setNotesFileTarget(null);
+    setNotesFolderTarget(null);
+    await loadPatientsWithInfo();
+  }
+
+  // The preview modal (sidebar for notes)
   const renderPreviewModal = (file) => {
     if (!file) return null;
-    const showNotesSidebar = !isLoneNotePdf(file) && file.consultation_notes && file.consultation_notes.length > 0;
+    // Hide sidebar for doctor-note PDFs
+    const showNotesSidebar = !(file.name && file.name.startsWith('doctor-note-')) && file.consultation_notes && file.consultation_notes.length > 0;
     return (
       <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
         <div
@@ -548,9 +666,11 @@ export default function DoctorsPatientsFolders() {
               {file.consultation_notes.map((note, idx) => (
                 <div key={note.id || idx} className="mb-4">
                   <div className="text-xs text-gray-500 mb-1">
-                    {note.doctor_id ? (
-                      <>Doctor {doctorMap[note.doctor_id] ? doctorMap[note.doctor_id] : `Unknown (${note.doctor_id})`}</>
-                    ) : ""}
+                    {note.doctor_id && doctorMap[note.doctor_id]
+                      ? <>Doctor {doctorMap[note.doctor_id]}</>
+                      : note.doctor_id
+                      ? `Doctor ${note.doctor_id}`
+                      : ""}
                     {note.created_at ? ` on ${new Date(note.created_at).toLocaleString()}` : ""}
                   </div>
                   <div className="text-sm whitespace-pre-line">{note.note}</div>
@@ -728,9 +848,7 @@ export default function DoctorsPatientsFolders() {
             setNotesFileTarget(null);
             setNotesFolderTarget(null);
           }}
-          onSave={async (noteText) => {
-            // Your existing save logic here...
-          }}
+          onSave={handleSaveNote}
           file={notesFileTarget}
           folder={notesFolderTarget}
         />
