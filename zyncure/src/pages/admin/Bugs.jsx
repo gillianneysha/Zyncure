@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, Bug, Trash2, Filter, RefreshCw, ChevronDown } from 'lucide-react';
-import { supabase } from '../../client'; 
+import { supabase } from '../../client';
 
 export default function AdminBugs() {
   const [bugs, setBugs] = useState([]);
@@ -25,7 +25,7 @@ export default function AdminBugs() {
         .order('name', { ascending: true });
 
       if (error) throw error;
-      
+
       setAdmins(data || []);
     } catch (err) {
       console.error('Error fetching admins:', err);
@@ -38,14 +38,14 @@ export default function AdminBugs() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const { data, error } = await supabase
         .from('bug_reports')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       setBugs(data || []);
     } catch (err) {
       console.error('Error fetching bug reports:', err);
@@ -101,10 +101,10 @@ export default function AdminBugs() {
   const updateBugStatus = async (bugId, newStatus) => {
     try {
       setUpdating(true);
-      
+
       const { error } = await supabase
         .from('bug_reports')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -113,7 +113,7 @@ export default function AdminBugs() {
       if (error) throw error;
 
       // Update local state
-      setBugs(prev => prev.map(bug => 
+      setBugs(prev => prev.map(bug =>
         bug.id === bugId ? { ...bug, status: newStatus, updated_at: new Date().toISOString() } : bug
       ));
 
@@ -133,10 +133,10 @@ export default function AdminBugs() {
   const updateBugPriority = async (bugId, newPriority) => {
     try {
       setUpdating(true);
-      
+
       const { error } = await supabase
         .from('bug_reports')
-        .update({ 
+        .update({
           priority: newPriority,
           updated_at: new Date().toISOString()
         })
@@ -145,7 +145,7 @@ export default function AdminBugs() {
       if (error) throw error;
 
       // Update local state
-      setBugs(prev => prev.map(bug => 
+      setBugs(prev => prev.map(bug =>
         bug.id === bugId ? { ...bug, priority: newPriority, updated_at: new Date().toISOString() } : bug
       ));
 
@@ -165,14 +165,14 @@ export default function AdminBugs() {
   const updateAssignedAdmin = async (bugId, adminId) => {
     try {
       setUpdating(true);
-      
+
       // Find the admin name for display
       const admin = admins.find(a => a.id.toString() === adminId.toString());
       const adminName = admin ? admin.name : null;
-      
+
       const { error } = await supabase
         .from('bug_reports')
-        .update({ 
+        .update({
           assigned_admin: adminName,
           assigned_admin_id: adminId,
           updated_at: new Date().toISOString()
@@ -182,19 +182,19 @@ export default function AdminBugs() {
       if (error) throw error;
 
       // Update local state
-      setBugs(prev => prev.map(bug => 
-        bug.id === bugId ? { 
-          ...bug, 
+      setBugs(prev => prev.map(bug =>
+        bug.id === bugId ? {
+          ...bug,
           assigned_admin: adminName,
           assigned_admin_id: adminId,
-          updated_at: new Date().toISOString() 
+          updated_at: new Date().toISOString()
         } : bug
       ));
 
       // Update selected bug if it's the one being updated
       if (selectedBug && selectedBug.id === bugId) {
-        setSelectedBug(prev => ({ 
-          ...prev, 
+        setSelectedBug(prev => ({
+          ...prev,
           assigned_admin: adminName,
           assigned_admin_id: adminId
         }));
@@ -215,7 +215,7 @@ export default function AdminBugs() {
 
     try {
       setUpdating(true);
-      
+
       const { error } = await supabase
         .from('bug_reports')
         .delete()
@@ -225,7 +225,7 @@ export default function AdminBugs() {
 
       // Remove from local state
       setBugs(prev => prev.filter(bug => bug.id !== bugId));
-      
+
       // Close modal if this bug was selected
       if (selectedBug && selectedBug.id === bugId) {
         setShowModal(false);
@@ -260,7 +260,7 @@ export default function AdminBugs() {
 
   if (loading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
+      <div className="bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="flex items-center justify-center h-64">
             <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
@@ -272,7 +272,7 @@ export default function AdminBugs() {
   }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
+    <div className="bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl p-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
@@ -297,14 +297,14 @@ export default function AdminBugs() {
             {error}
           </div>
         )}
-        
+
         {/* Controls */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-gray-700">Show</span>
-              <select 
-                value={showEntries} 
+              <select
+                value={showEntries}
                 onChange={(e) => setShowEntries(Number(e.target.value))}
                 className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
@@ -316,7 +316,7 @@ export default function AdminBugs() {
               <span className="text-gray-700">entries</span>
             </div>
           </div>
-          
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -330,112 +330,132 @@ export default function AdminBugs() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Ticket ID</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Description</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date Logged</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Priority</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Assigned Admin</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {currentBugs.length === 0 ? (
+        <div className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full divide-y divide-gray-500">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
-                    {filteredBugs.length === 0 && searchTerm ? 
-                      'No bug reports match your search.' : 
-                      'No bug reports found.'}
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    Reporter/Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 hidden sm:table-cell">
+                    Date Logged
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 hidden md:table-cell">
+                    Priority
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 hidden lg:table-cell">
+                    Admin
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    Actions
+                  </th>
                 </tr>
-              ) : (
-                currentBugs.map((bug) => (
-                  <tr key={bug.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm text-gray-900">#{bug.id}</td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{bug.title || 'No Title'}</div>
-                        <div className="text-sm text-gray-500 truncate max-w-xs">
-                          {bug.description || 'No description available'}
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {currentBugs.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                      {filteredBugs.length === 0 && searchTerm ?
+                        'No bug reports match your search.' :
+                        'No bug reports found.'}
+                    </td>
+                  </tr>
+                ) : (
+                  currentBugs.map((bug) => (
+                    <tr key={bug.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                        #{bug.id}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {bug.reporter_name || "N/A"}
+                          </div>
+                          <div className="text-sm text-gray-500 truncate">
+                            {bug.title || "No title"}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {formatDate(bug.date_logged)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-3 py-1 text-xs font-medium text-white rounded-full ${getStatusColor(bug.status)}`}>
-                        {bug.status || 'Open'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="relative">
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 hidden sm:table-cell">
+                        <span className="truncate block">
+                          {formatDate(bug.date_logged)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium text-white rounded-full ${getStatusColor(bug.status)}`}>
+                          {(bug.status || "Open").slice(0, 8)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 hidden md:table-cell">
                         <select
-                          value={bug.priority || 'Medium'}
+                          value={bug.priority || "Medium"}
                           onChange={(e) => updateBugPriority(bug.id, e.target.value)}
                           disabled={updating}
-                          className={`text-sm font-medium border-0 bg-transparent cursor-pointer focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 ${getPriorityColor(bug.priority)} disabled:opacity-50`}
+                          className={`text-sm font-medium border-none bg-transparent cursor-pointer hover:underline w-full disabled:opacity-50 ${getPriorityColor(bug.priority)}`}
                         >
-                          {priorityOptions.map(priority => (
+                          {priorityOptions.map((priority) => (
                             <option key={priority} value={priority} className="text-gray-900">
                               {priority}
                             </option>
                           ))}
                         </select>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="relative">
+                      </td>
+                      <td className="px-6 py-4 hidden lg:table-cell">
                         <select
-                          value={bug.assigned_admin_id || ''}
-                          onChange={(e) => updateAssignedAdmin(bug.id, e.target.value)}
+                          value={bug.assigned_admin || "Unassigned"}
+                          onChange={(e) => updateAssignedAdmin(bug.id, e.target.value === "Unassigned" ? "" : e.target.value)}
                           disabled={updating}
-                          className="text-sm text-gray-900 border-0 bg-transparent cursor-pointer focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 max-w-32 disabled:opacity-50"
+                          className="text-sm text-gray-900 border-none bg-transparent cursor-pointer hover:underline w-full disabled:opacity-50"
                         >
-                          <option value="">Unassigned</option>
-                          {admins.map(admin => (
-                            <option key={admin.id} value={admin.id}>
-                              {admin.name}
-                            </option>
-                          ))}
+                          <option value="Unassigned">Unassigned</option>
+                          <option value="Andrei">Andrei</option>
+                          <option value="Ysha">Ysha</option>
+                          <option value="Ambross">Ambross</option>
+                          <option value="Ludrein">Ludrein</option>
                         </select>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleViewBug(bug)}
-                          className="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                        >
-                          <Eye className="w-3 h-3" />
-                          View
-                        </button>
-                        <button 
-                          onClick={() => updateBugStatus(bug.id, 'Fixed')}
-                          disabled={updating}
-                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                        >
-                          Set Fixed
-                        </button>
-                        <button 
-                          onClick={() => deleteBug(bug.id)}
-                          disabled={updating}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewBug(bug)}
+                            className="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+                            title="View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {bug.status !== "Fixed" && bug.status !== "Closed" && (
+                            <button
+                              onClick={() => updateBugStatus(bug.id, "Fixed")}
+                              disabled={updating}
+                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                              title="Mark Fixed"
+                            >
+                              ✓
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteBug(bug.id)}
+                            disabled={updating}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Pagination */}
@@ -456,11 +476,10 @@ export default function AdminBugs() {
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-2 text-sm border rounded-lg transition-colors ${
-                    currentPage === page
-                      ? 'bg-blue-500 text-white border-blue-500'
-                      : 'border-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-2 text-sm border rounded-lg transition-colors ${currentPage === page
+                    ? 'bg-blue-500 text-white border-blue-500'
+                    : 'border-gray-300 hover:bg-gray-50'
+                    }`}
                 >
                   {page}
                 </button>
@@ -490,7 +509,7 @@ export default function AdminBugs() {
                 ×
               </button>
             </div>
-            
+
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -504,7 +523,7 @@ export default function AdminBugs() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Reporter Name</label>
@@ -515,18 +534,18 @@ export default function AdminBugs() {
                   <p className="text-gray-900">{selectedBug.reporter_email || 'N/A'}</p>
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium text-gray-700">Title</label>
                 <p className="text-gray-900 font-medium">{selectedBug.title || 'No title provided'}</p>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium text-gray-700">Description</label>
                 <p className="text-gray-900">{selectedBug.description || 'No description provided'}</p>
               </div>
-              
-              
+
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Browser Info</label>
@@ -537,7 +556,7 @@ export default function AdminBugs() {
                   <p className="text-gray-900">{selectedBug.device_info || 'N/A'}</p>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Priority</label>
@@ -566,11 +585,10 @@ export default function AdminBugs() {
                       className="text-gray-900 border border-gray-300 rounded px-3 py-1 focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     >
                       <option value="">Unassigned</option>
-                      {admins.map(admin => (
-                        <option key={admin.id} value={admin.id}>
-                          {admin.name}
-                        </option>
-                      ))}
+                      <option value="Andrei">Andrei</option>
+                      <option value="Ysha">Ysha</option>
+                      <option value="Ambross">Ambross</option>
+                      <option value="Ludrein">Ludrein</option>
                     </select>
                   </div>
                 </div>
@@ -591,30 +609,30 @@ export default function AdminBugs() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex gap-4 mt-8">
-              <button 
+              <button
                 onClick={() => updateBugStatus(selectedBug.id, 'In Progress')}
                 disabled={updating}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 Mark In Progress
               </button>
-              <button 
+              <button
                 onClick={() => updateBugStatus(selectedBug.id, 'Fixed')}
                 disabled={updating}
                 className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 Mark Fixed
               </button>
-              <button 
+              <button
                 onClick={() => updateBugStatus(selectedBug.id, 'Wont Fix')}
                 disabled={updating}
                 className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 Won't Fix
               </button>
-              <button 
+              <button
                 onClick={() => deleteBug(selectedBug.id)}
                 disabled={updating}
                 className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
