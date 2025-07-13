@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../client';
-import { jsPDF } from "jspdf";
+import { generateConsultationNotesPDF } from '../../utils/generateConsultationNotes';
 import {
   X, Folder, FileText, Download, ArrowLeft, User, Clock,
   SquarePlus, ChevronDown, MoreVertical, Trash2
@@ -272,6 +272,15 @@ export default function DoctorsPatientsFolders() {
 
   const [doctorMap, setDoctorMap] = useState({});
 
+  const [modalContent, setModalContent] = useState({
+    title: '',
+    message: '',
+    isError: false
+  });
+  const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState(null);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUser(data?.user || null);
@@ -482,6 +491,21 @@ export default function DoctorsPatientsFolders() {
         }
       });
     }
+
+    // Update the selected patient's files in the patients state to include folder files
+    setPatients(prev => prev.map(patient => {
+      if (patient.id === selectedPatient?.id) {
+        // Merge folder files with existing files, avoiding duplicates
+        const existingFileIds = new Set(patient.files.map(f => f.id));
+        const newFiles = folderFiles.filter(f => !existingFileIds.has(f.id));
+        return {
+          ...patient,
+          files: [...patient.files, ...newFiles]
+        };
+      }
+      return patient;
+    }));
+
     setFolderFiles(folderFiles);
   }
 
@@ -503,10 +527,10 @@ export default function DoctorsPatientsFolders() {
 
   async function handleDelete(file) {
     if (!currentUser || currentUser.id !== file.owner_id) return;
-    if (!window.confirm('Are you sure you want to delete this file?')) return;
-    await supabase.from('medical_files').delete().eq('id', file.id);
-    await loadPatientsWithInfo();
-  }
+
+    setFileToDelete(file);
+    setShowDeleteModal(true);
+  } // Add this missing closing brace
 
   function handleDropdownToggle() {
     setDropdownOpen(v => !v);
@@ -514,190 +538,295 @@ export default function DoctorsPatientsFolders() {
 
   async function handleSaveNote(noteText) {
     if (!currentUser || !selectedPatient) return;
-    let now = new Date();
 
-    if (notesFileTarget && notesFileTarget.id) {
-      const { error } = await supabase.from('consultation_notes').insert([
-        {
-          file_id: notesFileTarget.id,
-          folder_id: notesFileTarget.folder_id || null,
+    try {
+      setModalContent({
+        title: 'Saving Consultation Note...',
+        message: 'Please wait while we save your consultation note.',
+        isError: false
+      });
+      setShowModal(true);
+
+      let now = new Date();
+
+      if (notesFileTarget && notesFileTarget.id) {
+        const { data: insertedNote, error } = await supabase.from('consultation_notes').insert([
+          {
+            file_id: notesFileTarget.id,
+            folder_id: notesFileTarget.folder_id || null,
+            patient_id: selectedPatient.id,
+            doctor_id: currentUser.id,
+            note: noteText,
+            created_at: now.toISOString()
+          }
+        ]).select().single();
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        // Update the file with the new note immediately
+        const updateFileWithNote = (file) => {
+          if (file.id === notesFileTarget.id) {
+            return {
+              ...file,
+              consultation_notes: [...(file.consultation_notes || []), insertedNote]
+            };
+          }
+          return file;
+        };
+
+        // Update states immediately
+        setPatients(prev => prev.map(patient =>
+          patient.id === selectedPatient.id
+            ? { ...patient, files: patient.files.map(updateFileWithNote) }
+            : patient
+        ));
+
+        setSharedFiles(prev => prev.map(updateFileWithNote));
+        setFolderFiles(prev => prev.map(updateFileWithNote));
+
+        // Update preview file if it's the same file
+        if (previewFile && previewFile.id === notesFileTarget.id) {
+          setPreviewFile(prev => ({
+            ...prev,
+            consultation_notes: [...(prev.consultation_notes || []), insertedNote]
+          }));
+        }
+
+        setModalContent({
+          title: 'Success!',
+          message: 'Consultation note has been saved successfully.',
+          isError: false
+        });
+
+      } else if (notesFolderTarget && notesFolderTarget.id) {
+        // Generate professional PDF using the utility function
+        let pdfBlob;
+        let filename;
+
+        const { data: doctorProfile } = await supabase
+          .from('medicalprofessionals')
+          .select('first_name, last_name, email')
+          .eq('email', currentUser.email)
+          .single();
+
+        const doctorInfo = {
+          first_name: doctorProfile?.first_name,
+          last_name: doctorProfile?.last_name,
+          email: doctorProfile?.email || currentUser.email
+        };
+        const patientInfo = {
+          name: selectedPatient.name,
+          email: selectedPatient.email
+        };
+
+        const result = await generateConsultationNotesPDF(noteText, doctorInfo, patientInfo, { returnBlob: true });
+        pdfBlob = result.blob;
+        filename = result.filename;
+
+        const storagePath = `doctor-notes/${selectedPatient.id}/${filename}`;
+        let uploadResponse = await supabase.storage
+          .from("medical-files")
+          .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: true });
+
+        if (uploadResponse.error) {
+          throw new Error(uploadResponse.error.message);
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("medical-files")
+          .getPublicUrl(storagePath);
+
+        if (!publicUrlData?.publicUrl) {
+          throw new Error("Failed to get public URL for uploaded PDF.");
+        }
+
+        const { data: insertedFiles, error: fileInsertError } = await supabase
+          .from("medical_files")
+          .insert([{
+            name: filename,
+            file_path: storagePath,
+            file_url: publicUrlData.publicUrl,
+            preview_url: publicUrlData.publicUrl,
+            owner_id: currentUser.id,
+            folder_id: notesFolderTarget.id,
+            mime_type: "application/pdf"
+          }])
+          .select();
+
+        if (fileInsertError || !insertedFiles || !insertedFiles[0]) {
+          throw new Error(fileInsertError?.message || "Failed to insert file");
+        }
+
+        let file_id = insertedFiles[0].id;
+        const { error: shareErr } = await supabase.from("file_shares").insert([{
+          file_id,
+          owner_id: currentUser.id,
+          shared_with_id: selectedPatient.id,
+          share_type: "file",
+          is_active: true
+        }]);
+
+        if (shareErr) {
+          throw new Error(shareErr.message);
+        }
+
+        const { data: insertedNote, error: noteInsertErr } = await supabase.from("consultation_notes").insert([{
+          file_id,
+          folder_id: notesFolderTarget.id,
           patient_id: selectedPatient.id,
           doctor_id: currentUser.id,
           note: noteText,
           created_at: now.toISOString()
+        }]).select().single();
+
+        if (noteInsertErr) {
+          throw new Error(noteInsertErr.message);
         }
-      ]);
-      if (error) {
-        alert("Failed to insert consultation note: " + error.message);
-        return;
-      }
-    } else if (notesFolderTarget && notesFolderTarget.id) {
-      let doctorName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email || "Doctor";
-      let formattedDateTime = now.toLocaleString();
-      let doc;
-      try {
-        doc = new jsPDF();
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text(doctorName, 105, 20, { align: "center" });
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "italic");
-        doc.text(formattedDateTime, 105, 30, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
-        doc.text("Consultation Notes:", 20, 50);
-        doc.setFontSize(13);
-        doc.text(doc.splitTextToSize(noteText, 170), 20, 60);
-      } catch (err) {
-        alert("Failed to create PDF. jsPDF error: " + err.message);
-        return;
-      }
-      let pdfBlob;
-      try {
-        pdfBlob = doc.output("blob");
-      } catch (err) {
-        alert("Failed to convert PDF to blob: " + err.message);
-        return;
-      }
-      const filename = `doctor-note-folder-${notesFolderTarget.id}-${Date.now()}.pdf`;
-      const storagePath = `doctor-notes/${selectedPatient.id}/${filename}`;
-      let uploadResponse = await supabase.storage
-        .from("medical-files")
-        .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: true });
-      if (uploadResponse.error) {
-        alert("Upload failed: " + uploadResponse.error.message);
-        return;
-      }
-      const { data: publicUrlData } = supabase.storage
-        .from("medical-files")
-        .getPublicUrl(storagePath);
-      if (!publicUrlData?.publicUrl) {
-        alert("Failed to get public URL for uploaded PDF.");
-        return;
-      }
-      const { data: insertedFiles, error: fileInsertError } = await supabase
-        .from("medical_files")
-        .insert([{
-          name: filename,
-          file_path: storagePath,
-          file_url: publicUrlData.publicUrl,
-          preview_url: publicUrlData.publicUrl,
+
+        // Create the new file object with the note
+        const newFile = {
+          ...insertedFiles[0],
+          consultation_notes: [insertedNote]
+        };
+
+        // Update states immediately
+        setPatients(prev => prev.map(patient =>
+          patient.id === selectedPatient.id
+            ? { ...patient, files: [...patient.files, newFile] }
+            : patient
+        ));
+
+        // If we're in a folder, add to folder files
+        if (openedFolder && openedFolder.id === notesFolderTarget.id) {
+          setFolderFiles(prev => [...prev, newFile]);
+        } else {
+          setSharedFiles(prev => [...prev, newFile]);
+        }
+
+        setModalContent({
+          title: 'Success!',
+          message: `Consultation note PDF "${filename}" has been created and shared successfully.`,
+          isError: false
+        });
+
+      } else {
+        // Similar logic for general notes (without folder)
+        const { data: doctorProfile } = await supabase
+          .from('medicalprofessionals')
+          .select('first_name, last_name, email')
+          .eq('email', currentUser.email)
+          .single();
+
+        const doctorInfo = {
+          first_name: doctorProfile?.first_name,
+          last_name: doctorProfile?.last_name,
+          email: doctorProfile?.email || currentUser.email
+        };
+        const patientInfo = {
+          name: selectedPatient.name,
+          email: selectedPatient.email
+        };
+
+        const result = await generateConsultationNotesPDF(noteText, doctorInfo, patientInfo, { returnBlob: true });
+        const pdfBlob = result.blob;
+        const filename = result.filename;
+
+        const storagePath = `doctor-notes/${selectedPatient.id}/${filename}`;
+        let uploadResponse = await supabase.storage
+          .from("medical-files")
+          .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: true });
+
+        if (uploadResponse.error) {
+          throw new Error(uploadResponse.error.message);
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("medical-files")
+          .getPublicUrl(storagePath);
+
+        if (!publicUrlData?.publicUrl) {
+          throw new Error("Failed to get public URL for uploaded PDF.");
+        }
+
+        const { data: insertedFiles, error: fileInsertError } = await supabase
+          .from("medical_files")
+          .insert([{
+            name: filename,
+            file_path: storagePath,
+            file_url: publicUrlData.publicUrl,
+            preview_url: publicUrlData.publicUrl,
+            owner_id: currentUser.id,
+            mime_type: "application/pdf"
+          }])
+          .select();
+
+        if (fileInsertError || !insertedFiles || !insertedFiles[0]) {
+          throw new Error(fileInsertError?.message || "Failed to insert file");
+        }
+
+        let file_id = insertedFiles[0].id;
+        const { error: shareErr } = await supabase.from("file_shares").insert([{
+          file_id,
           owner_id: currentUser.id,
-          folder_id: notesFolderTarget.id,
-          mime_type: "application/pdf"
-        }])
-        .select();
-      if (fileInsertError || !insertedFiles || !insertedFiles[0]) {
-        alert("Failed to insert file: " + (fileInsertError?.message || "Unknown error"));
-        return;
+          shared_with_id: selectedPatient.id,
+          share_type: "file",
+          is_active: true
+        }]);
+
+        if (shareErr) {
+          throw new Error(shareErr.message);
+        }
+
+        const { data: insertedNote, error: noteInsertErr } = await supabase.from("consultation_notes").insert([{
+          file_id,
+          patient_id: selectedPatient.id,
+          doctor_id: currentUser.id,
+          note: noteText,
+          created_at: now.toISOString()
+        }]).select().single();
+
+        if (noteInsertErr) {
+          throw new Error(noteInsertErr.message);
+        }
+
+        // Create the new file object with the note
+        const newFile = {
+          ...insertedFiles[0],
+          consultation_notes: [insertedNote]
+        };
+
+        // Update states immediately
+        setPatients(prev => prev.map(patient =>
+          patient.id === selectedPatient.id
+            ? { ...patient, files: [...patient.files, newFile] }
+            : patient
+        ));
+
+        setSharedFiles(prev => [...prev, newFile]);
+
+        setModalContent({
+          title: 'Success!',
+          message: `Consultation note PDF "${filename}" has been created and shared successfully.`,
+          isError: false
+        });
       }
-      let file_id = insertedFiles[0].id;
-      const { error: shareErr } = await supabase.from("file_shares").insert([{
-        file_id,
-        owner_id: currentUser.id,
-        shared_with_id: selectedPatient.id,
-        share_type: "file",
-        is_active: true
-      }]);
-      if (shareErr) {
-        alert("Failed to share file: " + shareErr.message);
-        return;
-      }
-      const { error: noteInsertErr } = await supabase.from("consultation_notes").insert([{
-        file_id,
-        folder_id: notesFolderTarget.id,
-        patient_id: selectedPatient.id,
-        doctor_id: currentUser.id,
-        note: noteText,
-        created_at: now.toISOString()
-      }]);
-      if (noteInsertErr) {
-        alert("Failed to insert consultation note: " + noteInsertErr.message);
-        return;
-      }
-    } else {
-      let doctorName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email || "Doctor";
-      let formattedDateTime = now.toLocaleString();
-      let doc;
-      try {
-        doc = new jsPDF();
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text(doctorName, 105, 20, { align: "center" });
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "italic");
-        doc.text(formattedDateTime, 105, 30, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
-        doc.text("Consultation Notes:", 20, 50);
-        doc.setFontSize(13);
-        doc.text(doc.splitTextToSize(noteText, 170), 20, 60);
-      } catch (err) {
-        alert("Failed to create PDF. jsPDF error: " + err.message);
-        return;
-      }
-      let pdfBlob;
-      try {
-        pdfBlob = doc.output("blob");
-      } catch (err) {
-        alert("Failed to convert PDF to blob: " + err.message);
-        return;
-      }
-      const filename = `doctor-note-${selectedPatient.id}-${Date.now()}.pdf`;
-      const storagePath = `doctor-notes/${selectedPatient.id}/${filename}`;
-      let uploadResponse = await supabase.storage
-        .from("medical-files")
-        .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: true });
-      if (uploadResponse.error) {
-        alert("Upload failed: " + uploadResponse.error.message);
-        return;
-      }
-      const { data: publicUrlData } = supabase.storage
-        .from("medical-files")
-        .getPublicUrl(storagePath);
-      if (!publicUrlData?.publicUrl) {
-        alert("Failed to get public URL for uploaded PDF.");
-        return;
-      }
-      const { data: insertedFiles, error: fileInsertError } = await supabase
-        .from("medical_files")
-        .insert([{
-          name: filename,
-          file_path: storagePath,
-          file_url: publicUrlData.publicUrl,
-          preview_url: publicUrlData.publicUrl,
-          owner_id: currentUser.id,
-          mime_type: "application/pdf"
-        }])
-        .select();
-      if (fileInsertError || !insertedFiles || !insertedFiles[0]) {
-        alert("Failed to insert file: " + (fileInsertError?.message || "Unknown error"));
-        return;
-      }
-      let file_id = insertedFiles[0].id;
-      const { error: shareErr } = await supabase.from("file_shares").insert([{
-        file_id,
-        owner_id: currentUser.id,
-        shared_with_id: selectedPatient.id,
-        share_type: "file",
-        is_active: true
-      }]);
-      if (shareErr) {
-        alert("Failed to share file: " + shareErr.message);
-        return;
-      }
-      const { error: noteInsertErr } = await supabase.from("consultation_notes").insert([{
-        file_id,
-        patient_id: selectedPatient.id,
-        doctor_id: currentUser.id,
-        note: noteText,
-        created_at: now.toISOString()
-      }]);
-      if (noteInsertErr) {
-        alert("Failed to insert consultation note: " + noteInsertErr.message);
-        return;
-      }
+
+      // Auto-close success modal after 2 seconds
+      setTimeout(() => {
+        setShowModal(false);
+      }, 2000);
+
+    } catch (error) {
+      console.error('Error saving consultation note:', error);
+      setModalContent({
+        title: 'Error',
+        message: `Failed to save consultation note: ${error.message}`,
+        isError: true
+      });
     }
+
 
     setNotesFileTarget(null);
     setNotesFolderTarget(null);
@@ -709,18 +838,76 @@ export default function DoctorsPatientsFolders() {
     }
   }
 
+  async function confirmDelete() {
+    if (!fileToDelete) return;
+
+    try {
+      setShowDeleteModal(false);
+
+      setModalContent({
+        title: 'Deleting File...',
+        message: 'Please wait while we delete the file.',
+        isError: false
+      });
+      setShowModal(true);
+
+      // Delete from database
+      const { error } = await supabase.from('medical_files').delete().eq('id', fileToDelete.id);
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Update states immediately
+      const removeFileFromList = (files) => files.filter(f => f.id !== fileToDelete.id);
+
+      setPatients(prev => prev.map(patient =>
+        patient.id === selectedPatient?.id
+          ? { ...patient, files: removeFileFromList(patient.files) }
+          : patient
+      ));
+
+      setSharedFiles(prev => removeFileFromList(prev));
+      setFolderFiles(prev => removeFileFromList(prev));
+
+      // Close preview if the deleted file was being previewed
+      if (previewFile && previewFile.id === fileToDelete.id) {
+        setPreviewFile(null);
+      }
+
+      setModalContent({
+        title: 'Success!',
+        message: 'File has been deleted successfully.',
+        isError: false
+      });
+
+      // Auto-close success modal after 2 seconds
+      setTimeout(() => {
+        setShowModal(false);
+      }, 2000);
+
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      setModalContent({
+        title: 'Error',
+        message: `Failed to delete file: ${error.message}`,
+        isError: true
+      });
+    }
+
+    setFileToDelete(null);
+  }
+
   // --- PATCH: Preview modal always shows sidebar for files with notes inside/outside folders ---
   const renderPreviewModal = (file) => {
     if (!file) return null;
     // Hide sidebar for doctor-note PDFs only
-    const showNotesSidebar = !(file.name && file.name.startsWith('doctor-note-')) 
+    const showNotesSidebar = !(file.name && file.name.startsWith('consultation-notes-'))
       && file.consultation_notes && file.consultation_notes.length > 0;
     return (
       <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
         <div
-          className={`bg-white rounded-lg p-4 w-full relative shadow-2xl border flex flex-col ${
-            showNotesSidebar ? "max-w-4xl md:flex-row" : "max-w-md"
-          }`}
+          className={`bg-white rounded-lg p-4 w-full relative shadow-2xl border flex flex-col ${showNotesSidebar ? "max-w-4xl md:flex-row" : "max-w-md"
+            }`}
         >
           <button
             onClick={() => setPreviewFile(null)}
@@ -767,20 +954,26 @@ export default function DoctorsPatientsFolders() {
           {/* Notes Sidebar */}
           {showNotesSidebar && (
             <div className="w-full md:w-80 border-l bg-gray-50 p-4 flex-shrink-0 overflow-y-auto">
-              <div className="font-semibold text-[#55A1A4] mb-2">Consultation Notes</div>
-              {file.consultation_notes.map((note, idx) => (
-                <div key={note.id || idx} className="mb-4">
-                  <div className="text-xs text-gray-500 mb-1">
-                    {note.doctor_id && doctorMap[note.doctor_id]
-                      ? <>Doctor {doctorMap[note.doctor_id]}</>
-                      : note.doctor_id
-                      ? `Doctor ${note.doctor_id}`
-                      : ""}
-                    {note.created_at ? ` on ${new Date(note.created_at).toLocaleString()}` : ""}
-                  </div>
-                  <div className="text-sm whitespace-pre-line">{note.note}</div>
+              <div className="mb-3">
+                <h3 className="font-semibold text-gray-800 mb-2">Consultation Notes</h3>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {file.consultation_notes.map((note, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-gray-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <User size={16} className="text-blue-500" />
+                        <span className="font-medium text-sm text-gray-700">
+                          {doctorMap[note.doctor_id] || note.doctor_id}
+                        </span>
+                        <Clock size={14} className="text-gray-400" />
+                        <span className="text-xs text-gray-500">
+                          {new Date(note.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">{note.note}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>
@@ -795,27 +988,27 @@ export default function DoctorsPatientsFolders() {
           <h1 className="text-3xl font-bold text-[#55A1A4] text-left flex items-center">
             {selectedPatient
               ? <>
-                  <button
-                    title="Back"
-                    className="mr-1 text-[#55A1A4] hover:text-[#478384]"
-                    onClick={() => {
-                      if (openedFolder) {
-                        setOpenedFolder(null);
-                        setPreviewFile(null);
-                      } else {
-                        setSelectedPatient(null);
-                        setOpenedFolder(null);
-                        setPreviewFile(null);
-                      }
-                    }}
-                  >
-                    <ArrowLeft size={22} />
-                  </button>
-                  {openedFolder
-                    ? `${openedFolder.name} (from ${selectedPatient.name})`
-                    : `${selectedPatient.name}'s Shared Records`
-                  }
-                </>
+                <button
+                  title="Back"
+                  className="mr-1 text-[#55A1A4] hover:text-[#478384]"
+                  onClick={() => {
+                    if (openedFolder) {
+                      setOpenedFolder(null);
+                      setPreviewFile(null);
+                    } else {
+                      setSelectedPatient(null);
+                      setOpenedFolder(null);
+                      setPreviewFile(null);
+                    }
+                  }}
+                >
+                  <ArrowLeft size={22} />
+                </button>
+                {openedFolder
+                  ? `${openedFolder.name} (from ${selectedPatient.name})`
+                  : `${selectedPatient.name}'s Shared Records`
+                }
+              </>
               : "Patients who shared with you"
             }
           </h1>
@@ -945,6 +1138,7 @@ export default function DoctorsPatientsFolders() {
           </div>
         )}
 
+        {/* Notes Modal for both file and folder */}
         <NotesModal
           open={showNotesModal}
           onClose={() => {
@@ -956,7 +1150,98 @@ export default function DoctorsPatientsFolders() {
           file={notesFileTarget}
           folder={notesFolderTarget}
         />
+        {/* Status Modal */}
+        <StatusModal
+          show={showModal}
+          onClose={() => setShowModal(false)}
+          title={modalContent.title}
+          message={modalContent.message}
+          isError={modalContent.isError}
+        />
+
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmationModal
+          show={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setFileToDelete(null);
+          }}
+          onConfirm={confirmDelete}
+          fileName={fileToDelete?.name || ''}
+        />
       </div>
     </div>
   );
+
+  // Status Modal Component (for saving process)
+  function StatusModal({ show, onClose, title, message, isError }) {
+    if (!show) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="text-center">
+            <div className={`mx-auto mb-4 w-12 h-12 rounded-full flex items-center justify-center ${isError ? 'bg-red-100' : 'bg-green-100'
+              }`}>
+              {isError ? (
+                <X className={`w-6 h-6 text-red-600`} />
+              ) : (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+              )}
+            </div>
+            <h3 className={`text-lg font-semibold mb-2 ${isError ? 'text-red-900' : 'text-gray-900'
+              }`}>
+              {title}
+            </h3>
+            <p className="text-gray-600 mb-4">{message}</p>
+            {isError && (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Delete Confirmation Modal Component
+  function DeleteConfirmationModal({ show, onClose, onConfirm, fileName }) {
+    if (!show) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="text-center">
+            <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+              <Trash2 className="w-6 h-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900">
+              Delete File
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to delete "{fileName}"? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
