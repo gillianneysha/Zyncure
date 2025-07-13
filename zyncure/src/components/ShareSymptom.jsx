@@ -1,5 +1,3 @@
-July 12 (Adjusted modal with Active Share Management)
-
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, FileText, User, Clock, Trash2, XCircle } from 'lucide-react';
 import { supabase } from '../client';
