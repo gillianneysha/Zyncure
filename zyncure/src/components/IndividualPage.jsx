@@ -555,6 +555,45 @@ export function BillingPage() {
     else if (option === "Contact Information") setShowContactInfo(true); // <-- Fix: make Contact Information clickable
   };
 
+  // Calculate prorated amount for tier changes
+const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
+  if (!currentSubscription || !currentSubscription.expires_at) {
+    return tierPricing[newTier];
+  }
+
+  const now = new Date();
+  const subscriptionStart = new Date(currentSubscription.started_at);
+  const subscriptionEnd = new Date(currentSubscription.expires_at);
+  
+  // Calculate total days in current billing period
+  const totalDays = Math.ceil((subscriptionEnd - subscriptionStart) / (1000 * 60 * 60 * 24));
+  
+  // Calculate days used in current tier
+  const daysUsed = Math.ceil((now - subscriptionStart) / (1000 * 60 * 60 * 24));
+  
+  // Calculate remaining days in billing period
+  const remainingDays = totalDays - daysUsed;
+  
+  if (remainingDays <= 0) {
+    return tierPricing[newTier];
+  }
+  
+  // Calculate prorated amount
+  const currentTierPrice = tierPricing[currentTier] || 0;
+  const newTierPrice = tierPricing[newTier];
+  
+  // Amount to refund from current tier (unused days)
+  const currentTierRefund = (currentTierPrice / totalDays) * remainingDays;
+  
+  // Amount to charge for new tier (remaining days)
+  const newTierCharge = (newTierPrice / totalDays) * remainingDays;
+  
+  // Final amount to charge (difference)
+  const finalAmount = newTierCharge - currentTierRefund;
+  
+  return Math.max(finalAmount, 0); // Ensure non-negative
+};
+
   // Create PayMongo Checkout Session with improved error handling
   const createCheckoutSession = async (amount, description) => {
     if (!user) {
@@ -667,17 +706,18 @@ export function BillingPage() {
   };
 
   // Handle plan upgrade/downgrade
-  const handlePlanChange = () => {
-    if (!selectedTier) {
-      setError('Please select a new subscription tier');
-      return;
-    }
+const handlePlanChange = () => {
+  if (!selectedTier) {
+    setError('Please select a new subscription tier');
+    return;
+  }
 
-    const amount = tierPricing[selectedTier];
-    const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription (Plan Change)`;
+  const currentTier = getCurrentTier();
+  const proratedAmount = calculateProratedAmount(selectedTier, currentTier, currentSubscription);
+  const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription (Plan Change - Prorated)`;
 
-    createCheckoutSession(amount, description);
-  };
+  createCheckoutSession(proratedAmount, description);
+};
 
   // Handle cancellation
   const handleCancelSubscription = async () => {
@@ -847,7 +887,42 @@ export function BillingPage() {
     return currentSubscription.expires_at && new Date(currentSubscription.expires_at) < new Date();
   };
 
-
+const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
+  if (!currentSubscription || !hasActiveSubscription()) return null;
+  
+  const proratedAmount = calculateProratedAmount(newTier, currentTier, currentSubscription);
+  const regularAmount = tierPricing[newTier];
+  
+  if (proratedAmount === regularAmount) return null;
+  
+  const now = new Date();
+  const subscriptionStart = new Date(currentSubscription.started_at);
+  const subscriptionEnd = new Date(currentSubscription.expires_at);
+  const totalDays = Math.ceil((subscriptionEnd - subscriptionStart) / (1000 * 60 * 60 * 24));
+  const daysUsed = Math.ceil((now - subscriptionStart) / (1000 * 60 * 60 * 24));
+  const remainingDays = totalDays - daysUsed;
+  
+  const currentTierPrice = tierPricing[currentTier] || 0;
+  const newTierPrice = tierPricing[newTier];
+  const currentTierRefund = (currentTierPrice / totalDays) * remainingDays;
+  const newTierCharge = (newTierPrice / totalDays) * remainingDays;
+  
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+      <h4 className="font-semibold text-blue-800 mb-2">Prorated Billing Calculation</h4>
+      <div className="text-sm text-blue-700 space-y-1">
+        <p>• Current plan: {currentTier} (₱{currentTierPrice}/month)</p>
+        <p>• New plan: {newTier} (₱{newTierPrice}/month)</p>
+        <p>• Days used in current period: {daysUsed} of {totalDays}</p>
+        <p>• Remaining days: {remainingDays}</p>
+        <hr className="my-2 border-blue-300" />
+        <p>• Refund for unused {currentTier}: -₱{currentTierRefund.toFixed(2)}</p>
+        <p>• Charge for {newTier} ({remainingDays} days): +₱{newTierCharge.toFixed(2)}</p>
+        <p className="font-semibold">• Total amount to pay: ₱{proratedAmount.toFixed(2)}</p>
+      </div>
+    </div>
+  );
+};
   const SecurityOption = ({ title, onClick }) => (
     <div
       className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
@@ -1085,24 +1160,35 @@ export function BillingPage() {
           </div>
         </div>
 
-        {isActive && !isExpired && (
-          <div className="mt-4 flex gap-3 flex-wrap">
-            <button
-              onClick={() => setShowPlans(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
-            >
-              Change Plan
-            </button>
-            <button
-              onClick={handleCancelSubscription}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-            >
-              Cancel Subscription
-            </button>
-            <RefundButton />
-          </div>
-        )}
-
+        {isActive && !isExpired && (() => {
+  const currentTier = getCurrentTier();
+  return (
+    <div className="mt-4 space-y-3">
+      {selectedTier && selectedTier !== currentTier && (
+        <ProratedBillingInfo 
+          newTier={selectedTier} 
+          currentTier={currentTier} 
+          currentSubscription={currentSubscription} 
+        />
+      )}
+      <div className="flex gap-3 flex-wrap">
+        <button
+          onClick={() => setShowPlans(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+        >
+          Change Plan
+        </button>
+        <button
+          onClick={handleCancelSubscription}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+        >
+          Cancel Subscription
+        </button>
+        {/* <RefundButton /> */}
+      </div>
+    </div>
+  );
+})()}
         {(isExpired || isCancelled) && (
           <div className="mt-4">
             <button
@@ -1249,14 +1335,16 @@ export function BillingPage() {
             )}
             {currentTier !== 'premium' && (
               <input
-                type="radio"
-                name="subscriptionTier"
-                value="premium"
-                checked={selectedTier === "premium"}
-                onChange={() => setSelectedTier("premium")}
-                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-                aria-label="Select Premium"
-              />
+  type="radio"
+  name="subscriptionTier"
+  value="premium"
+  checked={selectedTier === "premium"}
+  onClick={() =>
+    setSelectedTier(selectedTier === "premium" ? "" : "premium")
+  }
+  className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+  aria-label="Select Premium"
+/>
             )}
             <h3 className={`font-bold mb-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 2: Premium <span className="font-normal text-sm">(Enhanced Access)</span>
@@ -1282,14 +1370,16 @@ export function BillingPage() {
             )}
             {currentTier !== 'pro' && (
               <input
-                type="radio"
-                name="subscriptionTier"
-                value="pro"
-                checked={selectedTier === "pro"}
-                onChange={() => setSelectedTier("pro")}
-                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-                aria-label="Select Pro"
-              />
+  type="radio"
+  name="subscriptionTier"
+  value="pro"
+  checked={selectedTier === "pro"}
+  onClick={() =>
+    setSelectedTier(selectedTier === "pro" ? "" : "pro")
+  }
+  className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+  aria-label="Select Pro"
+/>
             )}
             <h3 className={`font-bold mb-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 3: Pro <span className="font-normal text-sm">(Comprehensive Access)</span>
@@ -1306,27 +1396,32 @@ export function BillingPage() {
           </div>
         </div>
 
-        <div className="flex justify-center mt-8">
-          {!hasActiveSubscription() ? (
-            <button
-              className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
-              disabled={!selectedTier || isProcessing || !user}
-              onClick={handleSubscribe}
-            >
-              {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
-            </button>
-          ) : (
-            <button
-              className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
-              disabled={!selectedTier || isProcessing || !user || selectedTier === currentTier}
-              onClick={handlePlanChange}
-            >
-              {isProcessing ? 'Processing...' :
-                !user ? 'Please log in' :
-                  selectedTier === currentTier ? 'Current Plan' : 'Change Plan'}
-            </button>
-          )}
-        </div>
+        
+{!hasActiveSubscription() ? (
+  <div className="flex justify-center mt-8">
+    <button
+      className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
+      disabled={!selectedTier || isProcessing || !user}
+      onClick={handleSubscribe}
+    >
+      {isProcessing ? 'Processing...' : !user ? 'Please log in' : 'Subscribe Now'}
+    </button>
+  </div>
+) : (
+  <div className="flex justify-center mt-8">
+    <button
+      className="bg-teal-600 text-white px-10 py-2 rounded-xl font-semibold text-lg hover:bg-teal-700 transition disabled:opacity-50"
+      disabled={!selectedTier || isProcessing || !user || selectedTier === getCurrentTier()}
+      onClick={handlePlanChange}
+    >
+      {isProcessing ? 'Processing...' :
+        !user ? 'Please log in' :
+          selectedTier === getCurrentTier() ? 'Current Plan' : 
+          selectedTier ? `Pay ₱${calculateProratedAmount(selectedTier, getCurrentTier(), currentSubscription).toFixed(2)}` : 'Change Plan'}
+    </button>
+  </div>
+)}
+
 
         <div className="text-center mt-4">
           <p className="text-sm text-gray-600">
