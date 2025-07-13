@@ -30,7 +30,7 @@ export default function AdminSupport() {
   const priorityOptions = ["Low", "Medium", "High", "Critical"];
 
   // Admin options
-  const adminOptions = ["Unassigned"];
+  const adminOptions = ["Unassigned", "Andrei", "Ysha", "Ambross", "Ludrein"];
 
   // Fetch tickets from Supabase
   const fetchTickets = async () => {
@@ -126,9 +126,8 @@ export default function AdminSupport() {
       console.log("Creating notification for user:", userId, "type:", userType);
 
       // Enhanced notification message
-      const notificationMessage = `We've responded to your support ticket "${
-        ticket.subject || "Support Request"
-      }". 
+      const notificationMessage = `We've responded to your support ticket "${ticket.subject || "Support Request"
+        }". 
 
 Admin Response: ${responseMessage}
 
@@ -279,10 +278,10 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         prev.map((ticket) =>
           ticket.id === ticketId
             ? {
-                ...ticket,
-                assigned_admin: adminName === "Unassigned" ? null : adminName,
-                updated_at: data.updated_at,
-              }
+              ...ticket,
+              assigned_admin: adminName === "Unassigned" ? null : adminName,
+              updated_at: data.updated_at,
+            }
             : ticket
         )
       );
@@ -530,8 +529,8 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
 
   if (error) {
     return (
-      <div className="p-6 bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+      <div className="p-4 md:p-6 bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
+        <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 max-w-full overflow-hidden">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
@@ -553,7 +552,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
   }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
+    <div className="from-red-50 to-orange-50 min-h-screen">
       <div className="bg-white rounded-2xl shadow-xl p-8">
         {/* Success Message */}
         {successMessage && (
@@ -576,29 +575,29 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-gray-700">Show</span>
+              <span className="text-gray-700 text-sm md:text-base">Show</span>
               <select
                 value={showEntries}
                 onChange={(e) => {
                   setShowEntries(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-2 md:px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
               </select>
-              <span className="text-gray-700">entries</span>
+              <span className="text-gray-700 text-sm md:text-base">entries</span>
             </div>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <div className="relative w-full lg:w-auto">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
             <input
               type="text"
               placeholder="Search tickets..."
@@ -607,202 +606,173 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full lg:w-80 text-sm"
             />
           </div>
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Ticket ID
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Name
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Issue Category
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Priority
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Assigned Admin
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Created
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {currentTickets.length === 0 ? (
+        <div className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full divide-y divide-gray-500">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td
-                    colSpan="8"
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
-                    {filteredTickets.length === 0 && searchTerm
-                      ? "No tickets found matching your search."
-                      : "No support tickets available."}
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    Name/Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 hidden sm:table-cell">
+                    Category
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 hidden md:table-cell">
+                    Priority
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 hidden lg:table-cell">
+                    Admin
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
+                    Actions
+                  </th>
                 </tr>
-              ) : (
-                currentTickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      #{ticket.id}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {ticket.name || "N/A"}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {ticket.email || "N/A"}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {ticket.issue_category || "N/A"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-3 py-1 text-xs font-medium text-white rounded-full ${getStatusColor(
-                          ticket.status
-                        )}`}
-                      >
-                        {ticket.status || "Unknown"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <select
-                        value={ticket.priority || "Medium"}
-                        onChange={(e) =>
-                          updateTicketPriority(ticket.id, e.target.value)
-                        }
-                        className={`text-sm font-medium border-none bg-transparent cursor-pointer hover:underline ${getPriorityColor(
-                          ticket.priority
-                        )}`}
-                      >
-                        {priorityOptions.map((priority) => (
-                          <option
-                            key={priority}
-                            value={priority}
-                            className="text-gray-900"
-                          >
-                            {priority}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-6 py-4">
-                      <select
-                        value={ticket.assigned_admin || "Unassigned"}
-                        onChange={(e) =>
-                          assignAdminToTicket(ticket.id, e.target.value)
-                        }
-                        className="text-sm text-gray-900 border-none bg-transparent cursor-pointer hover:underline"
-                      >
-                        {adminOptions.map((admin) => (
-                          <option
-                            key={admin}
-                            value={admin}
-                            className="text-gray-900"
-                          >
-                            {admin}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {formatDate(ticket.created_at)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => handleViewTicket(ticket)}
-                          className="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                        >
-                          <Eye className="w-3 h-3" />
-                          View
-                        </button>
-                        {ticket.status !== "Closed" && (
-                          <>
-                            <button
-                              onClick={() => handleRespondToTicket(ticket)}
-                              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                            >
-                              <Send className="w-3 h-3" />
-                              Respond
-                            </button>
-                            <button
-                              onClick={() =>
-                                updateTicketStatus(ticket.id, "Closed")
-                              }
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                            >
-                              Close
-                            </button>
-                          </>
-                        )}
-                      </div>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {currentTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                      No tickets found.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  currentTickets.map((ticket) => (
+                    <tr key={ticket.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                        #{ticket.id}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {ticket.name || "N/A"}
+                          </div>
+                          <div className="text-sm text-gray-500 truncate">
+                            {ticket.email || "N/A"}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 hidden sm:table-cell">
+                        <span className="truncate block">
+                          {ticket.issue_category || "N/A"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium text-white rounded-full ${getStatusColor(ticket.status)}`}>
+                          {ticket.status?.slice(0, 8) || "Unknown"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 hidden md:table-cell">
+                        <select
+                          value={ticket.priority || "Medium"}
+                          onChange={(e) => updateTicketPriority(ticket.id, e.target.value)}
+                          className={`text-sm font-medium border-none bg-transparent cursor-pointer hover:underline w-full ${getPriorityColor(ticket.priority)}`}
+                        >
+                          {priorityOptions.map((priority) => (
+                            <option key={priority} value={priority} className="text-gray-900">
+                              {priority}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <select
+                          value={ticket.assigned_admin || "Unassigned"}
+                          onChange={(e) => assignAdminToTicket(ticket.id, e.target.value)}
+                          className="text-sm text-gray-900 border-none bg-transparent cursor-pointer hover:underline w-full"
+                        >
+                          {adminOptions.map((admin) => (
+                            <option key={admin} value={admin} className="text-gray-900">
+                              {admin}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewTicket(ticket)}
+                            className="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+                            title="View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {ticket.status !== "Closed" && (
+                            <>
+                              <button
+                                onClick={() => handleRespondToTicket(ticket)}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+                                title="Respond"
+                              >
+                                <Send className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => updateTicketStatus(ticket.id, "Closed")}
+                                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+                                title="Close"
+                              >
+                                x
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Pagination */}
         {filteredTickets.length > 0 && (
-          <div className="flex justify-between items-center mt-6">
-            <div className="text-sm text-gray-700">
+          <div className="flex flex-col md:flex-row justify-between items-center mt-6 gap-4">
+            <div className="text-sm text-gray-700 text-center md:text-left">
               Showing {startIndex + 1} to{" "}
               {Math.min(startIndex + showEntries, filteredTickets.length)} of{" "}
               {filteredTickets.length} entries
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1 md:gap-2 flex-wrap justify-center">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 md:px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Previous
+                Prev
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const page = i + Math.max(1, currentPage - 2);
+                return page <= totalPages ? (
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-2 text-sm border rounded-lg transition-colors ${
-                      currentPage === page
-                        ? "bg-blue-500 text-white border-blue-500"
-                        : "border-gray-300 hover:bg-gray-50"
-                    }`}
+                    className={`px-2 md:px-3 py-2 text-sm border rounded-lg transition-colors ${currentPage === page
+                      ? "bg-blue-500 text-white border-blue-500"
+                      : "border-gray-300 hover:bg-gray-50"
+                      }`}
                   >
                     {page}
                   </button>
-                )
-              )}
+                ) : null;
+              })}
               <button
                 onClick={() =>
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 md:px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
