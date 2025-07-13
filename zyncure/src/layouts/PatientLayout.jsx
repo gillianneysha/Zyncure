@@ -1,17 +1,40 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar, { SidebarItem, SidebarSubItem } from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { CalendarDays, Users, Bell, Heart, House, User, ChartPie, Folders, MessageSquare } from 'lucide-react';
 import { ReportModal } from '../components/ReportModal';
+import { supabase } from '../client'; // Make sure to import your supabase client
 
 export default function PatientLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const isActive = (path) => location.pathname === `/home${path}`;
   const isHealthActive = location.pathname.includes('/home/health');
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // Get current user session
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCurrentUser(session.user);
+      }
+    };
+
+    getCurrentUser();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setCurrentUser(session?.user || null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -82,6 +105,7 @@ export default function PatientLayout() {
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
+        user={currentUser} // Pass the current user here
       />
     </div>
   );

@@ -362,6 +362,7 @@ export default function DoctorLayout() {
           icon={<MessageSquare size={20} />}
           text="Need Help?"
           onClick={() => setIsReportModalOpen(true)}
+          
         />
       </Sidebar>
 
@@ -380,6 +381,7 @@ export default function DoctorLayout() {
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
+        user={user} // Pass the user prop here
       />
 
 

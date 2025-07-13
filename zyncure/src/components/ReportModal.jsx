@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { Bug, HelpCircle, X, Send, AlertCircle, CheckCircle, MessageSquare } from 'lucide-react';
-import { supabase } from '../client'; 
-
+import React, { useState, useEffect } from "react";
+import {
+  Bug,
+  HelpCircle,
+  X,
+  Send,
+  AlertCircle,
+  CheckCircle,
+  MessageSquare,
+} from "lucide-react";
+import { supabase } from "../client";
 
 // Report Button Component (to be added to your sidebar)
 export function ReportButton({ onClick }) {
@@ -20,14 +27,93 @@ export function ReportButton({ onClick }) {
 }
 
 // Main Report Modal Component
-export function ReportModal({ isOpen, onClose }) {
-  const [reportType, setReportType] = useState('');
+export function ReportModal({ isOpen, onClose, user }) {
+  const [reportType, setReportType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+
+  // Fetch user profile data when modal opens
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user?.id) return;
+
+      try {
+        // First check if user is a patient
+        const { data: patientData, error: patientError } = await supabase
+          .from('patients')
+          .select('first_name, last_name, email')
+          .eq('patient_id', user.id)
+          .single();
+
+        if (patientData && !patientError) {
+          setUserProfile({
+            name: `${patientData.first_name} ${patientData.last_name}`,
+            email: patientData.email || user.email,
+            type: 'patient'
+          });
+          return;
+        }
+
+        // If not a patient, check if user is a medical professional
+        const { data: medData, error: medError } = await supabase
+          .from('medicalprofessionals')
+          .select('first_name, last_name, email')
+          .eq('med_id', user.id)
+          .single();
+
+        if (medData && !medError) {
+          setUserProfile({
+            name: `${medData.first_name} ${medData.last_name}`,
+            email: medData.email || user.email,
+            type: 'medical'
+          });
+          return;
+        }
+
+        // If not in either table, check admin table
+        const { data: adminData, error: adminError } = await supabase
+          .from('admin')
+          .select('full_name, email')
+          .eq('user_id', user.id)
+          .single();
+
+        if (adminData && !adminError) {
+          setUserProfile({
+            name: adminData.full_name,
+            email: adminData.email || user.email,
+            type: 'admin'
+          });
+          return;
+        }
+
+        // Fallback to just email if no profile found
+        setUserProfile({
+          name: user.email?.split('@')[0] || '',
+          email: user.email || '',
+          type: 'unknown'
+        });
+
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        // Fallback to basic auth user info
+        setUserProfile({
+          name: user.email?.split('@')[0] || '',
+          email: user.email || '',
+          type: 'unknown'
+        });
+      }
+    };
+
+    if (isOpen && user) {
+      fetchUserProfile();
+    }
+  }, [isOpen, user]);
 
   const handleClose = () => {
-    setReportType('');
+    setReportType("");
     setSubmitStatus(null);
+    setUserProfile(null);
     onClose();
   };
 
@@ -54,27 +140,31 @@ export function ReportModal({ isOpen, onClose }) {
         <div className="p-6">
           {!reportType ? (
             <ReportTypeSelector onSelect={setReportType} />
-          ) : reportType === 'bug' ? (
-            <BugReportForm 
+          ) : reportType === "bug" ? (
+            <BugReportForm
               onSubmit={setIsSubmitting}
-              onSuccess={() => setSubmitStatus('success')}
-              onError={() => setSubmitStatus('error')}
+              onSuccess={() => setSubmitStatus("success")}
+              onError={() => setSubmitStatus("error")}
               isSubmitting={isSubmitting}
               submitStatus={submitStatus}
+              user={user}
+              userProfile={userProfile}
             />
           ) : (
-            <SupportTicketForm 
+            <SupportTicketForm
               onSubmit={setIsSubmitting}
-              onSuccess={() => setSubmitStatus('success')}
-              onError={() => setSubmitStatus('error')}
+              onSuccess={() => setSubmitStatus("success")}
+              onError={() => setSubmitStatus("error")}
               isSubmitting={isSubmitting}
               submitStatus={submitStatus}
+              user={user}
+              userProfile={userProfile}
             />
           )}
 
-          {reportType && submitStatus !== 'success' && (
+          {reportType && submitStatus !== "success" && (
             <button
-              onClick={() => setReportType('')}
+              onClick={() => setReportType("")}
               className="mt-4 text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
             >
               ← Back to options
@@ -91,7 +181,7 @@ function ReportTypeSelector({ onSelect }) {
   return (
     <div className="space-y-4">
       <button
-        onClick={() => onSelect('bug')}
+        onClick={() => onSelect("bug")}
         className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all text-left group"
       >
         <div className="flex items-center">
@@ -108,7 +198,7 @@ function ReportTypeSelector({ onSelect }) {
       </button>
 
       <button
-        onClick={() => onSelect('support')}
+        onClick={() => onSelect("support")}
         className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all text-left group"
       >
         <div className="flex items-center">
@@ -128,7 +218,7 @@ function ReportTypeSelector({ onSelect }) {
 }
 
 // Bug Report Form
-function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatus }) {
+function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatus,  userProfile }) {
   const [formData, setFormData] = useState({
     reporter_name: '',
     reporter_email: '',
@@ -138,44 +228,57 @@ function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatu
     device_info: `${navigator.platform} - Screen: ${screen.width}x${screen.height}`
   });
 
+  // Update form data when userProfile is loaded
+  useEffect(() => {
+    if (userProfile) {
+      setFormData(prev => ({
+        ...prev,
+        reporter_name: userProfile.name || '',
+        reporter_email: userProfile.email || '',
+      }));
+    }
+  }, [userProfile]);
+
   const handleSubmit = async () => {
     if (!formData.reporter_name || !formData.title || !formData.description) {
-      alert('Please fill in all required fields');
+      alert("Please fill in all required fields");
       return;
     }
 
     onSubmit(true);
-    
+
     try {
-      const { data, error } = await supabase
-        .from('bug_reports')
-        .insert([{
+      const { data, error } = await supabase.from("bug_reports").insert([
+        {
           reporter_name: formData.reporter_name,
           reporter_email: formData.reporter_email,
           title: formData.title,
           description: formData.description,
           browser_info: formData.browser_info,
           device_info: formData.device_info,
-          date_logged: new Date().toISOString().split('T')[0]
-        }]);
+          date_logged: new Date().toISOString().split("T")[0],
+        },
+      ]);
 
       if (error) throw error;
-      
-      console.log('Bug report submitted successfully:', data);
+
+      console.log("Bug report submitted successfully:", data);
       onSuccess();
     } catch (error) {
-      console.error('Error submitting bug report:', error);
+      console.error("Error submitting bug report:", error);
       onError();
     } finally {
       onSubmit(false);
     }
   };
 
-  if (submitStatus === 'success') {
+  if (submitStatus === "success") {
     return (
       <div className="text-center py-8">
         <CheckCircle className="mx-auto text-green-500 mb-4" size={48} />
-        <h3 className="text-lg font-medium text-gray-800 mb-2">Bug Report Submitted!</h3>
+        <h3 className="text-lg font-medium text-gray-800 mb-2">
+          Bug Report Submitted!
+        </h3>
         <p className="text-sm text-gray-600">
           Thank you for helping us improve. We'll investigate this issue soon.
         </p>
@@ -183,11 +286,13 @@ function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatu
     );
   }
 
-  if (submitStatus === 'error') {
+  if (submitStatus === "error") {
     return (
       <div className="text-center py-8">
         <AlertCircle className="mx-auto text-red-500 mb-4" size={48} />
-        <h3 className="text-lg font-medium text-gray-800 mb-2">Submission Failed</h3>
+        <h3 className="text-lg font-medium text-gray-800 mb-2">
+          Submission Failed
+        </h3>
         <p className="text-sm text-gray-600 mb-4">
           There was an error submitting your report. Please try again.
         </p>
@@ -214,14 +319,16 @@ function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatu
           placeholder="Your Name *"
           value={formData.reporter_name}
           onChange={(e) => setFormData({...formData, reporter_name: e.target.value})}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+          disabled={userProfile}
+          className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm ${userProfile ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         />
         <input
           type="email"
           placeholder="Email Address"
           value={formData.reporter_email}
           onChange={(e) => setFormData({...formData, reporter_email: e.target.value})}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+          disabled={userProfile}
+          className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm ${userProfile ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         />
       </div>
 
@@ -229,19 +336,18 @@ function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatu
         type="text"
         placeholder="Bug Title *"
         value={formData.title}
-        onChange={(e) => setFormData({...formData, title: e.target.value})}
+        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
       />
 
       <textarea
         placeholder="Describe the bug *"
         value={formData.description}
-        onChange={(e) => setFormData({...formData, description: e.target.value})}
+        onChange={(e) =>
+          setFormData({ ...formData, description: e.target.value })
+        }
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm h-20 resize-none"
       />
-
-      
-
 
       <button
         onClick={handleSubmit}
@@ -262,7 +368,7 @@ function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatu
 }
 
 // Support Ticket Form
-function SupportTicketForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatus }) {
+function SupportTicketForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatus,  userProfile }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -271,54 +377,72 @@ function SupportTicketForm({ onSubmit, onSuccess, onError, isSubmitting, submitS
     description: ''
   });
 
+  // Update form data when userProfile is loaded
+  useEffect(() => {
+    if (userProfile) {
+      setFormData(prev => ({
+        ...prev,
+        name: userProfile.name || '',
+        email: userProfile.email || '',
+      }));
+    }
+  }, [userProfile]);
+
   const categories = [
-    'Login & Registration',
-    'Profile Update Issues',
-    'Upload Feature',
-    'Billing Errors',
-    'Technical Issues',
-    'Feature Request',
-    'Other Issues'
+    "Login & Registration",
+    "Profile Update Issues",
+    "Upload Feature",
+    "Billing Errors",
+    "Technical Issues",
+    "Feature Request",
+    "Other Issues",
   ];
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.issue_category || !formData.subject || !formData.description) {
-      alert('Please fill in all required fields');
+    if (
+      !formData.name ||
+      !formData.issue_category ||
+      !formData.subject ||
+      !formData.description
+    ) {
+      alert("Please fill in all required fields");
       return;
     }
 
     onSubmit(true);
-    
+
     try {
-      const { data, error } = await supabase
-        .from('support_tickets')
-        .insert([{
+      const { data, error } = await supabase.from("support_tickets").insert([
+        {
           name: formData.name,
           email: formData.email,
           issue_category: formData.issue_category,
           subject: formData.subject,
           description: formData.description,
-          status: 'Open',
-          priority: 'Medium'
-        }]);
+          status: "Open",
+          priority: "Medium",
+        },
+      ]);
 
       if (error) throw error;
-      
-      console.log('Support ticket submitted successfully:', data);
+
+      console.log("Support ticket submitted successfully:", data);
       onSuccess();
     } catch (error) {
-      console.error('Error submitting support ticket:', error);
+      console.error("Error submitting support ticket:", error);
       onError();
     } finally {
       onSubmit(false);
     }
   };
 
-  if (submitStatus === 'success') {
+  if (submitStatus === "success") {
     return (
       <div className="text-center py-8">
         <CheckCircle className="mx-auto text-green-500 mb-4" size={48} />
-        <h3 className="text-lg font-medium text-gray-800 mb-2">Support Ticket Submitted!</h3>
+        <h3 className="text-lg font-medium text-gray-800 mb-2">
+          Support Ticket Submitted!
+        </h3>
         <p className="text-sm text-gray-600">
           We've received your request and will get back to you soon.
         </p>
@@ -326,11 +450,13 @@ function SupportTicketForm({ onSubmit, onSuccess, onError, isSubmitting, submitS
     );
   }
 
-  if (submitStatus === 'error') {
+  if (submitStatus === "error") {
     return (
       <div className="text-center py-8">
         <AlertCircle className="mx-auto text-red-500 mb-4" size={48} />
-        <h3 className="text-lg font-medium text-gray-800 mb-2">Submission Failed</h3>
+        <h3 className="text-lg font-medium text-gray-800 mb-2">
+          Submission Failed
+        </h3>
         <p className="text-sm text-gray-600 mb-4">
           There was an error submitting your ticket. Please try again.
         </p>
@@ -357,25 +483,31 @@ function SupportTicketForm({ onSubmit, onSuccess, onError, isSubmitting, submitS
           placeholder="Your Name *"
           value={formData.name}
           onChange={(e) => setFormData({...formData, name: e.target.value})}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          disabled={userProfile}
+          className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${userProfile ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         />
         <input
           type="email"
           placeholder="Email Address"
           value={formData.email}
           onChange={(e) => setFormData({...formData, email: e.target.value})}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          disabled={userProfile}
+          className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${userProfile ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         />
       </div>
 
       <select
         value={formData.issue_category}
-        onChange={(e) => setFormData({...formData, issue_category: e.target.value})}
+        onChange={(e) =>
+          setFormData({ ...formData, issue_category: e.target.value })
+        }
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
       >
         <option value="">Select Issue Category *</option>
-        {categories.map(category => (
-          <option key={category} value={category}>{category}</option>
+        {categories.map((category) => (
+          <option key={category} value={category}>
+            {category}
+          </option>
         ))}
       </select>
 
@@ -383,14 +515,16 @@ function SupportTicketForm({ onSubmit, onSuccess, onError, isSubmitting, submitS
         type="text"
         placeholder="Subject *"
         value={formData.subject}
-        onChange={(e) => setFormData({...formData, subject: e.target.value})}
+        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
       />
 
       <textarea
         placeholder="Describe your issue *"
         value={formData.description}
-        onChange={(e) => setFormData({...formData, description: e.target.value})}
+        onChange={(e) =>
+          setFormData({ ...formData, description: e.target.value })
+        }
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-24 resize-none"
       />
 
@@ -412,36 +546,37 @@ function SupportTicketForm({ onSubmit, onSuccess, onError, isSubmitting, submitS
   );
 }
 
-// Demo App Component
 export default function App() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    // Get current user session
+    const getCurrentUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCurrentUser(session.user);
+      }
+    };
+
+    getCurrentUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setCurrentUser(session?.user || null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      <div className="p-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">
-          Your App Content Here
-        </h1>
-        <p className="text-gray-600">
-          This is your main application. The report button is positioned at the bottom-right corner.
-          Click it to open the report modal where users can submit bug reports or support tickets.
-        </p>
-        
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-sm">
-          <h2 className="text-lg font-semibold mb-4">Integration Instructions:</h2>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-            <li>Replace the mock Supabase client with your actual Supabase configuration</li>
-            <li>Add the ReportButton component to your main layout or sidebar</li>
-            <li>Include the ReportModal component in your app's root component</li>
-            <li>The forms will automatically insert data into your existing tables</li>
-          </ol>
-        </div>
-      </div>
-
       <ReportButton onClick={() => setIsReportModalOpen(true)} />
-      <ReportModal 
-        isOpen={isReportModalOpen} 
-        onClose={() => setIsReportModalOpen(false)} 
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        user={currentUser}
       />
     </div>
   );
