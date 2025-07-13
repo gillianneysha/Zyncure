@@ -4,23 +4,21 @@ import {
   Rainbow, Flame, TriangleAlert, MessageCircleWarning,
   Heart, Brain, Activity, CircleArrowDown, CircleArrowUp, CircleAlert, Eye, Bed,
   Laugh, Frown, Popcorn, CakeSlice, Beef, Apple, Drumstick, Candy,
-  BatteryWarning, BatteryLow, BatteryMedium, BatteryFull, Gauge, NotebookPen, Check, Save, Lock
+  BatteryWarning, BatteryLow, BatteryMedium, BatteryFull, Gauge, NotebookPen, Check, Lock
 } from 'lucide-react';
 import TrackingCalendar from '../../components/TrackingCalendar';
 import { supabase } from '../../client';
 import ShareSymptom from '../../components/ShareSymptom';
 import { generatePDF } from '../../utils/generateTrackingReport';
 
-
 const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Feelings');
-  const FREE_TIER_CATEGORIES = ['Period Flow', 'Symptoms', 'Feelings'];
   const [selectedValues, setSelectedValues] = useState({
-    Feelings: [],
-    Cravings: [],
-    'Period Flow': [],
-    'Symptoms': [],
-    Energy: [],
+    Feelings: '',
+    Cravings: [], // Changed to array for multiple selections
+    'Period Flow': '',
+    'Symptoms': [], // Changed to array for multiple selections
+    Energy: '',
     Weight: '',
     Custom: ''
   });
@@ -31,24 +29,10 @@ const PeriodTracker = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
   const [showShareSymptom, setShowShareSymptom] = useState(false);
-
-  const [selectedSymptoms, setSelectedSymptoms] = useState(new Set());
-  
-  // New state for tier management
-  const [userTier, setUserTier] = useState({
-    current_tier: 'free',
-    max_symptoms: 3,
-    can_track_custom_symptoms: false,
-    symptoms_tracked: 0,
-    can_add_symptoms: true
-  });
-  // Removed unused showUpgradeModal state
-
  
   // Use ref to track if we should skip the next useEffect update
   const skipNextUpdate = useRef(false);
   const lastUpdateDate = useRef(null);
-
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userInfo, setUserInfo] = useState({
@@ -57,7 +41,19 @@ const PeriodTracker = () => {
     birthdate: ''
   });
 
-  // Function to fetch user tier information
+  // Tier limitation system state
+  const [userTier, setUserTier] = useState({
+    current_tier: 'free',
+    max_symptoms: 3,
+    can_track_custom_symptoms: false,
+    symptoms_tracked: 0,
+    can_add_symptoms: true
+  });
+
+  // Define which categories are free vs premium
+  const FREE_TIER_CATEGORIES = ['Period Flow', 'Symptoms', 'Feelings'];
+
+  // Function to fetch user tier information from database
   const fetchUserTierInfo = async (userId) => {
     try {
       const { data, error } = await supabase
@@ -96,31 +92,15 @@ const PeriodTracker = () => {
     }
   };
 
-const canTrackSymptom = (category) => {
-  // if (category === 'Weight') {
-  //   return true; // Weight is always trackable
-  // }
-  
-  if (userTier.current_tier === 'free') {
-    return FREE_TIER_CATEGORIES.includes(category) || category === 'Custom';
-  }
-  
-  return true; // Premium and Pro can track everything
-};
- 
-
-
-  // Function to get unique symptom categories user has tracked
-//   const getTrackedSymptomCategories = (entries) => {
-//   const categories = new Set();
-//   entries.forEach(entry => {
-//     // Exclude Weight from category count as it doesn't count toward symptom limit
-//     if (entry.symptoms && entry.symptoms !== 'Weight') {
-//       categories.add(entry.symptoms);
-//     }
-//   });
-//   return Array.from(categories);
-// };
+  // Function to check if a category can be tracked based on tier
+  const canTrackCategory = (category) => {
+    if (userTier.current_tier === 'free') {
+      return FREE_TIER_CATEGORIES.includes(category) || 
+             (category === 'Custom' && userTier.can_track_custom_symptoms);
+    }
+    
+    return true; // Premium and Pro can track everything
+  };
 
   // Function to load selected values for a specific date
   const loadSelectedValuesForDate = (targetDate, entries) => {
@@ -135,25 +115,30 @@ const canTrackSymptom = (category) => {
     });
 
     const newSelectedValues = {
-      Feelings: [],
+      Feelings: '',
       Cravings: [],
-      'Period Flow': [],
+      'Period Flow': '',
       'Symptoms': [],
-      Energy: [],
+      Energy: '',
       Weight: '',
       Custom: ''
     };
 
     entriesForDate.forEach(entry => {
       if (entry.symptoms && entry.severity) {
-        // For Weight and Custom, keep as single values
-        if (entry.symptoms === 'Weight' || entry.symptoms === 'Custom') {
-          newSelectedValues[entry.symptoms] = entry.severity;
-        } else {
-          // For other categories, store as arrays
-          if (!newSelectedValues[entry.symptoms].includes(entry.severity)) {
-            newSelectedValues[entry.symptoms].push(entry.severity);
+        if (entry.symptoms === 'Symptoms') {
+          // For symptoms, collect all severity values into an array
+          if (!newSelectedValues['Symptoms'].includes(entry.severity)) {
+            newSelectedValues['Symptoms'].push(entry.severity);
           }
+        } else if (entry.symptoms === 'Cravings') {
+          // For cravings, collect all severity values into an array
+          if (!newSelectedValues['Cravings'].includes(entry.severity)) {
+            newSelectedValues['Cravings'].push(entry.severity);
+          }
+        } else {
+          // For other tabs, keep single value
+          newSelectedValues[entry.symptoms] = entry.severity;
         }
       }
     });
@@ -161,202 +146,10 @@ const canTrackSymptom = (category) => {
     return newSelectedValues;
   };
 
-
-const handleSymptomToggle = (category, value) => {
-  if (!canTrackSymptom(category)) {
-    setModalContent({
-      title: 'Category Locked',
-      message: `This category is only available for premium users. Upgrade to access all tracking categories.`,
-      isError: true
-    });
-    setShowModal(true);
-    // Removed setShowUpgradeModal(true) as showUpgradeModal is unused
-    return;
-  }
-
-  const symptomKey = `${category}:${value}`;
-  const newSelected = new Set(selectedSymptoms);
- 
-  if (newSelected.has(symptomKey)) {
-    newSelected.delete(symptomKey);
-  } else {
-    newSelected.add(symptomKey);
-  }
- 
-  setSelectedSymptoms(newSelected);
-};
-  // Save multiple symptoms at once with tier checking
-  const handleMultiSave = async () => {
-    if (selectedSymptoms.size === 0) {
-      setModalContent({ title: 'Error', message: 'Please select at least one symptom to save.', isError: true });
-      setShowModal(true);
-      return;
-    }
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setModalContent({ title: 'Error', message: 'You must be logged in to save.', isError: true });
-      setShowModal(true);
-      return;
-    }
-
-    const normalizedDate = new Date(date);
-    normalizedDate.setHours(0, 0, 0, 0);
-
-    const now = new Date();
-    const dateWithCurrentTime = new Date(date);
-    dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-
-    const savePromises = [];
-    const savedSymptoms = [];
-
-    for (const symptomKey of selectedSymptoms) {
-      const [category, value] = symptomKey.split(':');
-     
-      // Check if entry exists for this date and symptom type
-      const existingEntry = loggedDates.find(entry => {
-        const entryDate = new Date(entry.date_logged);
-        entryDate.setHours(0, 0, 0, 0);
-        return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === category;
-      });
-
-      const dataToSave = {
-        symptoms: category,
-        severity: value,
-        date_logged: dateWithCurrentTime.toISOString(),
-        patients_id: user.id,
-      };
-
-      if (existingEntry) {
-        // Update existing entry
-        const promise = supabase
-          .from('symptomlog')
-          .update({
-            severity: value,
-            date_logged: dateWithCurrentTime.toISOString()
-          })
-          .eq('patients_id', user.id)
-          .eq('symptoms', category)
-          .eq('date_logged', existingEntry.date_logged.toISOString());
-       
-        savePromises.push(promise);
-      } else {
-        // Insert new entry
-        const promise = supabase.from('symptomlog').insert([dataToSave]);
-        savePromises.push(promise);
-      }
-     
-      savedSymptoms.push(`${category}: ${value}`);
-    }
-
-    try {
-      const results = await Promise.all(savePromises);
-      const hasError = results.some(result => result.error);
-     
-      if (hasError) {
-        setModalContent({ title: 'Error', message: 'Some symptoms failed to save. Please try again.', isError: true });
-        setShowModal(true);
-        return;
-      }
-
-      // Skip the next useEffect update
-      skipNextUpdate.current = true;
-
-      // Update the selected values with all saved symptoms
-      const newSelectedValues = { ...selectedValues };
-      for (const symptomKey of selectedSymptoms) {
-        const [category, value] = symptomKey.split(':');
-        // For Weight and Custom, store as single values
-        if (category === 'Weight' || category === 'Custom') {
-          newSelectedValues[category] = value;
-        } else {
-          // For other categories, store as arrays
-          if (!newSelectedValues[category].includes(value)) {
-            newSelectedValues[category].push(value);
-          }
-        }
-      }
-      setSelectedValues(newSelectedValues);
-
-      // Refresh data from Supabase
-      const { data, error: fetchError } = await supabase
-        .from('symptomlog')
-        .select('date_logged, symptoms, severity')
-        .eq('patients_id', user.id)
-        .order('date_logged', { ascending: false });
-
-      if (!fetchError) {
-        const normalized = data.map(entry => ({
-          ...entry,
-          date_logged: new Date(entry.date_logged),
-        }));
-        setLoggedDates(normalized);
-        
-        // Refresh tier information
-        const tierInfo = await fetchUserTierInfo(user.id);
-        setUserTier(tierInfo);
-      }
-
-      const formattedDate = normalizedDate.toDateString();
-      const formattedTime = now.toLocaleTimeString();
-     
-      setModalContent({
-        title: 'Success!',
-        message: `${savedSymptoms.length} symptoms saved on ${formattedDate} at ${formattedTime}:\n${savedSymptoms.join('\n')}`,
-        isError: false
-      });
-
-      setShowModal(true);
-     
-      // Clear selections after successful save
-      setSelectedSymptoms(new Set());
-     
-    } catch {
-      setModalContent({ title: 'Error', message: 'Failed to save symptoms. Please try again.', isError: true });
-      setShowModal(true);
-    }
-  };
-
-  // Function to load selected values for a specific date
-  // const loadSelectedValuesForDate = (targetDate, entries) => {
-  //   const normalizedDate = new Date(targetDate);
-  //   normalizedDate.setHours(0, 0, 0, 0);
-
-
-  //   // Find all entries for the selected date
-  //   const entriesForDate = entries.filter(entry => {
-  //     const entryDate = new Date(entry.date_logged);
-  //     entryDate.setHours(0, 0, 0, 0);
-  //     return entryDate.getTime() === normalizedDate.getTime();
-  //   });
-
-
-  //   const newSelectedValues = {
-  //     Feelings: '',
-  //     Cravings: '',
-  //     'Period Flow': '',
-  //     'Symptoms': '',
-  //     Energy: '',
-  //     Weight: '',
-  //     Custom: ''
-  //   };
-
-
-  //   entriesForDate.forEach(entry => {
-  //     if (entry.symptoms && entry.severity) {
-  //       newSelectedValues[entry.symptoms] = entry.severity;
-  //     }
-  //   });
-
-
-  //   return newSelectedValues;
-  // };
-
-
   useEffect(() => {
     const fetchAndStoreUserData = async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('Supabase user:', user);
+      console.log('Supabase user:', user); // Debug
       if (authError || !user) {
         console.error('User fetch failed:', authError?.message);
         return;
@@ -414,7 +207,7 @@ const handleSymptomToggle = (category, value) => {
     fetchAndStoreUserData();
   }, []);
 
-
+  // Effect to update selected values when date changes (but not when data refreshes after save)
   useEffect(() => {
     // Skip this update if we just saved data
     if (skipNextUpdate.current) {
@@ -422,17 +215,11 @@ const handleSymptomToggle = (category, value) => {
       return;
     }
 
-
-
     // Only update if the date actually changed
     const currentDateString = date.toDateString();
     if (lastUpdateDate.current === currentDateString) {
       return;
     }
-
-
-    lastUpdateDate.current = currentDateString;
-
 
     lastUpdateDate.current = currentDateString;
 
@@ -440,33 +227,55 @@ const handleSymptomToggle = (category, value) => {
     setSelectedValues(newSelectedValues);
     setWeightInput(newSelectedValues.Weight || '');
     setCustomInput(newSelectedValues.Custom || '');
-   
-    // Reset selections when date changes
-    setSelectedSymptoms(new Set());
-   
   }, [date, loggedDates]);
 
+  // Handler for symptom toggle with tier checking
+  const handleSymptomToggle = (category, name) => {
+    if (!canTrackCategory(category)) {
+      setModalContent({
+        title: 'Category Locked',
+        message: `The ${category} category is only available for premium users. Upgrade to access all tracking categories.`,
+        isError: true
+      });
+      setShowModal(true);
+      return;
+    }
+
+    if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
+      // Multi-select logic
+      setSelectedValues(prev => ({
+        ...prev,
+        [selectedTab]: prev[selectedTab].includes(name)
+          ? prev[selectedTab].filter(item => item !== name)
+          : [...prev[selectedTab], name]
+      }));
+    } else {
+      // Single-select logic
+      setSelectedValues(prev => ({
+        ...prev,
+        [selectedTab]: prev[selectedTab] === name ? '' : name
+      }));
+    }
+  };
+
   const handleSave = async () => {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    setModalContent({ title: 'Error', message: 'You must be logged in to save.', isError: true });
-    setShowModal(true);
-    return;
-  }
+    // Check tier restrictions before saving
+    if (!canTrackCategory(selectedTab)) {
+      setModalContent({
+        title: 'Category Locked',
+        message: `The ${selectedTab} category is only available for premium users. Upgrade to access all tracking categories.`,
+        isError: true
+      });
+      setShowModal(true);
+      return;
+    }
 
-  if (!canTrackSymptom(selectedTab)) {
-    setModalContent({
-      title: 'Category Locked',
-      message: `This category is only available for premium users. Upgrade to access all tracking categories.`,
-      isError: true
-    });
-    setShowModal(true);
-    // setShowUpgradeModal(true);
-    return;
-  }
-
-  // Rest of your handleSave logic...
-
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      setModalContent({ title: 'Error', message: 'You must be logged in to save.', isError: true });
+      setShowModal(true);
+      return;
+    }
 
     let valueToSave = selectedValues[selectedTab];
 
@@ -482,10 +291,20 @@ const handleSymptomToggle = (category, value) => {
       return;
     }
 
-    if (!valueToSave && selectedTab !== 'Weight' && selectedTab !== 'Custom') {
-      setModalContent({ title: 'Error', message: `Please select a ${selectedTab.toLowerCase()} option.`, isError: true });
-      setShowModal(true);
-      return;
+    // Handle multi-select tabs (Symptoms and Cravings)
+    if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
+      if (!valueToSave || valueToSave.length === 0) {
+        setModalContent({ title: 'Error', message: `Please select at least one ${selectedTab.toLowerCase()} option.`, isError: true });
+        setShowModal(true);
+        return;
+      }
+    } else {
+      // Handle single-select tabs
+      if (!valueToSave && selectedTab !== 'Weight' && selectedTab !== 'Custom') {
+        setModalContent({ title: 'Error', message: `Please select a ${selectedTab.toLowerCase()} option.`, isError: true });
+        setShowModal(true);
+        return;
+      }
     }
 
     if (selectedTab === 'Weight') valueToSave = weightInput;
@@ -494,44 +313,72 @@ const handleSymptomToggle = (category, value) => {
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Check if entry exists for this date and symptom type
-    const existingEntry = loggedDates.find(entry => {
-      const entryDate = new Date(entry.date_logged);
-      entryDate.setHours(0, 0, 0, 0);
-      return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === selectedTab;
-    });
-
     // Use the selected date but with current time for timestamp
     const now = new Date();
     const dateWithCurrentTime = new Date(date);
     dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
 
-    const dataToSave = {
-      symptoms: selectedTab,
-      severity: valueToSave,
-      date_logged: dateWithCurrentTime.toISOString(),
-      patients_id: user.id,
-    };
-
     let supabaseError;
 
-    if (existingEntry) {
-      // Update existing entry
-      const { error } = await supabase
+    if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
+      // For multi-select tabs, first delete existing entries for this date and tab
+      const { error: deleteError } = await supabase
         .from('symptomlog')
-        .update({
-          severity: valueToSave,
-          date_logged: dateWithCurrentTime.toISOString()
-        })
+        .delete()
         .eq('patients_id', user.id)
         .eq('symptoms', selectedTab)
-        .eq('date_logged', existingEntry.date_logged.toISOString());
+        .gte('date_logged', normalizedDate.toISOString())
+        .lt('date_logged', new Date(normalizedDate.getTime() + 24 * 60 * 60 * 1000).toISOString());
 
+      if (deleteError) {
+        setModalContent({ title: 'Error', message: `Failed to save: ${deleteError.message}`, isError: true });
+        setShowModal(true);
+        return;
+      }
+
+      // Then insert new entries for each selected value
+      const dataToInsert = valueToSave.map(value => ({
+        symptoms: selectedTab,
+        severity: value,
+        date_logged: dateWithCurrentTime.toISOString(),
+        patients_id: user.id,
+      }));
+
+      const { error } = await supabase.from('symptomlog').insert(dataToInsert);
       supabaseError = error;
     } else {
-      // Insert new entry
-      const { error } = await supabase.from('symptomlog').insert([dataToSave]);
-      supabaseError = error;
+      // Handle single-select tabs as before
+      const existingEntry = loggedDates.find(entry => {
+        const entryDate = new Date(entry.date_logged);
+        entryDate.setHours(0, 0, 0, 0);
+        return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === selectedTab;
+      });
+
+      const dataToSave = {
+        symptoms: selectedTab,
+        severity: valueToSave,
+        date_logged: dateWithCurrentTime.toISOString(),
+        patients_id: user.id,
+      };
+
+      if (existingEntry) {
+        // Update existing entry
+        const { error } = await supabase
+          .from('symptomlog')
+          .update({
+            severity: valueToSave,
+            date_logged: dateWithCurrentTime.toISOString()
+          })
+          .eq('patients_id', user.id)
+          .eq('symptoms', selectedTab)
+          .eq('date_logged', existingEntry.date_logged.toISOString());
+
+        supabaseError = error;
+      } else {
+        // Insert new entry
+        const { error } = await supabase.from('symptomlog').insert([dataToSave]);
+        supabaseError = error;
+      }
     }
 
     if (supabaseError) {
@@ -544,28 +391,10 @@ const handleSymptomToggle = (category, value) => {
     skipNextUpdate.current = true;
 
     // Update the selected values immediately with the saved value
-    setSelectedValues(prev => {
-      const newValues = { ...prev };
-      if (selectedTab === 'Weight' || selectedTab === 'Custom') {
-        newValues[selectedTab] = valueToSave;
-      } else {
-        if (!newValues[selectedTab].includes(valueToSave)) {
-          newValues[selectedTab] = [...newValues[selectedTab], valueToSave];
-        }
-      }
-      return newValues;
-    });
-
-    // Skip the next useEffect update since we're manually updating the state
-    skipNextUpdate.current = true;
-
-
-    // Update the selected values immediately with the saved value
     setSelectedValues(prev => ({
       ...prev,
       [selectedTab]: valueToSave
     }));
-
 
     // Refresh data from Supabase after successful save
     const { data, error: fetchError } = await supabase
@@ -580,17 +409,21 @@ const handleSymptomToggle = (category, value) => {
         date_logged: new Date(entry.date_logged),
       }));
       setLoggedDates(normalized);
-      
-      // Refresh tier information
-      const tierInfo = await fetchUserTierInfo(user.id);
-      setUserTier(tierInfo);
     }
 
     const formattedDate = normalizedDate.toDateString();
     const formattedTime = now.toLocaleTimeString();
+    
+    let saveMessage;
+    if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
+      saveMessage = `${selectedTab} saved as "${valueToSave.join(', ')}" on ${formattedDate} at ${formattedTime}`;
+    } else {
+      saveMessage = `${selectedTab} saved as "${valueToSave}" on ${formattedDate} at ${formattedTime}`;
+    }
+
     setModalContent({
       title: 'Success!',
-      message: `${selectedTab} saved as "${valueToSave}" on ${formattedDate} at ${formattedTime}`,
+      message: saveMessage,
       isError: false
     });
 
@@ -684,18 +517,38 @@ const handleSymptomToggle = (category, value) => {
   const currentConfig = tabConfigs[selectedTab];
 
   const renderContent = () => {
+    const canTrack = canTrackCategory(selectedTab);
+
     if (selectedTab === 'Weight') {
       return (
-        <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-6 rounded-2xl w-full">
+        <div className={`border border-[#F8C8B6] p-6 rounded-2xl w-full ${
+          canTrack ? 'bg-[#FFEFE9]' : 'bg-gray-100'
+        }`}>
           <div className="flex flex-col items-center space-y-4">
-            <Gauge size={60} color="#E67E22" />
-            <label className="text-lg font-semibold text-[#B65C4B]">Enter your weight:</label>
+            <div className="relative">
+              <Gauge size={60} color={canTrack ? "#E67E22" : "#999"} />
+              {!canTrack && (
+                <div className="absolute -top-1 -right-1 bg-gray-500 rounded-full p-1">
+                  <Lock size={12} className="text-white" />
+                </div>
+              )}
+            </div>
+            <label className={`text-lg font-semibold ${
+              canTrack ? 'text-[#B65C4B]' : 'text-gray-500'
+            }`}>
+              Enter your weight:
+            </label>
             <input
               type="text"
               value={weightInput}
-              onChange={(e) => setWeightInput(e.target.value)}
+              onChange={(e) => canTrack && setWeightInput(e.target.value)}
               placeholder="e.g., 65 kg or 143 lbs"
-              className="w-full max-w-xs px-4 py-3 text-lg border-2 border-[#F8C8B6] rounded-xl focus:border-[#3BA4A0] focus:outline-none text-center"
+              disabled={!canTrack}
+              className={`w-full max-w-xs px-4 py-3 text-lg border-2 rounded-xl focus:outline-none text-center ${
+                canTrack 
+                  ? 'border-[#F8C8B6] focus:border-[#3BA4A0]' 
+                  : 'border-gray-300 bg-gray-50 cursor-not-allowed'
+              }`}
             />
             {selectedValues.Weight && (
               <p className="text-sm text-[#3BA4A0] font-medium">
@@ -707,67 +560,91 @@ const handleSymptomToggle = (category, value) => {
       );
     }
 
- if (selectedTab === 'Custom') {
-  // const canTrackCustom = userTier.current_tier !== 'free' || userTier.current_tier === 'free'; // Always allow for free tier
-  
-  return (
-    <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-6 rounded-2xl w-full">
-      <div className="flex flex-col items-center space-y-4">
-        <NotebookPen size={60} color="#E67E22" />
-        <label className="text-lg font-semibold text-[#B65C4B]">Enter custom data:</label>
-        <textarea
-          value={customInput}
-          onChange={(e) => setCustomInput(e.target.value)}
-          placeholder="Enter any additional notes or symptoms..."
-          className="w-full px-4 py-3 text-lg border-2 border-[#F8C8B6] rounded-xl focus:border-[#3BA4A0] focus:outline-none resize-none"
-          rows={4}
-        />
-        {selectedValues.Custom && (
-          <p className="text-sm text-[#3BA4A0] font-medium">
-            Previously logged: {selectedValues.Custom}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
+    if (selectedTab === 'Custom') {
+      return (
+        <div className={`border border-[#F8C8B6] p-6 rounded-2xl w-full ${
+          canTrack ? 'bg-[#FFEFE9]' : 'bg-gray-100'
+        }`}>
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative">
+              <NotebookPen size={60} color={canTrack ? "#E67E22" : "#999"} />
+              {!canTrack && (
+                <div className="absolute -top-1 -right-1 bg-gray-500 rounded-full p-1">
+                  <Lock size={12} className="text-white" />
+                </div>
+              )}
+            </div>
+            <label className={`text-lg font-semibold ${
+              canTrack ? 'text-[#B65C4B]' : 'text-gray-500'
+            }`}>
+              Enter custom data:
+            </label>
+            <textarea
+              value={customInput}
+              onChange={(e) => canTrack && setCustomInput(e.target.value)}
+              placeholder="Enter any additional notes or symptoms..."
+              disabled={!canTrack}
+              className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none resize-none ${
+                canTrack 
+                  ? 'border-[#F8C8B6] focus:border-[#3BA4A0]' 
+                  : 'border-gray-300 bg-gray-50 cursor-not-allowed'
+              }`}
+              rows={4}
+            />
+            {selectedValues.Custom && (
+              <p className="text-sm text-[#3BA4A0] font-medium">
+                Previously logged: {selectedValues.Custom}
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
 
     return (
-      <div className="bg-[#FFEFE9] border border-[#F8C8B6] p-4 rounded-2xl w-full">
+      <div className={`border border-[#F8C8B6] p-4 rounded-2xl w-full ${
+        canTrack ? 'bg-[#FFEFE9]' : 'bg-gray-100'
+      }`}>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {currentConfig.options.map(({ name, icon, size, color }) => {
             const IconComponent = icon;
-            const isSelected = selectedSymptoms.has(`${selectedTab}:${name}`);
-            const isFromPreviousLog = selectedValues[selectedTab] &&
-              (Array.isArray(selectedValues[selectedTab])
-                ? selectedValues[selectedTab].includes(name)
-                : selectedValues[selectedTab] === name);
-            const canTrack = canTrackSymptom(selectedTab);
             
+            // Handle both single and multi-select tabs
+            let isSelected, isFromPreviousLog;
+            if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
+              isSelected = selectedValues[selectedTab].includes(name);
+              isFromPreviousLog = selectedValues[selectedTab].includes(name);
+            } else {
+              isSelected = selectedValues[selectedTab] === name;
+              isFromPreviousLog = selectedValues[selectedTab] && selectedValues[selectedTab] === name;
+            }
+
             return (
               <div
                 key={name}
                 onClick={() => canTrack && handleSymptomToggle(selectedTab, name)}
-                className={`flex flex-col items-center py-3 px-2 ${canTrack ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                className={`flex flex-col items-center py-3 px-2 ${
+                  canTrack ? 'cursor-pointer' : 'cursor-not-allowed'
+                }`}
               >
                 <div
                   className={`w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full border-4 transition-all relative ${
                     !canTrack
                       ? 'bg-gray-100 border-gray-300 opacity-50'
-                      : isSelected || isFromPreviousLog
+                      : isSelected
                       ? 'bg-[#C2EDEA] border-[#3BA4A0] text-[#3BA4A0] scale-110 shadow-md'
                       : 'bg-[#EDEDED] border-[#D8D8D8] text-[#B6B6B6] hover:border-[#3BA4A0] hover:bg-[#F0F9F9]'
                   }`}
                 >
                   <IconComponent size={size || 32} color={color} />
-                  {(isSelected || isFromPreviousLog) && (
+                  {isFromPreviousLog && canTrack && (
                     <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#3BA4A0] rounded-full flex items-center justify-center">
                       <Check size={10} className="text-white" />
                     </div>
                   )}
                 </div>
                 <span className={`mt-2 text-sm md:text-base font-semibold text-center transition-all ${
-                  isSelected || isFromPreviousLog ? 'text-[#3BA4A0]' : 'text-[#F98679]'
+                  !canTrack ? 'text-gray-500' : isSelected ? 'text-[#3BA4A0]' : 'text-[#F98679]'
                 }`}>
                   {name}
                 </span>
@@ -779,16 +656,10 @@ const handleSymptomToggle = (category, value) => {
     );
   };
 
-
-
-
   // Handler for calendar date select
   const handleDateSelect = (date) => {
     setDate(date);
   };
-
-
-
 
   // Handler for month navigation
   const handleMonthNavigate = (direction) => {
@@ -799,15 +670,9 @@ const handleSymptomToggle = (category, value) => {
     });
   };
 
-
-
-
   const handleMonthYearChange = (month, year) => {
     setCurrentDate(new Date(year, month, 1));
   };
-
-
-
 
   return (
     <div className="calendar-container min-h-[100vh] w-full relative">
@@ -821,117 +686,72 @@ const handleSymptomToggle = (category, value) => {
           onMonthYearChange={handleMonthYearChange}
         />
 
-
-
-
-{/* Tab Navigation */}
-{/* Replace the Tab Navigation section with: */}
-<div className="flex flex-wrap gap-2 justify-center w-full">
-  {Object.keys(tabConfigs).map(tab => {
-    const isLocked = !canTrackSymptom(tab);
-    return (
-      <button
-        key={tab}
-        onClick={() => !isLocked && setSelectedTab(tab)}
-        className={`text-sm md:text-base px-4 py-2 rounded-full font-semibold transition-all relative ${
-          isLocked
-            ? 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
-            : selectedTab === tab
-            ? 'bg-[#F98679] text-white shadow-lg scale-105'
-            : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
-        }`}
-        disabled={isLocked}
-      >
-        {tab}
-        {isLocked && (
-          <div className="absolute -top-1 -right-1 bg-gray-500 rounded-full p-1">
-            <Lock size={12} className="text-white" />
-          </div>
-        )}
-        {!isLocked && ((Array.isArray(selectedValues[tab]) && selectedValues[tab].length > 0) ||
-          (!Array.isArray(selectedValues[tab]) && selectedValues[tab])) && (
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#3BA4A0] rounded-full"></div>
-        )}
-      </button>
-    );
-  })}
-</div>
-
-
-
-
-        {/* Selection counter */}
-        {selectedSymptoms.size > 0 && (
-          <div className="bg-[#C2EDEA] border border-[#3BA4A0] px-4 py-2 rounded-full">
-            <span className="text-sm text-[#3BA4A0] font-medium">
-              {selectedSymptoms.size} symptom{selectedSymptoms.size > 1 ? 's' : ''} selected
-            </span>
-          </div>
-        )}
-
-
-
-
+        {/* Tab Navigation with Tier Restrictions */}
+        <div className="flex flex-wrap gap-2 justify-center w-full">
+          {Object.keys(tabConfigs).map(tab => {
+            const isLocked = !canTrackCategory(tab);
+            return (
+              <button
+                key={tab}
+                onClick={() => !isLocked && setSelectedTab(tab)}
+                className={`text-sm md:text-base px-4 py-2 rounded-full font-semibold transition-all relative ${
+                  isLocked
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
+                    : selectedTab === tab
+                    ? 'bg-[#F98679] text-white shadow-lg scale-105'
+                    : 'bg-[#FFD8C9] text-[#B65C4B] hover:bg-[#F8C8B6]'
+                }`}
+                disabled={isLocked}
+              >
+                {tab}
+                {isLocked && (
+                  <div className="absolute -top-1 -right-1 bg-gray-500 rounded-full p-1">
+                    <Lock size={12} className="text-white" />
+                  </div>
+                )}
+                {!isLocked && ((tab === 'Symptoms' || tab === 'Cravings') ? selectedValues[tab].length > 0 : selectedValues[tab]) && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#3BA4A0] rounded-full"></div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        
         {/* Content Area */}
         {renderContent()}
 
-
-
-
         {/* Save Button */}
-        <div className="flex gap-4 w-full justify-center">
-          {selectedTab === 'Weight' || selectedTab === 'Custom' ? (
+        <button
+          onClick={handleSave}
+          className="bg-[#3BA4A0] hover:bg-[#2E8B87] text-white text-lg md:text-xl px-8 py-3 rounded-full transition-all shadow-lg active:scale-95 font-semibold"
+        >
+          {((selectedTab === 'Symptoms' || selectedTab === 'Energy') ? selectedValues[selectedTab].length > 0 : selectedValues[selectedTab]) ? 'Update' : 'Save'} {selectedTab}
+        </button>
+      </div>
+
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-xl p-6 shadow-2xl text-center max-w-sm w-full">
+            <h2 className={`text-xl font-bold ${modalContent.isError ? 'text-red-600' : 'text-[#3BA4A0]'}`}>
+              {modalContent.title}
+            </h2>
+            <p className="text-[#555] mb-4 mt-2">{modalContent.message}</p>
             <button
-              onClick={handleSave}
- className="bg-[#3BA4A0] hover:bg-[#2E8B87] text-white text-lg md:text-xl px-8 py-3 rounded-full transition-all shadow-lg active:scale-95 font-semibold"            >
-              {selectedValues[selectedTab] ? 'Update' : 'Save'} {selectedTab}
-            </button>
-          ) : (
-            <button
-              onClick={handleMultiSave}
-              disabled={selectedSymptoms.size === 0}
-              className={`flex items-center gap-2 text-lg md:text-xl px-8 py-3 rounded-full transition-all shadow-lg active:scale-95 font-semibold ${
-  selectedSymptoms.size === 0
-    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-    : 'bg-teal-600 hover:bg-teal-600 text-white'
-}`}
+              onClick={() => setShowModal(false)}
+              className={`${modalContent.isError ? 'bg-red-500 hover:bg-red-600' : 'bg-[#F98679] hover:bg-[#d87364]'} text-white font-semibold px-6 py-2 rounded-full transition`}
             >
-              <Save size={20} />
-              {selectedSymptoms.size === 0
-                ? 'Select symptoms to save'
-                : `Save ${selectedSymptoms.size} Symptom${selectedSymptoms.size > 1 ? 's' : ''}`
-              }
+              {modalContent.isError ? 'Close' : 'Got it'}
             </button>
-          )}
-        </div>
-
-
-
-
-        {/* Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 px-4">
-            <div className="bg-white rounded-xl p-6 shadow-2xl text-center max-w-sm w-full">
-              <h2 className={`text-xl font-bold ${modalContent.isError ? 'text-red-600' : 'text-[#3BA4A0]'}`}>
-                {modalContent.title}
-              </h2>
-              <p className="text-[#555] mb-4 mt-2">{modalContent.message}</p>
-              <button
-                onClick={() => setShowModal(false)}
-                className={`${modalContent.isError ? 'bg-red-500 hover:bg-red-600' : 'bg-[#F98679] hover:bg-[#d87364]'} text-white font-semibold px-6 py-2 rounded-full transition`}
-              >
-                {modalContent.isError ? 'Close' : 'Got it'}
-              </button>
-            </div>
           </div>
-        )}
+        </div>
+      )}
 
 
-
-
-        {/* Download and Share Buttons */}
-        <div className="w-full flex justify-end">
-         <div className="bg-[#FFE0D3] rounded-2xl px-6 py-4 flex flex-row gap-10 shadow-sm items-center">
+      {/* Download and Share Buttons */}
+      <div className="w-full flex justify-end">
+        <div className="bg-[#FFE0D3] rounded-2xl px-6 py-4 flex flex-row gap-10 shadow-sm items-center">
           <button
             onClick={handleDownload}
             className="flex flex-col items-center text-[#F98679] hover:text-[#B65C4B] transition text-sm focus:outline-none"
@@ -951,11 +771,8 @@ const handleSymptomToggle = (category, value) => {
         </div>
       </div>
     </div>
-     </div>  
   );
 };
-
-
 
 export default PeriodTracker;
 
