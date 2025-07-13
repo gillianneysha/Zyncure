@@ -197,9 +197,7 @@ const canCancel = (appointment) => {
                             <span className="font-semibold text-gray-800 text-lg">
                               {doctor?.name || "Unknown Doctor"}
                             </span>
-                            <span className="text-sm text-gray-500">
-                              {doctor?.specialty || "General Practice"}
-                            </span>
+
                           </div>
                           <div className="flex flex-col flex-1">
                             <span className="text-sm text-gray-500 line-clamp-1">

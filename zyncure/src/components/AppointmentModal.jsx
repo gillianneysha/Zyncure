@@ -291,10 +291,10 @@ const AppointmentModal = ({
               className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-lg"
               disabled={isLoading}
             >
-              <option value="">Choose a doctor...</option>
+              <option value="">Choose a doctor</option>
               {doctors.map(doctor => (
                 <option key={doctor.id} value={doctor.id}>
-                  {doctor.name} - {doctor.specialty}
+                  {doctor.name} 
                 </option>
               ))}
             </select>
