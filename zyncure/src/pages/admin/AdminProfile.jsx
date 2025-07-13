@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { LogOut } from "lucide-react";
 import LogoutModal from "../../components/LogoutModal.jsx";
-import { PersonalInfoForm, SecurityPage, PoliciesPage, DeleteAccountPage } from "../../components/IndividualPage.jsx";
+import { AdminPersonalInfoForm } from "./AdminPersonalInfoForm.jsx"; // Import the new component
+import { SecurityPage, PoliciesPage, DeleteAccountPage } from "../../components/IndividualPage.jsx";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../client.js";
 
@@ -21,7 +22,7 @@ export default function AdminProfilePage() {
   const handleLogoutCancel = () => setShowLogoutModal(false);
 
   const tabs = [
-    { id: "My Profile", component: <PersonalInfoForm /> },
+    { id: "My Profile", component: <AdminPersonalInfoForm /> }, // Use the new admin component
     { id: "Security", component: <SecurityPage /> },
     { id: "Policies and Standards", component: <PoliciesPage /> },
     { id: "Delete Account", component: <DeleteAccountPage /> }
@@ -34,11 +35,10 @@ export default function AdminProfilePage() {
         {tabs.map((tab) => (
           <div
             key={tab.id}
-            className={`p-4 rounded-3xl cursor-pointer transition-colors ${
-              activeTab === tab.id
-                ? "bg-profileBg text-profileText font-bold"
-                : "bg-profileBg hover:bg-rose-200 text-profileText"
-            }`}
+            className={`p-4 rounded-3xl cursor-pointer transition-colors ${activeTab === tab.id
+              ? "bg-profileBg text-profileText font-bold"
+              : "bg-profileBg hover:bg-rose-200 text-profileText"
+              }`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.id}
