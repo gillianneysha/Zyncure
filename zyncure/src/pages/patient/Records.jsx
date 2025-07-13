@@ -1,17 +1,6 @@
 import {
-  SquarePlus,
-  FolderPlus,
-  FilePlus,
-  LayoutGrid,
-  Rows3,
-  MoreVertical,
-  FileText,
-  Share,
-  Cross,
-  ChevronDown,
-  ArrowLeft,
-  Edit,
-  Trash2,
+  SquarePlus, FolderPlus, FilePlus, LayoutGrid, Rows3, MoreVertical,
+  FileText, Share, Cross, ChevronDown, ArrowLeft, Edit, Trash2,
   X,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
@@ -42,8 +31,6 @@ const ALL_FILTERS = [
   { label: "Shared with Others", value: "shared_with_others" },
 ];
 
-
-
 // --- Helper hooks & functions ---
 function useMaxFileNameLength() {
   const [width, setWidth] = useState(
@@ -71,11 +58,6 @@ function truncateFileName(fileName, maxLength = 25) {
   if (keep <= 0) return "..." + fileName.slice(lastDot);
   return fileName.slice(0, keep) + "..." + "." + extension;
 }
-
-// function getFileExtension(name) {
-//   if (!name) return "";
-//   return name.split(".").pop().toLowerCase();
-// }
 
 function fileMatchesHistoryFilter(file, historyFilter) {
   if (!historyFilter || !file.created_at) return true;
@@ -108,37 +90,52 @@ function fileMatchesHistoryFilter(file, historyFilter) {
   }
 }
 
-// --- Get doctor IDs for "shared_with_others" ---
-function useDoctorIds() {
-  const [doctorIds, setDoctorIds] = useState([]);
-  useEffect(() => {
-    async function fetchDoctorIds() {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("role", "doctor");
-      if (!error && data) setDoctorIds(data.map((d) => d.id));
-    }
-    fetchDoctorIds();
-  }, []);
-  return doctorIds;
-}
-
-// --- FILTER for ALL ---
+// --- FILTER for ALL (for files) ---
 function fileMatchesAllFilter(file, allFilter, currentUserId) {
   if (!allFilter || allFilter === "all") return true;
   switch (allFilter) {
     case "mine":
       return file.owner_id === currentUserId;
     case "shared_with_me":
-      return (
-        file.shared_with_ids && file.shared_with_ids.includes(currentUserId)
-      );
+      return Array.isArray(file.shared_with_ids) && file.shared_with_ids.includes(currentUserId);
     case "shared_with_others":
       return (
         file.owner_id === currentUserId &&
-        file.shared_with_ids &&
-        file.shared_with_ids.length > 0
+        Array.isArray(file.shared_with_ids) &&
+        file.shared_with_ids.length > 0 &&
+        file.shared_with_ids.some(uid => uid && uid !== currentUserId)
+      );
+    default:
+      return true;
+  }
+}
+
+// --- FILTER for ALL (for folders) ---
+function folderMatchesAllFilter(folder, allFilter, currentUserId, files) {
+  if (!folder || !allFilter || allFilter === "all") return true;
+  switch (allFilter) {
+    case "mine":
+      return folder.owner_id === currentUserId;
+    case "shared_with_others":
+      return (
+        folder.owner_id === currentUserId &&
+        files.some(
+          file =>
+            file.folder_id === folder.id &&
+            file.owner_id === currentUserId &&
+            Array.isArray(file.shared_with_ids) &&
+            file.shared_with_ids.length > 0 &&
+            file.shared_with_ids.some(uid => uid && uid !== currentUserId)
+        )
+      );
+    case "shared_with_me":
+      return (
+        files.some(
+          file =>
+            file.folder_id === folder.id &&
+            Array.isArray(file.shared_with_ids) &&
+            file.shared_with_ids.includes(currentUserId)
+        )
       );
     default:
       return true;
@@ -264,6 +261,7 @@ function FileCard({
     created_at: createdAt,
     id,
     file_path: filePath,
+    consultation_notes = [],
   } = file;
 
   const ext = name.split(".").pop().toLowerCase();
@@ -284,6 +282,9 @@ function FileCard({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [dropdown]);
+
+  // --- hide consultation notes for doctor-note PDFs
+  const hideNotes = name && name.startsWith('doctor-note-');
 
   return (
     <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden">
@@ -374,10 +375,23 @@ function FileCard({
       </div>
       <div className="p-2 text-white">
         <div className="flex justify-between items-center mt-1">
-          {/*<div className="text-xs">Type: Medical</div>*/}
           <div className="text-xs">Date: {formattedDate}</div>
         </div>
       </div>
+      {/* --- Hide notes for doctor-note- PDFs --- */}
+      {consultation_notes.length > 0 && !hideNotes && (
+        <div className="bg-white p-2 mt-1 rounded">
+          <div className="font-semibold text-[#55A1A4] mb-1">Consultation Notes:</div>
+          {consultation_notes.map((note, idx) => (
+            <div key={note.id || idx} className="mb-2">
+              <div className="text-xs text-gray-500">
+                By {note.doctor_id} on {new Date(note.created_at).toLocaleString()}
+              </div>
+              <div className="text-sm">{note.note}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -399,6 +413,7 @@ function FileListItem({
     created_at: createdAt,
     id,
     file_path: filePath,
+    consultation_notes = [],
   } = file;
 
   const ext = name.split(".").pop().toLowerCase();
@@ -419,6 +434,9 @@ function FileListItem({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [dropdown]);
+
+  // --- hide consultation notes for doctor-note PDFs
+  const hideNotes = name && name.startsWith('doctor-note-');
 
   return (
     <div className="bg-[#55A1A4] rounded-lg shadow-md">
@@ -510,22 +528,91 @@ function FileListItem({
           </div>
           <div className="text-white">
             <div className="flex justify-between items-center mt-1">
-              {/*<div className="text-xs">Type: Medical</div>*/}
               <div className="text-xs">Date: {formattedDate}</div>
             </div>
           </div>
         </div>
       </div>
+      {/* --- Hide notes for doctor-note- PDFs --- */}
+      {consultation_notes.length > 0 && !hideNotes && (
+        <div className="bg-white p-2 mt-1 rounded">
+          <div className="font-semibold text-[#55A1A4] mb-1">Consultation Notes:</div>
+          {consultation_notes.map((note, idx) => (
+            <div key={note.id || idx} className="mb-2">
+              <div className="text-xs text-gray-500">
+                By {note.doctor_id} on {new Date(note.created_at).toLocaleString()}
+              </div>
+              <div className="text-sm">{note.note}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+// --- Fetch consultation notes for all files ---
+async function fetchConsultationNotes(fileIds) {
+  if (!fileIds.length) return {};
+  const { data, error } = await supabase
+    .from('consultation_notes')
+    .select('*')
+    .in('file_id', fileIds);
+  if (error) {
+    console.error('Error fetching notes:', error);
+    return {};
+  }
+  return (data || []).reduce((acc, note) => {
+    (acc[note.file_id] = acc[note.file_id] || []).push(note);
+    return acc;
+  }, {});
 }
 
 // --- Main Records Component ---
 export default function Records({ currentUserId: propUserId }) {
   const [currentUserId, setCurrentUserId] = useState(propUserId || null);
-  const doctorIds = useDoctorIds();
-
-   const [storageInfo, setStorageInfo] = useState(null);
+  const [storageInfo, setStorageInfo] = useState(null);
+  const fileInputRef = useRef(null);
+  const folderFileInputRef = useRef(null);
+  const [fileName, setFileName] = useState("");
+  const [viewMode, setViewMode] = useState("grid");
+  const [folders, setFolders] = useState([]);
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const [activeFolderId, setActiveFolderId] = useState(null);
+  const [folderUploadTarget, setFolderUploadTarget] = useState(null);
+  const [folderHeaderDropdown, setFolderHeaderDropdown] = useState(false);
+  const folderHeaderDropdownRef = useRef(null);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [fileTypeFilter, setFileTypeFilter] = useState(null);
+  const [historyFilter, setHistoryFilter] = useState(null);
+  const [allFilter, setAllFilter] = useState("all");
+  const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
+  const typeDropdownRef = useRef(null);
+  const historyDropdownRef = useRef(null);
+  const allDropdownRef = useRef(null);
+  const [shareModal, setShareModal] = useState({ open: false, file: null });
+  const [renameModal, setRenameModal] = useState({
+    open: false,
+    type: null,
+    id: null,
+    currentName: "",
+  });
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    type: null,
+    id: null,
+    name: "",
+    filePath: null,
+  });
+  const [successModal, setSuccessModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+  });
+  const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
 
   useEffect(() => {
     if (!propUserId) {
@@ -542,46 +629,12 @@ export default function Records({ currentUserId: propUserId }) {
     }
   }, [currentUserId]);
 
-  const fetchStorageInfo = async () => {
-    const { data, error } = await supabase
-      .from('user_tier_status')
-      .select('current_tier, storage_limit_mb, storage_used_mb, can_upload_files')
-      .eq('user_id', currentUserId)
-      .single();
-    
-    if (!error && data) {
-      setStorageInfo(data);
-    }
-  };
+  useEffect(() => {
+    fetchFolders();
+    fetchFiles();
+    // eslint-disable-next-line
+  }, [currentUserId]);
 
-  const fileInputRef = useRef(null);
-  const folderFileInputRef = useRef(null);
-  const [fileName, setFileName] = useState("");
-  const [viewMode, setViewMode] = useState("grid");
-  const [folders, setFolders] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  const [activeFolderId, setActiveFolderId] = useState(null);
-  const [folderUploadTarget, setFolderUploadTarget] = useState(null);
-
-  const [previewFile, setPreviewFile] = useState(null);
-
-  // Filters
-  const [fileTypeFilter, setFileTypeFilter] = useState(null);
-  const [historyFilter, setHistoryFilter] = useState(null);
-  const [allFilter, setAllFilter] = useState("all");
-
-  // Single filter dropdown state
-  const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
-
-  // Filter dropdown refs
-  const typeDropdownRef = useRef(null);
-  const historyDropdownRef = useRef(null);
-  const allDropdownRef = useRef(null);
-
-  // Close filter dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -600,38 +653,30 @@ export default function Records({ currentUserId: propUserId }) {
     };
   }, [openFilterDropdown]);
 
-  // Share modal state
-  const [shareModal, setShareModal] = useState({ open: false, file: null });
-
-  // --- Modal state ---
-  const [renameModal, setRenameModal] = useState({
-    open: false,
-    type: null, // 'file' or 'folder'
-    id: null,
-    currentName: "",
-  });
-  const [deleteModal, setDeleteModal] = useState({
-    open: false,
-    type: null,
-    id: null,
-    name: "",
-    filePath: null,
-  });
-  const [setSuccessModal] = useState({
-    open: false,
-    title: "",
-    message: "",
-  });
-
-  // --- Create Folder Modal state ---
-  const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
-
-  // --- Data fetching ---
   useEffect(() => {
-    fetchFolders();
-    fetchFiles();
-    // eslint-disable-next-line
-  }, [currentUserId]);
+    function handleClickOutside(event) {
+      if (folderHeaderDropdownRef.current && !folderHeaderDropdownRef.current.contains(event.target)) {
+        setFolderHeaderDropdown(false);
+      }
+    }
+    if (folderHeaderDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [folderHeaderDropdown]);
+
+  const fetchStorageInfo = async () => {
+    const { data, error } = await supabase
+      .from('user_tier_status')
+      .select('current_tier, storage_limit_mb, storage_used_mb, can_upload_files')
+      .eq('user_id', currentUserId)
+      .single();
+    if (!error && data) {
+      setStorageInfo(data);
+    }
+  };
 
   async function fetchFolders() {
     if (!currentUserId) return;
@@ -647,35 +692,62 @@ export default function Records({ currentUserId: propUserId }) {
   }
 
   async function fetchFiles() {
-    if (!currentUserId) return;
-    setLoading(true);
-    const { data, error } = await supabase
+  if (!currentUserId) return;
+  setLoading(true);
+
+  // 1. Files the patient owns
+  const { data: ownedFiles = [] } = await supabase
+    .from("medical_files")
+    .select("*")
+    .eq("owner_id", currentUserId);
+
+  // 2. Files shared with the patient (doctor notes, etc)
+  const { data: sharedFileShares = [] } = await supabase
+    .from("file_shares")
+    .select("file_id")
+    .eq("shared_with_id", currentUserId)
+    .eq("is_active", true);
+
+  const sharedFileIds = sharedFileShares.map(row => row.file_id);
+
+  let sharedFiles = [];
+  if (sharedFileIds.length > 0) {
+    const { data: filesFromShares = [] } = await supabase
       .from("medical_files")
       .select("*")
-      .or(`owner_id.eq.${currentUserId},shared_with_ids.cs.{${currentUserId}}`)
-      .order("created_at", { ascending: true });
-    if (error) setFiles([]);
-    else setFiles(data || []);
-
-     await fetchStorageInfo();
-    setLoading(false);
+      .in("id", sharedFileIds);
+    sharedFiles = filesFromShares;
   }
+
+  // Merge/deduplicate
+  const allFiles = [...ownedFiles, ...sharedFiles];
+  const dedupedFiles = allFiles.filter(
+    (file, idx, arr) => arr.findIndex(f => f.id === file.id) === idx
+  );
+
+  // Attach consultation notes
+  const fileIds = dedupedFiles.map(f => f.id).filter(Boolean);
+  const notesByFileId = await fetchConsultationNotes(fileIds);
+  const filesWithNotes = dedupedFiles.map(file => ({
+    ...file,
+    consultation_notes: notesByFileId[file.id] || [],
+  }));
+
+  setFiles(filesWithNotes);
+  setLoading(false);
+}
 
   const checkTierLimits = async (newFileSize) => {
     try {
-      // Get user's current tier status
       const { data: tierStatus, error } = await supabase
         .from("user_tier_status")
         .select("*")
         .eq("user_id", currentUserId)
         .single();
-
       if (error) {
         console.error("Error fetching tier status:", error);
         return { allowed: false, message: "Unable to verify storage limits." };
       }
-
-      // Check if user can upload files at all
       if (!tierStatus.can_upload_files) {
         return {
           allowed: false,
@@ -686,11 +758,8 @@ export default function Records({ currentUserId: propUserId }) {
           }MB limit. Please upgrade your plan or delete some files.`,
         };
       }
-
-      // Check if this specific file would exceed the limit
       const newFileSizeMB = newFileSize / (1024 * 1024);
       const totalAfterUpload = tierStatus.storage_used_mb + newFileSizeMB;
-
       if (
         tierStatus.storage_limit_mb !== -1 &&
         totalAfterUpload > tierStatus.storage_limit_mb
@@ -706,7 +775,6 @@ export default function Records({ currentUserId: propUserId }) {
           )}MB. Please upgrade your plan or delete some files.`,
         };
       }
-
       return { allowed: true };
     } catch (error) {
       console.error("Error checking tier limits:", error);
@@ -714,7 +782,6 @@ export default function Records({ currentUserId: propUserId }) {
     }
   };
 
-  // --- File/folder CRUD handlers ---
   const handleFileChange = async (e, folder_id = null) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -722,14 +789,12 @@ export default function Records({ currentUserId: propUserId }) {
       alert("User not authenticated");
       return;
     }
-
     const canUpload = await checkTierLimits(file.size);
     if (!canUpload.allowed) {
       alert(canUpload.message);
       e.target.value = "";
       return;
     }
-
     setFileName(file.name);
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("medical-files")
@@ -772,7 +837,6 @@ export default function Records({ currentUserId: propUserId }) {
 
   const handleDropdownToggle = () => setDropdownOpen((v) => !v);
 
-  // --- Modal-based Rename/Delete handlers ---
   const handleRenameFile = (fileId, currentName) => {
     setRenameModal({ open: true, type: "file", id: fileId, currentName });
   };
@@ -808,8 +872,6 @@ export default function Records({ currentUserId: propUserId }) {
 
   const doRename = async (newName) => {
     if (!renameModal.open) return;
-
-    // ---------- FILE RENAME ----------
     if (renameModal.type === "file") {
       const file = files.find((f) => f.id === renameModal.id);
       if (!file || file.owner_id !== currentUserId) {
@@ -821,8 +883,6 @@ export default function Records({ currentUserId: propUserId }) {
         });
         return;
       }
-
-      // Prevent extension rename
       const oldExt = getFileExtension(file.name);
       const newExt = getFileExtension(newName);
       if (oldExt !== newExt) {
@@ -834,7 +894,6 @@ export default function Records({ currentUserId: propUserId }) {
         });
         return;
       }
-
       const { error } = await supabase
         .from("medical_files")
         .update({ name: newName })
@@ -854,10 +913,7 @@ export default function Records({ currentUserId: propUserId }) {
           message: `Renamed "${renameModal.currentName}" to "${newName}".`,
         });
       }
-    }
-
-    // ---------- FOLDER RENAME ----------
-    else if (renameModal.type === "folder") {
+    } else if (renameModal.type === "folder") {
       const folder = folders.find((f) => f.id === renameModal.id);
       if (!folder || folder.owner_id !== currentUserId) {
         setRenameModal({ open: false, type: null, id: null, currentName: "" });
@@ -888,130 +944,119 @@ export default function Records({ currentUserId: propUserId }) {
         });
       }
     }
-
     setRenameModal({ open: false, type: null, id: null, currentName: "" });
   };
 
   const doDelete = async () => {
     if (!deleteModal.open) return;
-    if (deleteModal.type === "file") {
-      const file = files.find((f) => f.id === deleteModal.id);
-      if (!file || file.owner_id !== currentUserId) {
-        setDeleteModal({
-          open: false,
-          type: null,
-          id: null,
-          name: "",
-          filePath: null,
-        });
-        setSuccessModal({
-          open: true,
-          title: "Delete Failed",
-          message: "You can only delete files you own.",
-        });
-        return;
-      }
-      if (deleteModal.filePath) {
-        await supabase.storage
-          .from("medical-files")
-          .remove([deleteModal.filePath]);
-      }
-      const { error: dbError } = await supabase
-        .from("medical_files")
-        .delete()
-        .eq("id", deleteModal.id)
-        .eq("owner_id", currentUserId);
-      if (dbError) {
-        setSuccessModal({
-          open: true,
-          title: "Delete Failed",
-          message: dbError.message,
-        });
-      } else {
-        await fetchFiles();
-        await fetchStorageInfo(); 
-        setSuccessModal({
-          open: true,
-          title: "Deleted!",
-          message: `Deleted "${deleteModal.name}".`,
-        });
-      }
-      setPreviewFile((pf) => (pf && pf.id === deleteModal.id ? null : pf));
-    } else if (deleteModal.type === "folder") {
-      const folder = folders.find((f) => f.id === deleteModal.id);
-      if (!folder || folder.owner_id !== currentUserId) {
-        setDeleteModal({
-          open: false,
-          type: null,
-          id: null,
-          name: "",
-          filePath: null,
-        });
-        setSuccessModal({
-          open: true,
-          title: "Delete Failed",
-          message: "You can only delete folders you own.",
-        });
-        return;
-      }
-      const filesInFolder = files.filter(
-        (file) =>
-          file.folder_id === deleteModal.id && file.owner_id === currentUserId
-      );
-      for (const file of filesInFolder) {
-        await supabase.storage.from("medical-files").remove([file.file_path]);
-        await supabase
+    try {
+      if (deleteModal.type === "file") {
+        const file = files.find((f) => f.id === deleteModal.id);
+        if (!file || file.owner_id !== currentUserId) {
+          setSuccessModal({
+            open: true,
+            title: "Delete Failed",
+            message: "You can only delete files you own.",
+          });
+          return;
+        }
+        if (deleteModal.filePath) {
+          await supabase.storage.from("medical-files").remove([deleteModal.filePath]);
+        }
+        const { error: dbError } = await supabase
           .from("medical_files")
           .delete()
-          .eq("id", file.id)
+          .eq("id", deleteModal.id)
           .eq("owner_id", currentUserId);
+        if (dbError) {
+          setSuccessModal({
+            open: true,
+            title: "Delete Failed",
+            message: dbError.message,
+          });
+        } else {
+          await fetchFiles();
+          await fetchStorageInfo();
+          setSuccessModal({
+            open: true,
+            title: "Deleted!",
+            message: `Deleted "${deleteModal.name}".`,
+          });
+        }
+        setPreviewFile((pf) => (pf && pf.id === deleteModal.id ? null : pf));
+      } else if (deleteModal.type === "folder") {
+        const folder = folders.find((f) => f.id === deleteModal.id);
+        if (!folder || folder.owner_id !== currentUserId) {
+          setSuccessModal({
+            open: true,
+            title: "Delete Failed",
+            message: "You can only delete folders you own.",
+          });
+          return;
+        }
+        const filesInFolder = files.filter(
+          (file) => file.folder_id === deleteModal.id && file.owner_id === currentUserId
+        );
+        for (const file of filesInFolder) {
+          await supabase.storage.from("medical-files").remove([file.file_path]);
+          await supabase
+            .from("medical_files")
+            .delete()
+            .eq("id", file.id)
+            .eq("owner_id", currentUserId);
+        }
+        const { error } = await supabase
+          .from("folders")
+          .delete()
+          .eq("id", deleteModal.id)
+          .eq("owner_id", currentUserId);
+        if (error) {
+          setSuccessModal({
+            open: true,
+            title: "Delete Failed",
+            message: error.message,
+          });
+        } else {
+          await fetchFolders();
+          await fetchFiles();
+          setActiveFolderId((af) => (af === deleteModal.id ? null : af));
+          setSuccessModal({
+            open: true,
+            title: "Deleted!",
+            message: `Deleted folder "${deleteModal.name}".`,
+          });
+        }
       }
-      const { error } = await supabase
-        .from("folders")
-        .delete()
-        .eq("id", deleteModal.id)
-        .eq("owner_id", currentUserId);
-      if (error) {
-        setSuccessModal({
-          open: true,
-          title: "Delete Failed",
-          message: error.message,
-        });
-      } else {
-        await fetchFolders();
-        await fetchFiles();
-        setActiveFolderId((af) => (af === deleteModal.id ? null : af));
-        setSuccessModal({
-          open: true,
-          title: "Deleted!",
-          message: `Deleted folder "${deleteModal.name}".`,
-        });
-      }
+    } finally {
+      setDeleteModal({ open: false, type: null, id: null, name: "", filePath: null });
     }
-    setDeleteModal({
-      open: false,
-      type: null,
-      id: null,
-      name: "",
-      filePath: null,
-    });
   };
 
-  // --- Share handler for both files and folders ---
   function handleShare({ id, name, type }) {
     setShareModal({ open: true, file: { id, name, type } });
   }
 
-  // --- Render logic ---
-  const displayedFiles = (
-    activeFolderId
-      ? files.filter((file) => file.folder_id === activeFolderId)
-      : files.filter((file) => !file.folder_id)
-  ).filter((file) => {
-    const canSeeFile =
-      file.owner_id === currentUserId ||
-      (file.shared_with_ids && file.shared_with_ids.includes(currentUserId));
-    if (!canSeeFile) return false;
+  // --- Folders only show those owned by current user
+  const displayedFolders = folders.filter(folder =>
+    folderMatchesAllFilter(folder, allFilter, currentUserId, files)
+  );
+
+  // --- Files: Only show files in selected folder if folder is owned by current user.
+  let displayedFiles = [];
+  if (activeFolderId) {
+    const folder = folders.find(f => f.id === activeFolderId);
+    if (folder && folder.owner_id === currentUserId) {
+      displayedFiles = files.filter(
+        (file) => file.folder_id === activeFolderId && file.owner_id === currentUserId
+      );
+    } else {
+      displayedFiles = [];
+    }
+  } else {
+    displayedFiles = files.filter((file) => !file.folder_id);
+  }
+
+  displayedFiles = displayedFiles.filter((file) => {
     if (fileTypeFilter) {
       const ext = getFileExtension(file.name);
       if (fileTypeFilter === "jpg") {
@@ -1021,8 +1066,7 @@ export default function Records({ currentUserId: propUserId }) {
       }
     }
     if (!fileMatchesHistoryFilter(file, historyFilter)) return false;
-    if (!fileMatchesAllFilter(file, allFilter, currentUserId, doctorIds))
-      return false;
+    if (!fileMatchesAllFilter(file, allFilter, currentUserId)) return false;
     return true;
   });
 
@@ -1042,25 +1086,93 @@ export default function Records({ currentUserId: propUserId }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-myHeader text-left flex items-center">
-          {activeFolderId ? (
-            <>
-              <button
-                title="Back"
-                className="mr-1 text-indigo-400 hover:text-indigo-700"
-                onClick={() => {
-                  setActiveFolderId(null);
-                  setPreviewFile(null);
-                }}
-              >
-                <ArrowLeft size={22} />
-              </button>
-              {activeFolder?.name || "Folder"}
-            </>
+        {activeFolderId ? (
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center">
+                <button
+                  title="Back"
+                  className="mr-2 text-indigo-400 hover:text-indigo-700"
+                  onClick={() => {
+                    setActiveFolderId(null);
+                    setPreviewFile(null);
+                  }}
+                >
+                  <ArrowLeft size={22} />
+                </button>
+                <h1 className="text-3xl font-bold text-myHeader">
+                  {activeFolder?.name || "Folder"}
+                </h1>
+              </div>
+              <div className="relative" ref={folderHeaderDropdownRef}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFolderHeaderDropdown(!folderHeaderDropdown);
+                  }}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+                {folderHeaderDropdown && (
+                  <div className="absolute right-0 top-full w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFolderHeaderDropdown(false);
+                        setFolderUploadTarget(activeFolderId);
+                        setTimeout(() => {
+                          folderFileInputRef.current.click();
+                        }, 0);
+                      }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
+                    >
+                      <FilePlus size={18} className="text-indigo-500" />
+                      Upload File
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFolderHeaderDropdown(false);
+                        handleRenameFolder(activeFolderId, activeFolder?.name || "");
+                      }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
+                    >
+                      <Edit size={18} className="text-blue-500" />
+                      Rename Folder
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFolderHeaderDropdown(false);
+                        handleDeleteFolder(activeFolderId, activeFolder?.name || "");
+                      }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={18} className="text-red-500" />
+                      Delete Folder
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFolderHeaderDropdown(false);
+                        if (activeFolder) {
+                          handleShare({ id: activeFolder.id, name: activeFolder.name, type: "folder" });
+                        }
+                      }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-teal-50 transition-colors"
+                    >
+                      <Share size={18} className="text-teal-500" />
+                      Share Folder
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
-            "Medical Records"
+            <h1 className="text-3xl font-bold text-myHeader text-left">
+              Medical Records
+            </h1>
           )}
-        </h1>
         <div className="relative flex items-center" ref={dropdownRef}>
           <button
             onClick={handleDropdownToggle}
@@ -1135,21 +1247,21 @@ export default function Records({ currentUserId: propUserId }) {
               </div>
 
               {storageInfo && (
-  <div className="inline-flex items-center gap-2 text-xs text-gray-500">
-    <div className="w-12 h-1 bg-gray-200 rounded-full overflow-hidden">
-      <div 
-        className="h-full bg-blue-500 transition-all duration-300"
-        style={{ width: `${storageInfo.storage_limit_mb === -1 ? 0 : Math.min((storageInfo.storage_used_mb / storageInfo.storage_limit_mb) * 100, 100)}%` }}
-      />
-    </div>
-    <span>
-      {(storageInfo.storage_used_mb / 1024).toFixed(1)}GB
-      {storageInfo.storage_limit_mb !== -1 && 
-        ` of ${(storageInfo.storage_limit_mb / 1024).toFixed(1)}GB used`
-      }
-    </span>
-  </div>
-)}
+              <div className="inline-flex items-center gap-2 text-xs text-gray-500">
+                <div className="w-12 h-1 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${storageInfo.storage_limit_mb === -1 ? 0 : Math.min((storageInfo.storage_used_mb / storageInfo.storage_limit_mb) * 100, 100)}%` }}
+                  />
+                </div>
+                <span>
+                  {(storageInfo.storage_used_mb / 1024).toFixed(1)}GB
+                  {storageInfo.storage_limit_mb !== -1 && 
+                    ` of ${(storageInfo.storage_limit_mb / 1024).toFixed(1)}GB used`
+                  }
+                </span>
+              </div>
+            )}
 
               {fileName && (
               <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
@@ -1175,11 +1287,7 @@ export default function Records({ currentUserId: propUserId }) {
                     }
                   >
                     <span>
-                      {fileTypeFilter
-                        ? FILE_TYPE_FILTERS.find(
-                            (f) => f.value === fileTypeFilter
-                          )?.label ?? "Type"
-                        : "Type"}
+                      {(FILE_TYPE_FILTERS.find((f) => f.value === fileTypeFilter)?.label) ?? "Type"}
                     </span>
                     <ChevronDown size={15} className="ml-1 text-[#e37859]" />
                   </button>
@@ -1220,10 +1328,7 @@ export default function Records({ currentUserId: propUserId }) {
                     }
                   >
                     <span>
-                      {historyFilter
-                        ? HISTORY_FILTERS.find((f) => f.value === historyFilter)
-                            ?.label ?? "History"
-                        : "History"}
+                      {(HISTORY_FILTERS.find((f) => f.value === historyFilter)?.label) ?? "History"}
                     </span>
                     <ChevronDown size={15} className="ml-1 text-[#e37859]" />
                   </button>
@@ -1264,10 +1369,7 @@ export default function Records({ currentUserId: propUserId }) {
                     }
                   >
                     <span>
-                      {allFilter
-                        ? ALL_FILTERS.find((f) => f.value === allFilter)
-                            ?.label ?? "All"
-                        : "All"}
+                      {(ALL_FILTERS.find((f) => f.value === allFilter)?.label) ?? "All"}
                     </span>
                     <ChevronDown size={15} className="ml-1 text-[#e37859]" />
                   </button>
@@ -1296,7 +1398,7 @@ export default function Records({ currentUserId: propUserId }) {
                     No folders yet.
                   </div>
                 )}
-                {folders.map((folder) => (
+                {displayedFolders.map((folder) => (
                   <FolderCard
                     key={folder.id}
                     name={folder.name}
@@ -1406,6 +1508,20 @@ export default function Records({ currentUserId: propUserId }) {
                 <div className="text-gray-400">No Preview Available</div>
               )}
             </div>
+            {/* --- CONSULTATION NOTES --- */}
+            {previewFile.consultation_notes && previewFile.consultation_notes.length > 0 && (
+              <div className="bg-gray-50 p-3 rounded mb-2 border">
+                <div className="font-semibold text-[#55A1A4] mb-1">Consultation Notes:</div>
+                {previewFile.consultation_notes.map((note, idx) => (
+                  <div key={note.id || idx} className="mb-2">
+                    <div className="text-xs text-gray-500">
+                      {note.doctor_id ? `Doctor: ${note.doctor_id}` : ""} {note.created_at ? `on ${new Date(note.created_at).toLocaleString()}` : ""}
+                    </div>
+                    <div className="text-sm whitespace-pre-line">{note.note}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-4 text-right">
               <a
                 href={previewFile.preview_url}
@@ -1450,6 +1566,7 @@ export default function Records({ currentUserId: propUserId }) {
             filePath: null,
           })
         }
+        onClose={() => setDeleteModal(false)}
       />
 
       {/* --- Create Folder Modal --- */}
@@ -1473,7 +1590,7 @@ export default function Records({ currentUserId: propUserId }) {
         onClose={() => setCreateFolderModalOpen(false)}
       />
 
-      {/* --- Success Modal (optional) ---
+      {/* --- Success Modal --- 
       <SuccessModal
         open={successModal.open}
         title={successModal.title}
