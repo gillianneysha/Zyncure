@@ -9,8 +9,9 @@ const AppointmentList = ({
   emptyStateSubtext = 'Click "Book New Appointment" to schedule one',
   onRescheduleRequest,
   onCancelRequest,
-  onPermanentRemove, // This will be called after successful deletion
-  onRefresh, // Add this prop to refresh the appointments list
+  onPermanentRemove,
+  onRefresh,
+  getAppointmentStatusDetails, // ADD THIS LINE
 }) => {
   const [expandedAppointment, setExpandedAppointment] = useState(null);
   const [isRemoving, setIsRemoving] = useState(null); // Track which appointment is being removed
@@ -63,16 +64,17 @@ const AppointmentList = ({
     );
   };
 
-const canCancel = (appointment) => {
-  // Only allow cancellation for confirmed appointments within 24 hours of creation
-  if (appointment.status !== 'confirmed') return false;
-  
-  const now = new Date();
-  const appointmentCreatedAt = new Date(appointment.created_at);
-  const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
-  
-  return hoursFromCreation <= 24;
-};
+  const canCancel = (appointment) => {
+    // Only allow cancellation for confirmed appointments within 24 hours of creation
+    if (appointment.status !== "confirmed") return false;
+
+    const now = new Date();
+    const appointmentCreatedAt = new Date(appointment.created_at);
+    const hoursFromCreation =
+      (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
+
+    return hoursFromCreation <= 24;
+  };
 
   // Show confirmation modal
   const handleRemoveClick = (appointment) => {
@@ -169,6 +171,7 @@ const canCancel = (appointment) => {
                 (d) => d.id === appointment.doctor_id
               );
               const statusConfig = getStatusConfig(appointment.status);
+              const statusDetails = getAppointmentStatusDetails(appointment);
               const isExpanded = expandedAppointment === appointment.id;
               const needsAction = ["cancelled", "rescheduled"].includes(
                 appointment.status
@@ -250,17 +253,6 @@ const canCancel = (appointment) => {
                       <div className="mt-4 p-4 bg-red-100 border border-red-200 rounded-lg">
                         <div className="flex items-start gap-3">
                           <div className="text-red-600 mt-0.5">
-                            <svg
-                              className="w-5 h-5"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
                           </div>
                           <div className="flex-1">
                             <h4 className="font-medium text-red-800">
@@ -270,9 +262,30 @@ const canCancel = (appointment) => {
                             </h4>
                             <p className="text-sm text-red-700 mt-1">
                               {appointment.status === "cancelled"
-                                ? "This appointment has been cancelled. Would you like to reschedule or remove it from your schedule?"
+                                ? "This appointment has been cancelled. Would you like to reschedule or remove it from your schedule? "
                                 : "This appointment has been rescheduled. Please book a new time slot or remove it from your schedule."}
                             </p>
+
+                            {statusDetails.reason && (
+  <div
+    className={`mt-2 p-2 border rounded ${
+      appointment.status === "cancelled"
+        ? "bg-red-50 border-red-100"
+        : "bg-blue-50 border-blue-100"
+    }`}
+  >
+    <p
+      className={`text-xs ${
+        appointment.status === "cancelled"
+          ? "text-red-600"
+          : "text-blue-600"
+      }`}
+    >
+      <span className="font-medium">Reason: </span>
+      {statusDetails.reason}
+    </p>
+  </div>
+)}
                             <div className="mt-2 flex gap-2">
                               <button
                                 onClick={() =>
@@ -373,6 +386,22 @@ const canCancel = (appointment) => {
                               {appointment.reason}
                             </p>
                           </div>
+
+                          {/* Show cancellation/reschedule reason if available */}
+{statusDetails.reason && (
+  <div className="md:col-span-2">
+    <span className={`font-medium ${
+      appointment.status === 'cancelled' ? 'text-red-700' : 'text-blue-700'
+    }`}>
+      {appointment.status === 'cancelled' ? 'Cancellation' : 'Reschedule'} Reason:
+    </span>
+    <p className={`mt-1 ${
+      appointment.status === 'cancelled' ? 'text-red-600' : 'text-blue-600'
+    }`}>
+      {statusDetails.reason}
+    </p>
+  </div>
+)}
                         </div>
 
                         {/* Action Buttons */}
