@@ -14,6 +14,7 @@ export default function Navbar() {
   const [searchResults, setSearchResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -447,6 +448,7 @@ export default function Navbar() {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowDropdown(false);
+        setIsMobileSearchOpen(false);
       }
     };
 
@@ -459,6 +461,7 @@ export default function Navbar() {
       navigate(path);
       setSearchQuery("");
       setShowDropdown(false);
+      setIsMobileSearchOpen(false);
     } catch (error) {
       console.error("Navigation error:", error);
     }
@@ -475,6 +478,7 @@ export default function Navbar() {
     setSearchQuery("");
     setSearchResults([]);
     setShowDropdown(false);
+    setIsMobileSearchOpen(false);
   };
 
   // Keyboard navigation for search results
@@ -484,109 +488,235 @@ export default function Navbar() {
     }
   };
 
+  const toggleMobileSearch = () => {
+    setIsMobileSearchOpen(!isMobileSearchOpen);
+    if (!isMobileSearchOpen) {
+      // Focus the search input when opening
+      setTimeout(() => {
+        const searchInput = searchRef.current?.querySelector('input');
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 100);
+    }
+  };
+
   const displayName = userData.name;
 
   return (
-    <nav className="h-16 bg-mySidebar shadow-md px-8 py-6 flex items-center justify-between">
-      {/* Enhanced Search bar */}
-      <div className="relative w-full max-w-sm" ref={searchRef}>
-        <form onSubmit={handleSearchSubmit}>
-          <input
-            type="text"
-            placeholder={`Search...`}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full px-4 py-2 pr-20 rounded-2xl bg-white text-gray-800 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200"
-            autoComplete="off"
-          />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
-                aria-label="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-            <Search className="text-mySidebar w-5 h-5" />
-          </div>
-        </form>
+    <>
+      {/* Main navbar */}
+      <nav className="h-16 bg-mySidebar shadow-md px-4 md:px-8 py-6 flex items-center justify-between">
+        {/* Desktop Search bar */}
+        <div className="hidden md:block relative w-full max-w-sm" ref={searchRef}>
+          <form onSubmit={handleSearchSubmit}>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-full px-4 py-2 pr-20 rounded-2xl bg-white text-gray-800 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200"
+              autoComplete="off"
+            />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                  aria-label="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              <Search className="text-mySidebar w-5 h-5" />
+            </div>
+          </form>
 
-        {/* Enhanced Search dropdown */}
-        {showDropdown && (
-          <div
-            ref={dropdownRef}
-            className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
-          >
-            {isLoading ? (
-              <div className="p-4 text-center text-gray-500">
-                <div className="w-4 h-4 border-2 border-t-mySidebar border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                Searching...
-              </div>
-            ) : searchResults.length > 0 ? (
-              <div className="py-2">
-                {searchResults.map((item, index) => (
-                  <button
-                    key={`${item.path}-${index}`}
-                    onClick={() => handleSearchItemClick(item.path)}
-                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors border-l-4 border-transparent hover:border-indigo-400 ${location.pathname === item.path ? 'bg-indigo-50 border-indigo-400' : ''
+          {/* Desktop Search dropdown */}
+          {showDropdown && (
+            <div
+              ref={dropdownRef}
+              className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
+            >
+              {isLoading ? (
+                <div className="p-4 text-center text-gray-500">
+                  <div className="w-4 h-4 border-2 border-t-mySidebar border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                  Searching...
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div className="py-2">
+                  {searchResults.map((item, index) => (
+                    <button
+                      key={`${item.path}-${index}`}
+                      onClick={() => handleSearchItemClick(item.path)}
+                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors border-l-4 border-transparent hover:border-indigo-400 ${
+                        location.pathname === item.path ? 'bg-indigo-50 border-indigo-400' : ''
                       }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-800 flex items-center">
-                          {item.title}
-                          {location.pathname === item.path && (
-                            <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">
-                              Current
-                            </span>
-                          )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-800 flex items-center">
+                            {item.title}
+                            {location.pathname === item.path && (
+                              <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500 mt-1">{item.description}</div>
                         </div>
-                        <div className="text-sm text-gray-500 mt-1">{item.description}</div>
+                        <div className="text-xs text-gray-400 ml-2">
+                          {item.category}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400 ml-2">
-                        {item.category}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  <div className="mb-2">No results found for "{searchQuery}"</div>
+                  <div className="text-xs text-gray-400">
+                    Try searching for features like "profile", "appointments", or "health"
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Mobile search button and user info container */}
+        <div className="flex items-center justify-between w-full md:w-auto">
+          {/* Mobile search button - positioned to avoid sidebar button overlap */}
+          <div className="md:hidden ml-16">
+            <button
+              onClick={toggleMobileSearch}
+              className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+              aria-label="Open search"
+            >
+              <Search className="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          {/* User info section */}
+          <div className="flex items-center space-x-2 md:space-x-3 ml-auto">
+            {/* Desktop user info */}
+            <div className="hidden md:flex flex-col leading-tight text-right">
+              <span className="text-white font-medium">Hi, {displayName}!</span>
+              <span className="text-sm text-white">
+                ID: {userData.id} •
+                <span className="bg-indigo-500 px-1.5 py-0.5 rounded-full ml-1">
+                  {userData.userType}
+                </span>
+              </span>
+            </div>
+
+            {/* Mobile user info - condensed */}
+            <div className="md:hidden flex flex-col leading-tight text-right">
+              <span className="text-white font-medium text-sm">Hi, {displayName}!</span>
+              <div className="flex items-center justify-end space-x-1 text-xs text-white">
+                <span>ID: {userData.id}</span>
+                <span className="bg-indigo-500 px-1 py-0.5 rounded text-xs">
+                  {userData.userType}
+                </span>
+              </div>
+            </div>
+
+            {/* Avatar */}
+            <div className="relative">
+              <img
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  userData.name
+                )}&background=c7d2fe&color=3730a3`}
+                alt="User Avatar"
+                className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-indigo-300 hover:border-indigo-400 transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile search overlay */}
+      {isMobileSearchOpen && (
+        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-50" onClick={clearSearch}>
+          <div className="bg-white p-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="relative" ref={searchRef}>
+              <form onSubmit={handleSearchSubmit}>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="w-full px-4 py-3 pr-20 rounded-2xl bg-white text-gray-800 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200"
+                  autoComplete="off"
+                  autoFocus
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                      aria-label="Clear search"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <Search className="text-mySidebar w-5 h-5" />
+                </div>
+              </form>
+
+              {/* Mobile search results */}
+              {showDropdown && (
+                <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                  {isLoading ? (
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="w-4 h-4 border-2 border-t-mySidebar border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                      Searching...
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <div className="py-2">
+                      {searchResults.map((item, index) => (
+                        <button
+                          key={`mobile-${item.path}-${index}`}
+                          onClick={() => handleSearchItemClick(item.path)}
+                          className={`w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors border-l-4 border-transparent hover:border-indigo-400 ${
+                            location.pathname === item.path ? 'bg-indigo-50 border-indigo-400' : ''
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <div className="font-medium text-gray-800 flex items-center">
+                              {item.title}
+                              {location.pathname === item.path && (
+                                <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">{item.description}</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              {item.category}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="mb-2">No results found for "{searchQuery}"</div>
+                      <div className="text-xs text-gray-400">
+                        Try searching for features like "profile", "appointments", or "health"
                       </div>
                     </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 text-center text-gray-500">
-                <div className="mb-2">No results found for "{searchQuery}"</div>
-                <div className="text-xs text-gray-400">
-                  Try searching for features like "profile", "appointments", or "health"
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* User info section */}
-      <div className="flex items-center space-x-3 ml-6">
-        <div className="flex flex-col leading-tight text-right">
-          <span className="text-white font-medium">Hi, {displayName}!</span>
-          <span className="text-sm text-white">
-            ID: {userData.id} •
-            <span className="bg-indigo-500 px-1.5 py-0.5 rounded-full ml-1">
-              {userData.userType}
-            </span>
-          </span>
         </div>
-        <div className="relative">
-          <img
-            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-              userData.name
-            )}&background=c7d2fe&color=3730a3`}
-            alt="User Avatar"
-            className="w-10 h-10 rounded-full border-2 border-indigo-300 hover:border-indigo-400 transition-colors"
-          />
-        </div>
-      </div>
-    </nav>
+      )}
+    </>
   );
 }
