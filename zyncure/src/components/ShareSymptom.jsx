@@ -1,8 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle, FileText, User, Clock, Trash2, XCircle } from 'lucide-react';
+import { X, CheckCircle, FileText, User, Clock, Trash2, XCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../client';
-
 
 const ShareSymptom = ({ isOpen, onClose }) => {
   const [symptomsDuration, setSymptomsDuration] = useState('');
@@ -12,9 +10,9 @@ const ShareSymptom = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showRevokeModal, setShowRevokeModal] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
   const [activeShares, setActiveShares] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
-
 
   useEffect(() => {
     const fetchUserAndData = async () => {
@@ -42,10 +40,8 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       }
     };
 
-
     fetchUserAndData();
   }, [isOpen]);
-
 
   const fetchConnections = async (userId) => {
     console.log('Fetching connections for user:', userId);
@@ -57,9 +53,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         .eq('status', 'accepted')
         .eq('patient_id', userId);
 
-
       console.log('Connections query result:', { data, error });
-
 
       if (error) {
         console.error('Error fetching connections:', error.message);
@@ -74,12 +68,10 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     }
   };
 
-
   const fetchActiveShares = async (userId) => {
     try {
       console.log('Fetching active shares for user:', userId);
      
-      // First, let's try a simpler query to see if the table exists
       const { data, error } = await supabase
         .from('shared_symptoms')
         .select('*')
@@ -87,29 +79,22 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
 
-
       console.log('Active shares query result:', { data, error });
-
 
       if (error) {
         console.error('Error fetching active shares:', error);
-        // Don't set activeShares if there's an error, keep it empty
         return;
       }
 
-
-      // If we have data, try to enrich it with doctor info
       if (data && data.length > 0) {
         const enrichedShares = await Promise.all(
           data.map(async (share) => {
             try {
-              // Try to get doctor info from the connections table
               const { data: doctorData, error: doctorError } = await supabase
                 .from('patient_connection_details')
                 .select('doctor_first_name, doctor_last_name, doctor_email')
                 .eq('med_id', share.shared_with)
                 .single();
-
 
               if (!doctorError && doctorData) {
                 return {
@@ -138,13 +123,10 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     }
   };
 
-
   const fetchSymptomData = async (userId, duration) => {
     const endDate = new Date();
     const startDate = new Date();
 
-
-    // Calculate start date based on selected duration
     switch (duration) {
       case '1 week':
         startDate.setDate(startDate.getDate() - 7);
@@ -162,10 +144,8 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         startDate.setMonth(startDate.getMonth() - 1);
     }
 
-
     console.log('Fetching symptomlog data for user:', userId);
     console.log('Date range:', startDate.toISOString(), 'to', endDate.toISOString());
-
 
     const { data, error } = await supabase
       .from('symptomlog')
@@ -175,17 +155,13 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       .lte('date_logged', endDate.toISOString())
       .order('date_logged', { ascending: false });
 
-
     if (error) {
       console.error('Error fetching symptomlog data:', error.message);
       return [];
     }
 
-
     console.log('Fetched symptomlog data:', data);
 
-
-    // Transform data to match the structure expected by generatePDF
     const transformedData = (data || []).map(entry => ({
       date_logged: entry.date_logged,
       symptoms: entry.symptoms,
@@ -193,10 +169,8 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       ...entry
     }));
 
-
     return transformedData;
   };
-
 
   const fetchUserInfo = async (userId) => {
     const { data, error } = await supabase
@@ -204,7 +178,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       .select('first_name, last_name, email, birthdate')
       .eq('patient_id', userId)
       .single();
-
 
     if (error) {
       console.error('Error fetching user info:', error.message);
@@ -215,7 +188,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       };
     }
 
-
     return {
       name: data.first_name && data.last_name ? `${data.first_name} ${data.last_name}` : 'Patient',
       email: data.email || '',
@@ -223,12 +195,10 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     };
   };
 
-
   const handleRevokeShare = async (shareId) => {
     try {
       setLoading(true);
      
-      // Set expires_at to current time to effectively revoke the share
       const { error } = await supabase
         .from('shared_symptoms')
         .update({
@@ -238,11 +208,8 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         .eq('id', shareId)
         .eq('shared_by', currentUserId);
 
-
       if (error) throw error;
 
-
-      // Refresh active shares
       await fetchActiveShares(currentUserId);
       setShowRevokeModal(true);
     } catch (error) {
@@ -253,20 +220,16 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     }
   };
 
-
   const formatExpirationDate = (dateString) => {
     if (!dateString) return "No expiration";
     const date = new Date(dateString);
     const now = new Date();
 
-
     if (date < now) return "Expired";
-
 
     const diffMs = date - now;
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
-
 
     if (diffDays > 0) {
       return `Expires in ${diffDays} day${diffDays > 1 ? "s" : ""}`;
@@ -277,9 +240,7 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     }
   };
 
-
   const formatDoctorName = (share) => {
-    // Check if we have doctor info from the enriched data
     if (share.shared_with_doctor?.first_name && share.shared_with_doctor?.last_name) {
       return `${share.shared_with_doctor.first_name} ${share.shared_with_doctor.last_name}`;
     }
@@ -287,7 +248,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       return share.shared_with_doctor.email;
     }
    
-    // Fallback: try to find doctor info from connections
     const connection = connections.find(conn => conn.med_id === share.shared_with);
     if (connection?.doctor_first_name && connection?.doctor_last_name) {
       return `${connection.doctor_first_name} ${connection.doctor_last_name}`;
@@ -296,8 +256,29 @@ const ShareSymptom = ({ isOpen, onClose }) => {
     return 'Unknown Doctor';
   };
 
+  const getValidationMessage = () => {
+    const missingFields = [];
+    
+    if (!symptomsDuration) missingFields.push('symptom duration');
+    if (!selectedConnection) missingFields.push('doctor selection');
+    if (!accessDuration) missingFields.push('access duration');
+    
+    if (missingFields.length === 1) {
+      return `Please select a ${missingFields[0]} to continue.`;
+    } else if (missingFields.length === 2) {
+      return `Please select ${missingFields[0]} and ${missingFields[1]} to continue.`;
+    } else {
+      return 'Please fill out all required fields to continue.';
+    }
+  };
 
   const handleConfirm = async () => {
+    // Validate fields before proceeding
+    if (!symptomsDuration || !selectedConnection || !accessDuration) {
+      setShowValidationModal(true);
+      return;
+    }
+
     setLoading(true);
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
@@ -306,47 +287,27 @@ const ShareSymptom = ({ isOpen, onClose }) => {
       return;
     }
 
-
-    if (!symptomsDuration || !selectedConnection || !accessDuration) {
-      alert('Please fill out all fields.');
-      setLoading(false);
-      return;
-    }
-
-
     try {
-      // Fetch symptom data and user info
       const [loggedDates, userInfo] = await Promise.all([
         fetchSymptomData(user.id, symptomsDuration),
         fetchUserInfo(user.id)
       ]);
 
-
       console.log('Data to be included in PDF:', { loggedDates, userInfo });
 
-
-      // Check if we have data to include
       if (!loggedDates || loggedDates.length === 0) {
         alert('No symptom data found for the selected duration. Please try a different time period.');
         setLoading(false);
         return;
       }
 
-
-      // Import the generatePDFAsBlob function
       const { generatePDFAsBlob } = await import('../utils/generateTrackingReport');
-     
-      // Generate PDF blob using the updated function
       const pdfBlob = await generatePDFAsBlob(loggedDates, userInfo);
-     
-      // Create filename for sharing
       const shareFileName = `symptoms-report-${user.id}-${Date.now()}.pdf`;
-
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('sharedsymptoms')
         .upload(shareFileName, pdfBlob, { contentType: 'application/pdf' });
-
 
       if (uploadError) {
         console.error('Upload error:', uploadError.message);
@@ -355,11 +316,9 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         return;
       }
 
-
       const { data: urlData } = supabase.storage
         .from('sharedsymptoms')
         .getPublicUrl(uploadData.path);
-
 
       const now = new Date();
       const expiresAt = (() => {
@@ -376,7 +335,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         }
       })();
 
-
       const { error: insertError } = await supabase.from('shared_symptoms').insert([
         {
           shared_by: user.id,
@@ -390,7 +348,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         }
       ]);
 
-
       if (insertError) {
         console.error('DB insert error:', insertError.message);
         alert(`Failed to save shared report: ${insertError.message}`);
@@ -399,24 +356,18 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         setSelectedConnection('');
         setAccessDuration('');
         setShowSuccessModal(true);
-       
-        // Refresh active shares after successful share
         await fetchActiveShares(user.id);
       }
-
 
     } catch (error) {
       console.error('Error generating report:', error);
       alert(`Error generating report: ${error.message}`);
     }
 
-
     setLoading(false);
   };
 
-
   if (!isOpen) return null;
-
 
   return (
     <>
@@ -428,7 +379,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
           <h2 className="text-xl font-bold text-[#3BA4A0] mb-4">Share Symptoms Report</h2>
           <p className="text-sm text-gray-600 mb-6">Generate and share a comprehensive PDF report containing all your symptoms data.</p>
 
-
           <div className="space-y-4">
             <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
               <div className="flex items-center gap-2 mb-2">
@@ -439,7 +389,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 Includes: Period Flow, Symptoms, Feelings, Cravings, Energy, Weight, Custom entries
               </p>
             </div>
-
 
             <div>
               <label className="block text-sm font-semibold mb-1">Symptom Duration</label>
@@ -455,7 +404,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 <option value="5 months">5 months</option>
               </select>
             </div>
-
 
             <div>
               <label className="block text-sm font-semibold mb-1">Share with doctor</label>
@@ -473,7 +421,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
               </select>
             </div>
 
-
             <div>
               <label className="block text-sm font-semibold mb-1">Access duration</label>
               <select
@@ -488,7 +435,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 <option value="1 month">1 month</option>
               </select>
             </div>
-
 
             <div className="flex justify-between mt-6">
               <button
@@ -506,7 +452,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
                 {loading ? 'Generating...' : 'Generate & Share'}
               </button>
             </div>
-
 
             {/* Active shares section */}
             {activeShares.length > 0 && (
@@ -552,6 +497,33 @@ const ShareSymptom = ({ isOpen, onClose }) => {
         </div>
       </div>
 
+    {/* Validation Modal */}
+{showValidationModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60]">
+    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+      <div className="flex items-center justify-center mb-4">
+        <div className="bg-orange-100 p-3 rounded-full">
+          <AlertCircle className="text-orange-600" size={32} />
+        </div>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-800 text-center mb-2">
+        Missing Information
+      </h3>
+      <p className="text-gray-600 text-center mb-6 text-sm">
+        {getValidationMessage()}
+      </p>
+      <div className="flex justify-center">
+        <button
+          onClick={() => setShowValidationModal(false)}
+          className="bg-[#3BA4A0] text-white px-6 py-2 rounded-lg hover:bg-[#32948f] transition-colors font-medium"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Success Modal for Report Sharing */}
       {showSuccessModal && (
@@ -569,7 +541,6 @@ const ShareSymptom = ({ isOpen, onClose }) => {
           </div>
         </div>
       )}
-
 
       {/* Revoke Success Modal */}
       {showRevokeModal && (
@@ -591,6 +562,4 @@ const ShareSymptom = ({ isOpen, onClose }) => {
   );
 };
 
-
 export default ShareSymptom;
-

@@ -5,8 +5,17 @@ const Calendar = ({
   selectedDate, 
   appointments = [], 
   onDateSelect, 
-  onMonthNavigate 
+  onMonthNavigate,
+  isPastDate 
 }) => {
+  // Default isPastDate function if not provided
+  const checkIsPastDate = isPastDate || ((date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    return checkDate < today;
+  });
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
@@ -52,6 +61,11 @@ const Calendar = ({
     return appointments.filter(apt => apt.date === dateStr);
   };
 
+  const handleDateClick = (date) => {
+    if (!date || checkIsPastDate(date)) return;
+    onDateSelect(date);
+  };
+
   const renderCalendar = () => {
     const days = getDaysInMonth(currentDate);
     const weeks = [];
@@ -66,21 +80,32 @@ const Calendar = ({
           const hasAppointments = day && getAppointmentsForDate(day).length > 0;
           const isSelected = day && isSameDate(day, selectedDate);
           const isToday = day && isSameDate(day, new Date());
+          const isPast = day && checkIsPastDate(day);
           
           return (
             <div
               key={dayIndex}
-              className={`h-10 flex items-center justify-center text-sm cursor-pointer relative
+              className={`h-10 flex items-center justify-center text-sm relative
                 ${day === null ? '' : 
+                  isPast ? 'cursor-not-allowed text-gray-400 pointer-events-none' :
                   isSelected ? 'bg-[#55A1A4] text-white rounded-full' :
                   isToday ? 'bg-orange-200 text-orange-800 rounded-full font-semibold' :
-                  'text-[#F15629] hover:bg-orange-100 rounded-full'}
+                  'text-[#F15629] hover:bg-orange-100 rounded-full cursor-pointer'}
               `}
-              onClick={() => day && onDateSelect(day)}
+              onClick={() => {
+                if (!day || checkIsPastDate(day)) return;
+                handleDateClick(day);
+              }}
             >
-              {day && day.getDate()}
+              {day && (
+                <span>
+                  {day.getDate()}
+                </span>
+              )}
               {hasAppointments && (
-                <div className="absolute bottom-1 w-1 h-1 bg-teal-400 rounded-full"></div>
+                <div className={`absolute bottom-1 w-1 h-1 rounded-full
+                  ${isPast ? 'bg-gray-400' : 'bg-teal-400'}
+                `}></div>
               )}
             </div>
           );
