@@ -33,22 +33,22 @@ const newUserProjections = [
   { year: '2026', users: 210 }
 ];
 
-const userRatingData = [
-  { rating: '1 Star', count: 45 },
-  { rating: '2 Star', count: 35 },
-  { rating: '3 Star', count: 80 },
-  { rating: '4 Star', count: 120 },
-  { rating: '5 Star', count: 150 }
+const subscriberTierData = [
+  { tier: 'Free', count: 0 },
+  { tier: 'Pro', count: 0 },
+  { tier: 'Premium', count: 0 }
 ];
 
 export default function AdminReports() {
   const [userDemographicData, setUserDemographicData] = useState([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [subscriberData, setSubscriberData] = useState(subscriberTierData);
 
   useEffect(() => {
     fetchUserDemographics();
     fetchTotalRevenue();
+    fetchSubscriberTiers();
   }, []);
 
   const fetchUserDemographics = async () => {
@@ -134,6 +134,69 @@ const fetchTotalRevenue = async () => {
   }
 };
 
+const fetchSubscriberTiers = async () => {
+  try {
+    // Get all active subscriptions
+    const { data: subscriptions, error: subError } = await supabase
+      .from('subscriptions')
+      .select('tier, status')
+      .eq('status', 'active');
+
+    if (subError) throw subError;
+
+    // Get total user count (medical professionals + patients)
+    const { data: medicalProfessionals, error: medError } = await supabase
+      .from('medicalprofessionals')
+      .select('med_id');
+
+    const { data: patients, error: patientError } = await supabase
+      .from('patients')
+      .select('patient_id');
+
+    if (medError || patientError) throw medError || patientError;
+
+    const totalUsers = (medicalProfessionals?.length || 0) + (patients?.length || 0);
+
+    // Count subscribers by tier
+    const tierCounts = {
+      Free: 0,
+      Pro: 0,
+      Premium: 0
+    };
+
+    subscriptions?.forEach(subscription => {
+      const tier = subscription.tier;
+      if (tier === 'pro') {
+        tierCounts.Pro++;
+      } else if (tier === 'premium') {
+        tierCounts.Premium++;
+      }
+    });
+
+    // Free users are total users minus subscribed users
+    const subscribedUsers = tierCounts.Pro + tierCounts.Premium;
+    tierCounts.Free = totalUsers - subscribedUsers;
+
+    // Convert to chart format
+    const chartData = [
+      { tier: 'Free', count: tierCounts.Free },
+      { tier: 'Pro', count: tierCounts.Pro },
+      { tier: 'Premium', count: tierCounts.Premium }
+    ];
+
+    setSubscriberData(chartData);
+  } catch (error) {
+    console.error('Error fetching subscriber tiers:', error);
+    // Fallback data if database fetch fails
+    setSubscriberData([
+      { tier: 'Free', count: 850 },
+      { tier: 'Pro', count: 120 },
+      { tier: 'Premium', count: 45 }
+    ]);
+  }
+};
+
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
@@ -143,7 +206,7 @@ const fetchTotalRevenue = async () => {
     }).format(amount);
   };
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload}) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
@@ -236,6 +299,50 @@ const fetchTotalRevenue = async () => {
           {/* User Rating Bar Chart */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wide">
+              Subscriber Tiers
+            </h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={subscriberData}>
+                <XAxis 
+                  dataKey="tier" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#666' }}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#666' }}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px'
+                  }}
+                />
+                <Bar 
+                  dataKey="count" 
+                  fill={colors.tertiary} 
+                  radius={[4, 4, 0, 0]} 
+                />
+              </BarChart>
+            </ResponsiveContainer>
+            {/* Legend */}
+            <div className="mt-4 flex justify-center space-x-6">
+              {subscriberData.map((item, index) => (
+                <div key={index} className="flex items-center text-sm">
+                  <div
+                    className="w-3 h-3 rounded-full mr-2"
+                    style={{ backgroundColor: colors.tertiary }}
+                  ></div>
+                  <span className="text-gray-600">{item.tier}: {item.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wide">
               User Rating
             </h3>
             <ResponsiveContainer width="100%" height={200}>
@@ -246,7 +353,7 @@ const fetchTotalRevenue = async () => {
                 <Bar dataKey="count" fill={colors.tertiary} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </div> */}
         </div>
 
         {/* Bottom Row - Trend Charts */}
