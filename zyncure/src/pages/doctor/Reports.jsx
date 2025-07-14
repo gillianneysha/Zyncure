@@ -5,7 +5,7 @@ import {
   X, Folder, FileText, Download, ArrowLeft, User, Clock,
   SquarePlus, ChevronDown, MoreVertical, Trash2
 } from 'lucide-react';
-import ActionModal from "../../components/ActionModal"; // <-- reference your ActionModal
+import ActionModal from "../../components/ActionModal"; 
 
 // Utility for truncating file names
 function truncateFileName(fileName, maxLength = 25) {
@@ -64,6 +64,10 @@ function FileCard({ file, onPreview, onAddNote, onDelete, currentUser }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
 
+  // PATCH: Only show Add Consultation Notes for files shared by patient, not lone doctor-note PDFs
+  const isLoneDoctorNote = file.name && file.name.startsWith('doctor-note-');
+  const showAddNoteOption = !isLoneDoctorNote && file.owner_id !== currentUser?.id;
+
   return (
     <div className="bg-[#55A1A4] rounded-lg shadow-md overflow-hidden relative group">
       <div className="p-2 flex justify-between items-center">
@@ -88,16 +92,18 @@ function FileCard({ file, onPreview, onAddNote, onDelete, currentUser }) {
           </button>
           {dropdownOpen && (
             <div className="absolute right-0 top-full w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-              <button
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onAddNote(file);
-                }}
-                className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-emerald-50 transition-colors"
-              >
-                <FileText size={18} className="text-emerald-500" />
-                Add Consultation Notes
-              </button>
+              {showAddNoteOption && (
+                <button
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    onAddNote(file);
+                  }}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-emerald-50 transition-colors"
+                >
+                  <FileText size={18} className="text-emerald-500" />
+                  Add Consultation Notes
+                </button>
+              )}
               <a
                 href={file.file_url}
                 download={file.name}
@@ -275,6 +281,10 @@ export default function DoctorsPatientsFolders() {
   // PATCH: state for note deletion
   const [deleteNoteTarget, setDeleteNoteTarget] = useState(null);
   const [showDeleteNoteModal, setShowDeleteNoteModal] = useState(false);
+
+  // PATCH: state for lone PDF note deletion modal
+  const [deleteLonePdfTarget, setDeleteLonePdfTarget] = useState(null);
+  const [showDeleteLonePdfModal, setShowDeleteLonePdfModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -500,11 +510,31 @@ export default function DoctorsPatientsFolders() {
     setPreviewFile(null);
   };
 
+  // PATCH: handleDelete now triggers ActionModal for lone PDF notes
   async function handleDelete(file) {
     if (!currentUser || currentUser.id !== file.owner_id) return;
+    const isLoneDoctorNote = file.name && file.name.startsWith('doctor-note-');
+    if (isLoneDoctorNote) {
+      setDeleteLonePdfTarget(file);
+      setShowDeleteLonePdfModal(true);
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this file?')) return;
     await supabase.from('medical_files').delete().eq('id', file.id);
     await loadPatientsWithInfo();
+  }
+
+  async function confirmDeleteLonePdf(file) {
+    await supabase.from('medical_files').delete().eq('id', file.id);
+    setDeleteLonePdfTarget(null);
+    setShowDeleteLonePdfModal(false);
+    await loadPatientsWithInfo();
+    if (openedFolder) {
+      await handleOpenSharedFolder(openedFolder);
+    }
+    if (previewFile && previewFile.id === file.id) {
+      setPreviewFile(null);
+    }
   }
 
   function handleDropdownToggle() {
@@ -708,24 +738,24 @@ export default function DoctorsPatientsFolders() {
 
   // PATCH: Delete Note Handler
   async function handleDeleteNote(note) {
-  if (!note?.id) return;
-  await supabase.from('consultation_notes').delete().eq('id', note.id);
-  await loadPatientsWithInfo();
-  if (openedFolder) {
-    await handleOpenSharedFolder(openedFolder);
-  }
-  if (previewFile) {
-    const updatedNotes = (previewFile.consultation_notes || []).filter(n => n.id !== note.id);
-    if (updatedNotes.length === 0) {
-      setPreviewFile(null);
-    } else {
-      setPreviewFile(prev => ({
-        ...prev,
-        consultation_notes: updatedNotes
-      }));
+    if (!note?.id) return;
+    await supabase.from('consultation_notes').delete().eq('id', note.id);
+    await loadPatientsWithInfo();
+    if (openedFolder) {
+      await handleOpenSharedFolder(openedFolder);
+    }
+    if (previewFile) {
+      const updatedNotes = (previewFile.consultation_notes || []).filter(n => n.id !== note.id);
+      if (updatedNotes.length === 0) {
+        setPreviewFile(null);
+      } else {
+        setPreviewFile(prev => ({
+          ...prev,
+          consultation_notes: updatedNotes
+        }));
+      }
     }
   }
-}
 
   const renderPreviewModal = (file) => {
     if (!file) return null;
@@ -783,6 +813,19 @@ export default function DoctorsPatientsFolders() {
                   Download
                 </a>
               )}
+              {/* PATCH: Lone doctor note PDF delete button */}
+              {isLoneDoctorNote && currentUser && currentUser.id === file.owner_id && (
+                <button
+                  className="inline-block ml-2 px-4 py-2 bg-[#E36464] text-white rounded hover:bg-[#c64a4a]"
+                  onClick={() => {
+                    setDeleteLonePdfTarget(file);
+                    setShowDeleteLonePdfModal(true);
+                  }}
+                >
+                  <Trash2 size={18} className="inline-block mr-1" />
+                  Delete
+                </button>
+              )}
             </div>
           </div>
           {showNotesSidebar && (
@@ -825,7 +868,6 @@ export default function DoctorsPatientsFolders() {
         {/* Use your ActionModal for delete confirmation */}
         <ActionModal
           open={showDeleteNoteModal && !!deleteNoteTarget}
-          icon={<Trash2 size={32} style={{ color: "#E36464" }} />}
           title="Delete Consultation Note"
           message="Are you sure you want to delete this consultation note? This action cannot be undone."
           confirmLabel="Delete"
@@ -838,6 +880,21 @@ export default function DoctorsPatientsFolders() {
           onCancel={() => {
             setShowDeleteNoteModal(false);
             setDeleteNoteTarget(null);
+          }}
+        />
+        {/* PATCH: Lone PDF note modal */}
+        <ActionModal
+          open={showDeleteLonePdfModal && !!deleteLonePdfTarget}
+          title="Delete Consultation Note PDF"
+          message="Are you sure you want to delete this generated PDF consultation note? This action cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={async () => {
+            await confirmDeleteLonePdf(deleteLonePdfTarget);
+          }}
+          onCancel={() => {
+            setShowDeleteLonePdfModal(false);
+            setDeleteLonePdfTarget(null);
           }}
         />
       </div>
@@ -972,6 +1029,21 @@ export default function DoctorsPatientsFolders() {
                 ))}
             </div>
             {previewFile && renderPreviewModal(previewFile)}
+            {/* PATCH: Lone PDF delete modal at top view */}
+            <ActionModal
+              open={showDeleteLonePdfModal && !!deleteLonePdfTarget}
+              title="Delete Consultation Note PDF"
+              message="Are you sure you want to delete this generated PDF consultation note? This action cannot be undone."
+              confirmLabel="Delete"
+              cancelLabel="Cancel"
+              onConfirm={async () => {
+                await confirmDeleteLonePdf(deleteLonePdfTarget);
+              }}
+              onCancel={() => {
+                setShowDeleteLonePdfModal(false);
+                setDeleteLonePdfTarget(null);
+              }}
+            />
           </div>
         )}
 
@@ -998,6 +1070,21 @@ export default function DoctorsPatientsFolders() {
               )}
             </div>
             {previewFile && renderPreviewModal(previewFile)}
+            {/* PATCH: Lone PDF delete modal for folder view */}
+            <ActionModal
+              open={showDeleteLonePdfModal && !!deleteLonePdfTarget}
+              title="Delete Consultation Note PDF"
+              message="Are you sure you want to delete this generated PDF consultation note? This action cannot be undone."
+              confirmLabel="Delete"
+              cancelLabel="Cancel"
+              onConfirm={async () => {
+                await confirmDeleteLonePdf(deleteLonePdfTarget);
+              }}
+              onCancel={() => {
+                setShowDeleteLonePdfModal(false);
+                setDeleteLonePdfTarget(null);
+              }}
+            />
           </div>
         )}
 
