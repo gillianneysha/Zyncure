@@ -45,20 +45,39 @@ export default function AdminHome() {
         setTotalUsers(0);
       }
     }
-    async function fetchPendingVerification() {
-      const { count, error } = await supabase
-        .from("support_tickets")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "Open");
-      if (!error) setPendingVerification(count || 0);
+   async function fetchPendingVerification() {
+  const { count, error } = await supabase
+    .from("doctor_verifications")
+    .select("*", { count: "exact", head: true })
+    .is("status", null); 
+  if (!error) setPendingVerification(count || 0);
+}
+   async function fetchReportsForReview() {
+  try {
+    // Count open support tickets
+    const { count: supportCount, error: supportError } = await supabase
+      .from("support_tickets")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["Open", "In Progress"]);
+
+    // Count open bug reports
+    const { count: bugCount, error: bugError } = await supabase
+      .from("bug_reports")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["Open", "In Progress"]);
+
+    if (!supportError && !bugError) {
+      const totalCount = (supportCount || 0) + (bugCount || 0);
+      setReportsForReview(totalCount);
+    } else {
+      console.error('Error fetching reports:', supportError || bugError);
+      setReportsForReview(0);
     }
-    async function fetchReportsForReview() {
-      const { count, error } = await supabase
-        .from("bug_reports")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "In Progress");
-      if (!error) setReportsForReview(count || 0);
-    }
+  } catch (error) {
+    console.error('Error fetching reports for review:', error);
+    setReportsForReview(0);
+  }
+}
     fetchTotalUsers();
     fetchPendingVerification();
     fetchReportsForReview();
@@ -107,11 +126,11 @@ export default function AdminHome() {
           <span className="text-4xl font-bold text-[#F46B5D]">{totalUsers}</span>
         </div>
         <div className="bg-white rounded-xl p-6 shadow flex flex-col items-center">
-          <span className="text-xl font-semibold mb-2">Pending Verification</span>
+          <span className="text-xl font-semibold mb-2">Pending License Verification</span>
           <span className="text-4xl font-bold text-[#F46B5D]">{pendingVerification}</span>
         </div>
         <div className="bg-white rounded-xl p-6 shadow flex flex-col items-center">
-          <span className="text-xl font-semibold mb-2">Reports for Review</span>
+          <span className="text-xl font-semibold mb-2">Tickets for Review</span>
           <span className="text-4xl font-bold text-[#F46B5D]">{reportsForReview}</span>
         </div>
       </div>
