@@ -19,6 +19,7 @@ export default function DoctorLayout() {
   const isActive = (path) => location.pathname === `/doctor${path}`;
   const isHealthActive = location.pathname.includes('/doctor/patients');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [hasManuallyDismissedModal, setHasManuallyDismissedModal] = useState(false);
 
   // Fixed: Use correct property names from useUser hook
   const verificationStatus = user?.verification_status;
@@ -213,17 +214,19 @@ export default function DoctorLayout() {
   };
 
 
-  // Auto-open verification modal for unverified doctors
-  useEffect(() => {
-    console.log('Modal effect - shouldShowVerificationModal:', shouldShowVerificationModal);
-    console.log('Modal effect - verificationModalOpen:', verificationModalOpen);
+ useEffect(() => {
+  console.log('Modal effect - shouldShowVerificationModal:', shouldShowVerificationModal);
+  console.log('Modal effect - verificationModalOpen:', verificationModalOpen);
+  console.log('Modal effect - hasManuallyDismissedModal:', hasManuallyDismissedModal);
 
-
-    if (shouldShowVerificationModal && !verificationModalOpen) {
-      console.log('Opening verification modal');
+  if (shouldShowVerificationModal && !verificationModalOpen && !hasManuallyDismissedModal) {
+    console.log('Opening verification modal');
+    // Small delay to ensure proper rendering
+    setTimeout(() => {
       setVerificationModalOpen(true);
-    }
-  }, [shouldShowVerificationModal, verificationModalOpen]);
+    }, 100);
+  }
+}, [shouldShowVerificationModal, verificationModalOpen, hasManuallyDismissedModal]);
 
 
   if (isLoading) {
@@ -264,15 +267,15 @@ export default function DoctorLayout() {
             showResubmit: true
           };
         case 'no_record':
-        default:
-          return {
-            icon: <Clock className="w-5 h-5 text-gray-600" />,
-            bgColor: 'bg-gray-50',
-            borderColor: 'border-gray-200',
-            textColor: 'text-gray-800',
-            message: 'Please complete your verification to access all features.',
-            showResubmit: false
-          };
+default:
+  return {
+    icon: <Clock className="w-5 h-5 text-gray-600" />,
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    textColor: 'text-gray-800',
+    message: 'Please complete your verification to access all features.',
+    showResubmit: true
+  };
       }
     };
 
@@ -289,13 +292,16 @@ export default function DoctorLayout() {
               {config.message}
             </p>
             {config.showResubmit && (
-              <button
-                onClick={() => setVerificationModalOpen(true)}
-                className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-              >
-                Resubmit Verification
-              </button>
-            )}
+  <button
+    onClick={() => {
+      setVerificationModalOpen(true);
+      setHasManuallyDismissedModal(false);
+    }}
+    className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+  >
+    {verificationStatus === 'rejected' ? 'Resubmit Verification' : 'Complete Verification'}
+  </button>
+)}
             {rejectionReason && (
               <p className="mt-1 text-sm text-red-600">
                 Reason: {rejectionReason}
@@ -389,11 +395,9 @@ export default function DoctorLayout() {
       <DoctorVerificationModal
         open={verificationModalOpen}
         onClose={() => {
-          // Only allow closing if doctor has submitted verification (not no_record or rejected)
-          if (verificationStatus !== 'no_record' && verificationStatus !== 'rejected') {
-            setVerificationModalOpen(false);
-          }
-        }}
+  setVerificationModalOpen(false);
+  setHasManuallyDismissedModal(true);
+}}
         onSubmit={handleVerificationSubmit}
         loading={submissionLoading}
         verificationStatus={verificationStatus}
