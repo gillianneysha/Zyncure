@@ -1,4 +1,4 @@
-import { Search, X, ChevronDown } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../client";
@@ -14,14 +14,11 @@ export default function Navbar() {
   const [searchResults, setSearchResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showSearchOnMobile, setShowSearchOnMobile] = useState(false);
-  const [showUserDetails, setShowUserDetails] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
   const searchRef = useRef(null);
   const dropdownRef = useRef(null);
-  const userDetailsRef = useRef(null);
 
   // Comprehensive search items based on user role with accurate paths
   const getSearchItems = (userType) => {
@@ -219,89 +216,185 @@ export default function Navbar() {
     }
   };
 
-  useEffect(() => {
-    const getUserData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  // Function to fetch user data
+  const getUserData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-        let profile = {};
-        let userType = "";
+      let profile = {};
+      let userType = "";
 
-        // Check patients table first
-        const { data: patientData } = await supabase
-          .from("patients")
+      // Check patients table first - using patient_id instead of user_id
+      const { data: patientData } = await supabase
+        .from("patients")
+        .select("*")
+        .eq("patient_id", user.id)
+        .single();
+
+      if (patientData) {
+        profile = patientData;
+        userType = "patient";
+      } else {
+        // Check medicalprofessionals table - using med_id instead of user_id
+        const { data: professionalData } = await supabase
+          .from("medicalprofessionals")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("med_id", user.id)
           .single();
 
-        if (patientData) {
-          profile = patientData;
-          userType = "patient";
+        if (professionalData) {
+          profile = professionalData;
+          userType = "doctor";
         } else {
-          // Check medicalprofessionals table
-          const { data: professionalData } = await supabase
-            .from("medicalprofessionals")
+          // Check admin table - assuming admin uses user_id
+          const { data: adminData } = await supabase
+            .from("admin")
             .select("*")
             .eq("user_id", user.id)
             .single();
 
-          if (professionalData) {
-            profile = professionalData;
-            userType = "doctor";
-          } else {
-            // Check admin table
-            const { data: adminData } = await supabase
-              .from("admin")
-              .select("*")
-              .eq("user_id", user.id)
-              .single();
-
-            if (adminData) {
-              profile = adminData;
-              userType = "admin";
-            }
+          if (adminData) {
+            profile = adminData;
+            userType = "admin";
           }
         }
+      }
 
-        // Extract name based on table structure
-        let initialName = "";
-        if (userType === "admin") {
-          // Admin table uses full_name
-          initialName = profile.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
-        } else {
-          // Patients and medicalprofessionals tables use first_name
-          initialName = profile.first_name || user.user_metadata?.first_name || user.email?.split("@")[0] || "User";
-        }
+      // Extract name based on table structure
+      let initialName = "";
+      if (userType === "admin") {
+        // Admin table uses full_name
+        initialName = profile.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
+      } else {
+        // Patients and medicalprofessionals tables use first_name
+        initialName = profile.first_name || user.user_metadata?.first_name || user.email?.split("@")[0] || "User";
+      }
 
-        // Fallback to user metadata if no profile found
-        if (!profile.user_id && !profile.med_id && !profile.patient_id) {
-          userType = user.user_metadata?.user_type || user.user_metadata?.role || "User";
-          initialName = user.user_metadata?.first_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
-        }
+      // Fallback to user metadata if no profile found
+      if (!profile.patient_id && !profile.med_id && !profile.user_id) {
+        userType = user.user_metadata?.user_type || user.user_metadata?.role || "User";
+        initialName = user.user_metadata?.first_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
+      }
 
-        const capitalizedUserType = userType.charAt(0).toUpperCase() + userType.slice(1).toLowerCase();
+      const capitalizedUserType = userType.charAt(0).toUpperCase() + userType.slice(1).toLowerCase();
 
-        setUserData({
-          name: initialName,
-          id: user.id ? user.id.substring(0, 4) : "----",
-          userType: capitalizedUserType,
-        });
-      } catch (error) {
-        console.error("Error fetching user data:", error);
+      setUserData({
+        name: initialName,
+        id: user.id ? user.id.substring(0, 4) : "----",
+        userType: capitalizedUserType,
+      });
+    } catch (error) {
+      console.error("Error fetching user data:", error);
 
-        // Fallback to user metadata on error
-        const fallbackUserType = user?.user_metadata?.user_type || user?.user_metadata?.role || "User";
-        const fallbackName = user?.user_metadata?.first_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+      // Fallback to user metadata on error
+      const { data: { user } } = await supabase.auth.getUser();
+      const fallbackUserType = user?.user_metadata?.user_type || user?.user_metadata?.role || "User";
+      const fallbackName = user?.user_metadata?.first_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
 
-        setUserData({
-          name: fallbackName,
-          id: user?.id ? user.id.substring(0, 4) : "----",
-          userType: fallbackUserType.charAt(0).toUpperCase() + fallbackUserType.slice(1).toLowerCase(),
-        });
+      setUserData({
+        name: fallbackName,
+        id: user?.id ? user.id.substring(0, 4) : "----",
+        userType: fallbackUserType.charAt(0).toUpperCase() + fallbackUserType.slice(1).toLowerCase(),
+      });
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    getUserData();
+  }, []);
+
+  // Listen for profile updates via custom events
+  useEffect(() => {
+    const handleProfileUpdate = (event) => {
+      if (event.detail?.type === 'profile-updated') {
+        getUserData();
       }
     };
-    getUserData();
+
+    window.addEventListener('profile-updated', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+    };
+  }, []);
+
+  // Listen for database changes using Supabase realtime
+  useEffect(() => {
+    const setupRealtimeSubscriptions = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Subscribe to changes in the patients table - using patient_id
+      const patientsSubscription = supabase
+        .channel('patients-changes')
+        .on('postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'patients',
+            filter: `patient_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('Patient data updated:', payload);
+            getUserData();
+          }
+        )
+        .subscribe();
+
+      // Subscribe to changes in the medicalprofessionals table - using med_id
+      const professionalsSubscription = supabase
+        .channel('professionals-changes')
+        .on('postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'medicalprofessionals',
+            filter: `med_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('Professional data updated:', payload);
+            getUserData();
+          }
+        )
+        .subscribe();
+
+      // Subscribe to changes in the admin table - assuming admin uses user_id
+      const adminSubscription = supabase
+        .channel('admin-changes')
+        .on('postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'admin',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('Admin data updated:', payload);
+            getUserData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        patientsSubscription.unsubscribe();
+        professionalsSubscription.unsubscribe();
+        adminSubscription.unsubscribe();
+      };
+    };
+
+    setupRealtimeSubscriptions();
+  }, []);
+
+  // Refresh data when window regains focus (backup method)
+  useEffect(() => {
+    const handleFocus = () => {
+      getUserData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   // Enhanced search functionality with multiple matching criteria
@@ -349,15 +442,11 @@ export default function Navbar() {
     setIsLoading(false);
   }, [searchQuery, userData.userType]);
 
-  // Handle click outside to close dropdown and user details
+  // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setShowDropdown(false);
-        setShowSearchOnMobile(false);
-      }
-      if (userDetailsRef.current && !userDetailsRef.current.contains(event.target)) {
-        setShowUserDetails(false);
       }
     };
 
@@ -365,19 +454,11 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Close user details when route changes
-  useEffect(() => {
-    setShowUserDetails(false);
-    setShowSearchOnMobile(false);
-  }, [location.pathname]);
-
   const handleSearchItemClick = (path) => {
     try {
       navigate(path);
       setSearchQuery("");
       setShowDropdown(false);
-      setShowSearchOnMobile(false);
-      setShowUserDetails(false);
     } catch (error) {
       console.error("Navigation error:", error);
     }
@@ -400,252 +481,112 @@ export default function Navbar() {
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') {
       clearSearch();
-      setShowSearchOnMobile(false);
-      setShowUserDetails(false);
     }
   };
 
-  const toggleMobileSearch = () => {
-    setShowSearchOnMobile(!showSearchOnMobile);
-    setShowUserDetails(false);
-  };
-
-  const toggleUserDetails = () => {
-    setShowUserDetails(!showUserDetails);
-    setShowSearchOnMobile(false);
-  };
-
-  const firstName = userData.name.includes(" ")
-    ? userData.name.split(" ")[0]
-    : userData.name;
+  const displayName = userData.name;
 
   return (
-    <>
-      <nav className="h-16 bg-mySidebar shadow-md px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between relative z-40">
-        {/* Desktop Search bar */}
-        <div className="hidden lg:block relative w-full max-w-sm" ref={searchRef}>
-          <form onSubmit={handleSearchSubmit}>
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="w-full px-4 py-2 pr-20 rounded-2xl bg-white text-gray-800 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200"
-              autoComplete="off"
-            />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
-                  aria-label="Clear search"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-              <Search className="text-mySidebar w-5 h-5" />
-            </div>
-          </form>
-
-          {/* Desktop Search dropdown */}
-          {showDropdown && (
-            <div
-              ref={dropdownRef}
-              className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
-            >
-              {isLoading ? (
-                <div className="p-4 text-center text-gray-500">
-                  <div className="w-4 h-4 border-2 border-t-mySidebar border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                  Searching...
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="py-2">
-                  {searchResults.map((item, index) => (
-                    <button
-                      key={`${item.path}-${index}`}
-                      onClick={() => handleSearchItemClick(item.path)}
-                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors border-l-4 border-transparent hover:border-indigo-400 ${location.pathname === item.path ? 'bg-indigo-50 border-indigo-400' : ''
-                        }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-800 flex items-center">
-                            {item.title}
-                            {location.pathname === item.path && (
-                              <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">
-                                Current
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-500 mt-1">{item.description}</div>
-                        </div>
-                        <div className="text-xs text-gray-400 ml-2">
-                          {item.category}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-4 text-center text-gray-500">
-                  <div className="mb-2">No results found for "{searchQuery}"</div>
-                  <div className="text-xs text-gray-400">
-                    Try searching for features like "profile", "appointments", or "health"
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Mobile search button */}
-        <div className="lg:hidden flex-1 flex justify-start">
-          <button
-            onClick={toggleMobileSearch}
-            className="text-white hover:text-indigo-200 transition-colors p-2 rounded-md"
-            aria-label="Toggle search"
-          >
-            <Search className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* User info section */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
-          {/* Desktop user info */}
-          <div className="hidden sm:flex flex-col leading-tight text-right">
-            <span className="text-white font-medium text-sm lg:text-base">Hi, {firstName}!</span>
-            <span className="text-xs lg:text-sm text-white">
-              ID: {userData.id} •
-              <span className="bg-indigo-500 px-1.5 py-0.5 rounded-full ml-1">
-                {userData.userType}
-              </span>
-            </span>
+    <nav className="h-16 bg-mySidebar shadow-md px-8 py-6 flex items-center justify-between">
+      {/* Enhanced Search bar */}
+      <div className="relative w-full max-w-sm" ref={searchRef}>
+        <form onSubmit={handleSearchSubmit}>
+          <input
+            type="text"
+            placeholder={`Search...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full px-4 py-2 pr-20 rounded-2xl bg-white text-gray-800 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200"
+            autoComplete="off"
+          />
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            <Search className="text-mySidebar w-5 h-5" />
           </div>
-          
-          {/* Mobile user info - clickable for details */}
-          <div className="sm:hidden flex items-center space-x-2 relative" ref={userDetailsRef}>
-            <button
-              onClick={toggleUserDetails}
-              className="flex items-center space-x-2 text-white hover:text-indigo-200 transition-colors p-1 rounded-md"
-              aria-label="Toggle user details"
-            >
-              <span className="font-medium text-sm">Hi, {firstName}!</span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${showUserDetails ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {/* Mobile user details dropdown */}
-            {showUserDetails && (
-              <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 min-w-48">
-                <div className="text-sm text-gray-800">
-                  <div className="font-medium mb-1">{userData.name}</div>
-                  <div className="text-gray-500 text-xs">
-                    ID: {userData.id}
-                  </div>
-                  <div className="mt-2">
-                    <span className="bg-indigo-500 text-white px-2 py-1 rounded-full text-xs">
-                      {userData.userType}
-                    </span>
-                  </div>
+        </form>
+
+        {/* Enhanced Search dropdown */}
+        {showDropdown && (
+          <div
+            ref={dropdownRef}
+            className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto"
+          >
+            {isLoading ? (
+              <div className="p-4 text-center text-gray-500">
+                <div className="w-4 h-4 border-2 border-t-mySidebar border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                Searching...
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="py-2">
+                {searchResults.map((item, index) => (
+                  <button
+                    key={`${item.path}-${index}`}
+                    onClick={() => handleSearchItemClick(item.path)}
+                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors border-l-4 border-transparent hover:border-indigo-400 ${location.pathname === item.path ? 'bg-indigo-50 border-indigo-400' : ''
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-800 flex items-center">
+                          {item.title}
+                          {location.pathname === item.path && (
+                            <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">{item.description}</div>
+                      </div>
+                      <div className="text-xs text-gray-400 ml-2">
+                        {item.category}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-gray-500">
+                <div className="mb-2">No results found for "{searchQuery}"</div>
+                <div className="text-xs text-gray-400">
+                  Try searching for features like "profile", "appointments", or "health"
                 </div>
               </div>
             )}
           </div>
+        )}
+      </div>
 
-          <div className="relative">
-            <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                userData.name
-              )}&background=c7d2fe&color=3730a3`}
-              alt="User Avatar"
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-indigo-300 hover:border-indigo-400 transition-colors"
-            />
-          </div>
+      {/* User info section */}
+      <div className="flex items-center space-x-3 ml-6">
+        <div className="flex flex-col leading-tight text-right">
+          <span className="text-white font-medium">Hi, {displayName}!</span>
+          <span className="text-sm text-white">
+            ID: {userData.id} •
+            <span className="bg-indigo-500 px-1.5 py-0.5 rounded-full ml-1">
+              {userData.userType}
+            </span>
+          </span>
         </div>
-      </nav>
-
-      {/* Mobile Search Overlay */}
-      {showSearchOnMobile && (
-        <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-4 shadow-lg">
-            <div className="relative" ref={searchRef}>
-              <form onSubmit={handleSearchSubmit}>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="w-full px-4 py-3 pr-20 rounded-2xl bg-white text-gray-800 border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all duration-200"
-                  autoComplete="off"
-                  autoFocus
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={clearSearch}
-                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
-                      aria-label="Clear search"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                  <Search className="text-mySidebar w-5 h-5" />
-                </div>
-              </form>
-
-              {/* Mobile Search Results */}
-              {showDropdown && (
-                <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
-                  {isLoading ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <div className="w-4 h-4 border-2 border-t-mySidebar border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                      Searching...
-                    </div>
-                  ) : searchResults.length > 0 ? (
-                    <div className="py-2">
-                      {searchResults.map((item, index) => (
-                        <button
-                          key={`${item.path}-${index}`}
-                          onClick={() => handleSearchItemClick(item.path)}
-                          className={`w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors border-l-4 border-transparent hover:border-indigo-400 ${location.pathname === item.path ? 'bg-indigo-50 border-indigo-400' : ''
-                            }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-800 flex items-center">
-                                {item.title}
-                                {location.pathname === item.path && (
-                                  <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">
-                                    Current
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-500 mt-1">{item.description}</div>
-                            </div>
-                            <div className="text-xs text-gray-400 ml-2">
-                              {item.category}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">
-                      <div className="mb-2">No results found for "{searchQuery}"</div>
-                      <div className="text-xs text-gray-400">
-                        Try searching for features like "profile", "appointments", or "health"
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="relative">
+          <img
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+              userData.name
+            )}&background=c7d2fe&color=3730a3`}
+            alt="User Avatar"
+            className="w-10 h-10 rounded-full border-2 border-indigo-300 hover:border-indigo-400 transition-colors"
+          />
         </div>
-      )}
-    </>
+      </div>
+    </nav>
   );
 }
