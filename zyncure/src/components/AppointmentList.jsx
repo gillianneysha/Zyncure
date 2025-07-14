@@ -163,10 +163,10 @@ const AppointmentList = ({
   return (
     <>
       <div className="bg-white rounded-2xl overflow-hidden shadow-sm border">
-        <div className="bg-myHeader text-white p-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">My Schedule</h2>
-            <span className="text-lg font-medium">
+        <div className="bg-myHeader text-white p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+            <h2 className="text-lg sm:text-xl font-semibold">My Schedule</h2>
+            <span className="text-sm sm:text-lg font-medium mt-1 sm:mt-0">
               {selectedDate.toLocaleDateString("en-US", {
                 weekday: "long",
                 year: "numeric",
@@ -175,7 +175,7 @@ const AppointmentList = ({
               })}
             </span>
           </div>
-          <p className="text-teal-100 mt-1">
+          <p className="text-teal-100 mt-1 text-sm sm:text-base">
             {selectedDateAppointments.length} appointment
             {selectedDateAppointments.length !== 1 ? "s" : ""} scheduled
           </p>
@@ -183,8 +183,8 @@ const AppointmentList = ({
 
         <div className="divide-y divide-gray-100">
           {selectedDateAppointments.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <p className="text-lg">{emptyStateMessage}</p>
+            <div className="p-6 sm:p-8 text-center text-gray-500">
+              <p className="text-base sm:text-lg">{emptyStateMessage}</p>
               <p className="text-sm mt-2">{emptyStateSubtext}</p>
             </div>
           ) : (
@@ -210,40 +210,35 @@ const AppointmentList = ({
                       : "bg-gray-50 border-l-4 border-l-gray-400"
                   }`}
                 >
-                  <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-6 flex-1">
-                        <div className="text-gray-600 font-bold text-lg min-w-[100px]">
-                          {appointment.time}
-                        </div>
-                        <div className="flex items-center gap-6 flex-1">
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-gray-800 text-lg">
+                  <div className="p-4 sm:p-6">
+                    {/* Mobile Layout */}
+                    <div className="sm:hidden">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="text-gray-600 font-bold text-lg">
+                              {appointment.time}
+                            </div>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium border ${statusConfig.color} flex items-center gap-1`}
+                            >
+                              <span>{statusConfig.icon}</span>
+                              {statusConfig.label}
+                            </span>
+                          </div>
+                          <div className="mb-2">
+                            <span className="font-semibold text-gray-800 text-base">
                               {doctor?.name || "Unknown Doctor"}
                             </span>
-
                           </div>
-                          <div className="flex flex-col flex-1">
-                            <span className="text-sm text-gray-500 line-clamp-1">
-                              {appointment.reason}
-                            </span>
+                          <div className="text-sm text-gray-600 pr-2">
+                            {appointment.reason}
                           </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {/* Status Badge */}
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium border ${statusConfig.color} flex items-center gap-1`}
-                        >
-                          <span>{statusConfig.icon}</span>
-                          {statusConfig.label}
-                        </span>
-
-                        {/* Expand/Collapse Button */}
+                        
                         <button
                           onClick={() => toggleExpanded(appointment.id)}
-                          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                          className="p-2 hover:bg-gray-100 rounded-full transition-colors ml-2 flex-shrink-0"
                           aria-label={
                             isExpanded ? "Collapse details" : "Expand details"
                           }
@@ -267,11 +262,69 @@ const AppointmentList = ({
                       </div>
                     </div>
 
+                    {/* Desktop Layout */}
+                    <div className="hidden sm:block">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-6 flex-1">
+                          <div className="text-gray-600 font-bold text-lg min-w-[100px]">
+                            {appointment.time}
+                          </div>
+                          <div className="flex items-center gap-6 flex-1">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-gray-800 text-lg">
+                                {doctor?.name || "Unknown Doctor"}
+                              </span>
+                            </div>
+                            <div className="flex flex-col flex-1">
+                              <span className="text-sm text-gray-500 line-clamp-1">
+                                {appointment.reason}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {/* Status Badge */}
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-medium border ${statusConfig.color} flex items-center gap-1`}
+                          >
+                            <span>{statusConfig.icon}</span>
+                            {statusConfig.label}
+                          </span>
+
+                          {/* Expand/Collapse Button */}
+                          <button
+                            onClick={() => toggleExpanded(appointment.id)}
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                            aria-label={
+                              isExpanded ? "Collapse details" : "Expand details"
+                            }
+                          >
+                            <svg
+                              className={`w-5 h-5 text-gray-400 transition-transform ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Action Alert for Cancelled/Rescheduled */}
                     {needsAction && (
-                      <div className="mt-4 p-4 bg-red-100 border border-red-200 rounded-lg">
+                      <div className="mt-4 p-3 sm:p-4 bg-red-100 border border-red-200 rounded-lg">
                         <div className="flex items-start gap-3">
-                          <div className="text-red-600 mt-0.5">
+                          <div className="text-red-600 mt-0.5 flex-shrink-0">
                             <svg
                               className="w-5 h-5"
                               fill="currentColor"
@@ -284,27 +337,27 @@ const AppointmentList = ({
                               />
                             </svg>
                           </div>
-                          <div className="flex-1">
-                            <h4 className="font-medium text-red-800">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-red-800 text-sm sm:text-base">
                               {appointment.status === "cancelled"
                                 ? "Appointment Cancelled"
                                 : "Appointment Rescheduled"}
                             </h4>
-                            <p className="text-sm text-red-700 mt-1">
+                            <p className="text-xs sm:text-sm text-red-700 mt-1">
                               {appointment.status === "cancelled"
                                 ? "This appointment has been cancelled. Would you like to reschedule or remove it from your schedule?"
                                 : "This appointment has been rescheduled. Please book a new time slot or remove it from your schedule."}
                             </p>
-                            <div className="mt-2 flex gap-2">
+                            <div className="mt-2 flex flex-col sm:flex-row gap-2">
                               <button
                                 onClick={() =>
                                   onRescheduleRequest?.(appointment)
                                 }
-                                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                className="px-3 sm:px-4 py-2 bg-blue-600 text-white text-xs sm:text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                                 disabled={isBeingRemoved}
                               >
                                 <svg
-                                  className="w-4 h-4"
+                                  className="w-4 h-4 flex-shrink-0"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -321,7 +374,7 @@ const AppointmentList = ({
                               <button
                                 onClick={() => handleRemoveClick(appointment)}
                                 disabled={isBeingRemoved}
-                                className={`px-4 py-2 text-white text-sm rounded-lg transition-colors flex items-center gap-2 ${
+                                className={`px-3 sm:px-4 py-2 text-white text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center gap-2 ${
                                   isBeingRemoved
                                     ? "bg-gray-400 cursor-not-allowed"
                                     : "bg-red-600 hover:bg-red-700"
@@ -330,7 +383,7 @@ const AppointmentList = ({
                                 {isBeingRemoved ? (
                                   <>
                                     <svg
-                                      className="w-4 h-4 animate-spin"
+                                      className="w-4 h-4 animate-spin flex-shrink-0"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                     >
@@ -348,12 +401,13 @@ const AppointmentList = ({
                                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                       ></path>
                                     </svg>
-                                    Removing...
+                                    <span className="hidden sm:inline">Removing...</span>
+                                    <span className="sm:hidden">...</span>
                                   </>
                                 ) : (
                                   <>
                                     <svg
-                                      className="w-4 h-4"
+                                      className="w-4 h-4 flex-shrink-0"
                                       fill="none"
                                       stroke="currentColor"
                                       viewBox="0 0 24 24"
@@ -365,7 +419,8 @@ const AppointmentList = ({
                                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                       />
                                     </svg>
-                                    Remove from Schedule
+                                    <span className="hidden sm:inline">Remove from Schedule</span>
+                                    <span className="sm:hidden">Remove</span>
                                   </>
                                 )}
                               </button>
@@ -395,21 +450,20 @@ const AppointmentList = ({
                               {appointment.reason}
                             </p>
                           </div>
-
                         </div>
 
                         {/* Action Buttons */}
                         {appointment.status === "confirmed" && (
-                          <div className="mt-4 flex gap-3">
+                          <div className="mt-4 flex flex-col sm:flex-row gap-3">
                             {canReschedule(appointment) && (
                               <button
                                 onClick={() =>
                                   onRescheduleRequest?.(appointment)
                                 }
-                                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                               >
                                 <svg
-                                  className="w-4 h-4"
+                                  className="w-4 h-4 flex-shrink-0"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -427,10 +481,10 @@ const AppointmentList = ({
                             {canCancel(appointment) && (
                               <button
                                 onClick={() => onCancelRequest?.(appointment)}
-                                className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
                               >
                                 <svg
-                                  className="w-4 h-4"
+                                  className="w-4 h-4 flex-shrink-0"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -459,10 +513,10 @@ const AppointmentList = ({
 
       {/* Confirmation Modal */}
       {showConfirmModal && appointmentToRemove && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full">
             <div className="flex items-center gap-3 mb-4">
-              <div className="text-red-600">
+              <div className="text-red-600 flex-shrink-0">
                 <svg
                   className="w-6 h-6"
                   fill="none"
@@ -482,34 +536,34 @@ const AppointmentList = ({
               </h3>
             </div>
 
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-6 text-sm sm:text-base">
               Are you sure you want to remove this appointment from your
               schedule? This action cannot be undone.
             </p>
 
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-6">
               <div className="text-sm">
                 <div className="font-medium text-gray-900 mb-1">
                   {appointmentToRemove.time} -{" "}
                   {doctors.find((d) => d.id === appointmentToRemove.doctor_id)
                     ?.name || "Unknown Doctor"}
                 </div>
-                <div className="text-gray-600">
+                <div className="text-gray-600 text-xs sm:text-sm">
                   {appointmentToRemove.date} • {appointmentToRemove.reason}
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 justify-end">
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
               <button
                 onClick={handleCancelRemove}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors order-2 sm:order-1"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmRemove}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors order-1 sm:order-2"
               >
                 Yes, Remove
               </button>
