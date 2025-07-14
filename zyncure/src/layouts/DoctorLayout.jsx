@@ -362,7 +362,7 @@ default:
           text="Notifications"
           active={isActive('/notifications')}
           onClick={() => navigate('/doctor/notifications')}
-          alert
+          // alert
         />
         <SidebarItem
           icon={<MessageSquare size={20} />}
