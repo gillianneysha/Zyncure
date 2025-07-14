@@ -102,32 +102,44 @@ export default function AdminReports() {
     }
   };
 
-  const fetchTotalRevenue = async () => {
-    try {
-      const { data: payments, error } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('status', 'completed');
+const fetchTotalRevenue = async () => {
+  try {
+    // Fetch all payments with paid or refunded status
+    const { data: payments, error } = await supabase
+      .from('payments')
+      .select('amount, status')
+      .in('status', ['paid', 'refunded']);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      const total = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
-      setTotalRevenue(total);
-    } catch (error) {
-      console.error('Error fetching revenue:', error);
-      // Fallback data if database fetch fails
-      setTotalRevenue(85000);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Calculate total: add paid amounts, subtract refunded amounts
+    // Convert from centavos to PHP by dividing by 100
+    const total = payments?.reduce((sum, payment) => {
+      const amount = (payment.amount || 0) / 100;
+      if (payment.status === 'paid') {
+        return sum + amount;
+      } else if (payment.status === 'refunded') {
+        return sum - amount;
+      }
+      return sum;
+    }, 0) || 0;
+
+    setTotalRevenue(total);
+  } catch (error) {
+    console.error('Error fetching revenue:', error);
+
+    setTotalRevenue(85000);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount);
   };
 
