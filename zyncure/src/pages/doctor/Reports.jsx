@@ -5,6 +5,7 @@ import {
   X, Folder, FileText, Download, ArrowLeft, User, Clock,
   SquarePlus, ChevronDown, MoreVertical, Trash2
 } from 'lucide-react';
+import ActionModal from "../../components/ActionModal"; // <-- reference your ActionModal
 
 // Utility for truncating file names
 function truncateFileName(fileName, maxLength = 25) {
@@ -26,7 +27,6 @@ function formatExpiresAt(expires_at) {
   const diffMins = Math.round(diffMs / (1000 * 60));
   const diffHrs = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
   if (diffDays > 0) return `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
   if (diffHrs > 0) return `Expires in ${diffHrs} hour${diffHrs > 1 ? 's' : ''}`;
   if (diffMins > 0) return `Expires in ${diffMins} minute${diffMins > 1 ? 's' : ''}`;
@@ -272,6 +272,10 @@ export default function DoctorsPatientsFolders() {
 
   const [doctorMap, setDoctorMap] = useState({});
 
+  // PATCH: state for note deletion
+  const [deleteNoteTarget, setDeleteNoteTarget] = useState(null);
+  const [showDeleteNoteModal, setShowDeleteNoteModal] = useState(false);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUser(data?.user || null);
@@ -337,9 +341,11 @@ export default function DoctorsPatientsFolders() {
 
   async function loadPatientsWithInfo() {
     setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
     const { data: connections, error: connError } = await supabase
       .from('doctor_connection_details')
       .select('*')
+      .eq('med_id', user.id)
       .eq('status', 'accepted');
     if (connError || !connections) {
       setPatients([]);
@@ -420,12 +426,16 @@ export default function DoctorsPatientsFolders() {
       const uniqueFiles = allFiles.filter(
         (file, idx, arr) => arr.findIndex(f2 => f2.id === file.id) === idx
       );
+      // Only get consultation notes for medical_files UUIDs
+      const fileIds = uniqueFiles
+        .filter(f => typeof f.id === 'string' && !f.id.startsWith('sharedsymptom_'))
+        .map(f => f.id)
+        .filter(Boolean);
 
-      const fileIds = uniqueFiles.map(f => f.id).filter(Boolean);
       const notesByFileId = await fetchConsultationNotes(fileIds);
       const filesWithNotes = uniqueFiles.map(file => ({
         ...file,
-        consultation_notes: notesByFileId[file.id] || [],
+        consultation_notes: (notesByFileId[file.id] || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
       }));
 
       return {
@@ -440,41 +450,30 @@ export default function DoctorsPatientsFolders() {
     setLoading(false);
   }
 
-  // --- PATCH: fetch consultation notes for folder files ---
   async function fetchFolderFilesWithNotes(folderId, patientId) {
-    // Get all files in folder owned by patient
     const { data: filesInFolder, error } = await supabase
       .from('medical_files')
       .select('*')
       .eq('folder_id', folderId)
       .eq('owner_id', patientId);
-
     if (error || !filesInFolder) return [];
-
-    // Get consultation notes for these files
     const fileIds = filesInFolder.map(f => f.id);
     const notesByFileId = await fetchConsultationNotes(fileIds);
-
     return filesInFolder.map(file => ({
       ...file,
-      consultation_notes: notesByFileId[file.id] || [],
+      consultation_notes: (notesByFileId[file.id] || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
     }));
   }
 
   async function handleOpenSharedFolder(folder) {
     setOpenedFolder(folder);
     setPreviewFile(null);
-
-    // 1. Files in this folder that are already in sharedFiles (from shares)
     let folderFiles = [];
     if (sharedFiles && folder) {
       folderFiles = sharedFiles.filter(f => f.folder_id === folder.id);
     }
-
-    // 2. PLUS: Fetch all files in this folder owned by the patient, with notes
     if (folder && selectedPatient?.id) {
       const filesFromPatientWithNotes = await fetchFolderFilesWithNotes(folder.id, selectedPatient.id);
-      // Avoid duplicates (by id)
       const existingFileIds = new Set(folderFiles.map(f => f.id));
       filesFromPatientWithNotes.forEach(f => {
         if (!existingFileIds.has(f.id)) {
@@ -515,7 +514,6 @@ export default function DoctorsPatientsFolders() {
   async function handleSaveNote(noteText) {
     if (!currentUser || !selectedPatient) return;
     let now = new Date();
-
     if (notesFileTarget && notesFileTarget.id) {
       const { error } = await supabase.from('consultation_notes').insert([
         {
@@ -703,18 +701,42 @@ export default function DoctorsPatientsFolders() {
     setNotesFolderTarget(null);
     await loadPatientsWithInfo();
 
-    // If previewing a folder, reload its files (with notes)
     if (openedFolder) {
       await handleOpenSharedFolder(openedFolder);
     }
   }
 
-  // --- PATCH: Preview modal always shows sidebar for files with notes inside/outside folders ---
+  // PATCH: Delete Note Handler
+  async function handleDeleteNote(note) {
+  if (!note?.id) return;
+  await supabase.from('consultation_notes').delete().eq('id', note.id);
+  await loadPatientsWithInfo();
+  if (openedFolder) {
+    await handleOpenSharedFolder(openedFolder);
+  }
+  if (previewFile) {
+    const updatedNotes = (previewFile.consultation_notes || []).filter(n => n.id !== note.id);
+    if (updatedNotes.length === 0) {
+      setPreviewFile(null);
+    } else {
+      setPreviewFile(prev => ({
+        ...prev,
+        consultation_notes: updatedNotes
+      }));
+    }
+  }
+}
+
   const renderPreviewModal = (file) => {
     if (!file) return null;
-    // Hide sidebar for doctor-note PDFs only
-    const showNotesSidebar = !(file.name && file.name.startsWith('doctor-note-')) 
-      && file.consultation_notes && file.consultation_notes.length > 0;
+    const isLoneDoctorNote = file.name && file.name.startsWith('doctor-note-');
+    const showNotesSidebar = !isLoneDoctorNote
+      && file.consultation_notes
+      && file.consultation_notes.length > 0;
+    const sortedNotes = (file.consultation_notes || []).slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const uniqueNotes = sortedNotes.filter(
+      (note, idx, arr) => note.id && arr.findIndex(n2 => n2.id === note.id) === idx
+    );
     return (
       <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
         <div
@@ -729,7 +751,6 @@ export default function DoctorsPatientsFolders() {
           >
             <X size={22} />
           </button>
-          {/* File Preview */}
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="mb-2 font-semibold truncate">{file.name}</div>
             <div className="flex-1 flex items-center justify-center overflow-auto my-4">
@@ -764,19 +785,36 @@ export default function DoctorsPatientsFolders() {
               )}
             </div>
           </div>
-          {/* Notes Sidebar */}
           {showNotesSidebar && (
             <div className="w-full md:w-80 border-l bg-gray-50 p-4 flex-shrink-0 overflow-y-auto">
               <div className="font-semibold text-[#55A1A4] mb-2">Consultation Notes</div>
-              {file.consultation_notes.map((note, idx) => (
-                <div key={note.id || idx} className="mb-4">
-                  <div className="text-xs text-gray-500 mb-1">
-                    {note.doctor_id && doctorMap[note.doctor_id]
-                      ? <>Doctor {doctorMap[note.doctor_id]}</>
-                      : note.doctor_id
-                      ? `Doctor ${note.doctor_id}`
-                      : ""}
-                    {note.created_at ? ` on ${new Date(note.created_at).toLocaleString()}` : ""}
+              {uniqueNotes.map(note => (
+                <div key={note.id} className="mb-4 group relative">
+                  <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                    <span>
+                      {note.doctor_id && doctorMap[note.doctor_id]
+                        ? <>Doctor {doctorMap[note.doctor_id]}</>
+                        : note.doctor_id
+                        ? `Doctor ${note.doctor_id}`
+                        : ""}
+                      {note.created_at ? ` on ${new Date(note.created_at).toLocaleString()}` : ""}
+                    </span>
+                    <div className="relative flex items-center">
+                      {/* PATCH: Only doctors can delete notes */}
+                      {currentUser && currentUser.id === note.doctor_id && (
+                        <button
+                          className="ml-2 p-1 rounded hover:bg-gray-200"
+                          title="Note options"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setDeleteNoteTarget(note);
+                            setShowDeleteNoteModal(true);
+                          }}
+                        >
+                          <MoreVertical size={18} className="text-gray-500" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="text-sm whitespace-pre-line">{note.note}</div>
                 </div>
@@ -784,6 +822,24 @@ export default function DoctorsPatientsFolders() {
             </div>
           )}
         </div>
+        {/* Use your ActionModal for delete confirmation */}
+        <ActionModal
+          open={showDeleteNoteModal && !!deleteNoteTarget}
+          icon={<Trash2 size={32} style={{ color: "#E36464" }} />}
+          title="Delete Consultation Note"
+          message="Are you sure you want to delete this consultation note? This action cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={async () => {
+            await handleDeleteNote(deleteNoteTarget);
+            setShowDeleteNoteModal(false);
+            setDeleteNoteTarget(null);
+          }}
+          onCancel={() => {
+            setShowDeleteNoteModal(false);
+            setDeleteNoteTarget(null);
+          }}
+        />
       </div>
     );
   };

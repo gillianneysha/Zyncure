@@ -143,6 +143,8 @@ export default function AppRouter() {
         </Route>
         <Route path="connections" element={<DoctorConnections />} />
         <Route path="notifications" element={<DoctorNotifications />} />
+        {/* --- IMPORTANT: Add direct /doctor/reports route to use layout --- */}
+        <Route path="reports" element={<DoctorReports />} />
       </Route>
 
       {/* --- ADMIN ROUTES --- */}
