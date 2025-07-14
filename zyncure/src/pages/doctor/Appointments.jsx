@@ -23,27 +23,151 @@ const DoctorAppointments = () => {
   const [patientDetails, setPatientDetails] = useState(null);
   const [appointmentsByDate, setAppointmentsByDate] = useState({});
 
+
   
 
-const formatTimeForDisplay = (time) => {
-  if (!time) return '';
   
-  // If time is in 24-hour format (HH:MM), convert to 12-hour format
-  if (/^\d{2}:\d{2}$/.test(time)) {
-    const [hours, minutes] = time.split(':');
-    const hour24 = parseInt(hours);
-    const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
-    const period = hour24 >= 12 ? 'PM' : 'AM';
-    return `${hour12}:${minutes} ${period}`;
+
+const formatTimeForDisplay = (timeString) => {
+  if (!timeString) return '';
+  
+  console.log('=== DEBUG TIME FORMATTING ===');
+  console.log('Original timeString:', timeString);
+  console.log('Type of timeString:', typeof timeString);
+  
+  try {
+    // If already in 12-hour format, return as is
+    if (timeString.includes('AM') || timeString.includes('PM')) {
+      console.log('Already in 12-hour format, returning as is');
+      return timeString;
+    }
+    
+    // Handle your database format: "2025-07-13 08:30:00:00"
+    let timePart;
+    
+    if (timeString.includes(' ')) {
+      // Split by space and get the time part
+      const parts = timeString.split(' ');
+      timePart = parts[1]; // This gets "08:30:00:00"
+      console.log('Date part:', parts[0]);
+      console.log('Time part:', timePart);
+    } else {
+      timePart = timeString;
+      console.log('No space found, using full string as time part:', timePart);
+    }
+    
+    // Remove extra seconds if present (08:30:00:00 -> 08:30:00)
+    const timeComponents = timePart.split(':');
+    console.log('Time components:', timeComponents);
+    
+    let hours = parseInt(timeComponents[0]);
+    const minutes = parseInt(timeComponents[1]);
+    
+    console.log('Parsed hours:', hours);
+    console.log('Parsed minutes:', minutes);
+    
+    // IMPORTANT: Check what the patient side is expecting
+    // If patient books at 2:00 PM and it's stored as 14:00, then we should show 2:00 PM
+    // If patient books at 2:00 PM and it's stored as 22:00 (due to UTC conversion), then we need to adjust
+    
+    // Let's try different approaches:
+    
+    // APPROACH 1: Just convert to 12-hour format without any adjustment
+    let finalTime;
+    
+    if (hours === 0) {
+      finalTime = `12:${minutes.toString().padStart(2, '0')} AM`;
+    } else if (hours < 12) {
+      finalTime = `${hours}:${minutes.toString().padStart(2, '0')} AM`;
+    } else if (hours === 12) {
+      finalTime = `12:${minutes.toString().padStart(2, '0')} PM`;
+    } else {
+      finalTime = `${hours - 12}:${minutes.toString().padStart(2, '0')} PM`;
+    }
+    
+    console.log('Final formatted time (no adjustment):', finalTime);
+    
+    // APPROACH 2: Try with timezone adjustment (if needed)
+    // Create a Date object to handle timezone properly
+    let adjustedTime;
+    try {
+      if (timeString.includes(' ')) {
+        // Full datetime string
+        const fullDateTime = new Date(timeString);
+        console.log('Full datetime object:', fullDateTime);
+        console.log('UTC hours:', fullDateTime.getUTCHours());
+        console.log('Local hours:', fullDateTime.getHours());
+        
+        // Format using local time
+        adjustedTime = fullDateTime.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        console.log('Adjusted time using Date object:', adjustedTime);
+      }
+    } catch (dateError) {
+      console.log('Error creating Date object:', dateError);
+    }
+    
+    console.log('=== END DEBUG ===');
+    
+    // Return the basic conversion for now
+    return finalTime;
+    
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return timeString;
   }
-  
-  // If already in 12-hour format, return as is
-  if (time.includes('AM') || time.includes('PM')) {
-    return time;
-  }
-  
-  return time;
 };
+
+// Alternative approach: Let's also try this function
+const formatTimeAlternative = (timeString) => {
+  if (!timeString) return '';
+  
+  console.log('=== ALTERNATIVE APPROACH ===');
+  console.log('Input:', timeString);
+  
+  try {
+    // Try to parse as a full datetime first
+    const date = new Date(timeString);
+    
+    if (!isNaN(date.getTime())) {
+      console.log('Successfully parsed as Date object');
+      console.log('Date object:', date);
+      console.log('UTC string:', date.toUTCString());
+      console.log('Local string:', date.toString());
+      
+      // Format using the user's local timezone
+      const formatted = date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila' // Adjust this to your timezone
+      });
+      
+      console.log('Formatted with timezone:', formatted);
+      console.log('=== END ALTERNATIVE ===');
+      
+      return formatted;
+    }
+  } catch (error) {
+    console.log('Date parsing failed:', error);
+  }
+  
+  // Fallback to manual parsing
+  return formatTimeForDisplay(timeString);
+};
+
+const formatDateForStorage = (date) => {
+  // Create a new date object to avoid timezone issues
+  const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const loadAppointments = useCallback(async () => {
   setLoading(true);
   setError('');
@@ -53,10 +177,9 @@ const loadAppointments = useCallback(async () => {
     status: statusFilter
   });
   
-  try {
-    const dateString = selectedDate.toISOString().split('T')[0];
-    const { data, error } = await doctorAppointmentService.getDoctorAppointments(dateString, statusFilter);
-    
+ try {
+  const dateString = formatDateForStorage(selectedDate); // ← NEW LINE
+  const { data, error } = await doctorAppointmentService.getDoctorAppointments(dateString, statusFilter);
     console.log('Debug - Appointments loaded:', {
       success: !!data,
       count: data?.length || 0,
@@ -67,6 +190,11 @@ const loadAppointments = useCallback(async () => {
       setError(`Error loading appointments: ${error}`);
       setAppointments([]);
     } else {
+      console.log('Raw appointment data:', data); // ADD THIS LINE
+      if (data && data.length > 0) {
+        console.log('First appointment time:', data[0].time); // ADD THIS LINE
+        console.log('Formatted time:', formatTimeForDisplay(data[0].time)); // ADD THIS LINE
+      }
       setAppointments(data || []);
     }
   } catch (err) {
@@ -114,9 +242,9 @@ const loadAppointments = useCallback(async () => {
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
       
-      const { data, error } = await doctorAppointmentService.getDoctorAppointmentsRange(
-        firstDay.toISOString().split('T')[0],
-        lastDay.toISOString().split('T')[0]
+     const { data, error } = await doctorAppointmentService.getDoctorAppointmentsRange(
+  formatDateForStorage(firstDay),     // ← NEW LINE
+  formatDateForStorage(lastDay)       // ← NEW LINE
       );
       
       if (!error && data) {
