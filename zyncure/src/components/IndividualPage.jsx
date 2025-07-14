@@ -8,6 +8,7 @@ import LogoutModal from "./LogoutModal";
 import DeleteAccountModal from "./DeleteAccountModal";
 import Security from "../pages/IndividualPages/Security";
 import Notification from "../pages/IndividualPages/Notifications";
+import ConfirmationModal from "./ConfirmationModal";
 
 export function PersonalInfoForm() {
   const [formData, setFormData] = useState({
@@ -493,6 +494,8 @@ export function BillingPage() {
   const [error, setError] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
   const [showContactInfo, setShowContactInfo] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+const [showReactivateModal, setShowReactivateModal] = useState(false);
 
   // Check for payment success/failure in URL params
   useEffect(() => {
@@ -720,25 +723,25 @@ const handlePlanChange = () => {
 };
 
   // Handle cancellation
-  const handleCancelSubscription = async () => {
-    if (!currentSubscription) return;
+const handleCancelSubscription = async () => {
+  if (!currentSubscription) return;
 
-    if (confirm('Are you sure you want to cancel your subscription? This action cannot be undone.')) {
-      try {
-        const { error } = await supabase
-          .from('subscriptions')
-          .update({ status: 'cancelled' })
-          .eq('id', currentSubscription.id);
+  try {
+    const { error } = await supabase
+      .from('subscriptions')
+      .update({ status: 'cancelled' })
+      .eq('id', currentSubscription.id);
 
-        if (error) throw error;
+    if (error) throw error;
 
-        setCurrentSubscription({ ...currentSubscription, status: 'cancelled' });
-        setPaymentStatus('Your subscription has been cancelled successfully.');
-      } catch (error) {
-        setError(`Failed to cancel subscription: ${error.message}`);
-      }
-    }
-  };
+    setCurrentSubscription({ ...currentSubscription, status: 'cancelled' });
+    setPaymentStatus('Your subscription has been cancelled successfully.');
+    setShowCancelModal(false);
+  } catch (error) {
+    setError(`Failed to cancel subscription: ${error.message}`);
+    setShowCancelModal(false);
+  }
+};
 
   // Handle payment success (call this when user returns from PayMongo)
   const handlePaymentSuccess = async (paymentRecordId, userId, tier) => {
@@ -951,30 +954,32 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   };
 
   const reactivateSubscription = async () => {
-    try {
-      // Update subscription status to active
-      const { error } = await supabase
-        .from('subscriptions')
-        .update({
-          status: 'active',
-          started_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
+  try {
+    // Update subscription status to active
+    const { error } = await supabase
+      .from('subscriptions')
+      .update({
+        status: 'active',
+        started_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', user.id);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // Refresh subscription data
-      await fetchSubscription();
+    // Refresh subscription data
+    await fetchSubscription();
 
-      // Show success message
-      alert('Subscription reactivated successfully!');
-    } catch (error) {
-      console.error('Error reactivating subscription:', error);
-      alert('Failed to reactivate subscription. Please try again.');
-    }
-  };
+    // Show success message
+    setPaymentStatus('Subscription reactivated successfully!');
+    setShowReactivateModal(false);
+  } catch (error) {
+    console.error('Error reactivating subscription:', error);
+    setError('Failed to reactivate subscription. Please try again.');
+    setShowReactivateModal(false);
+  }
+};
 
   // Handle refund request
   const handleRefundRequest = async (paymentId) => {
@@ -1178,12 +1183,12 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
         >
           Change Plan
         </button>
-        <button
-          onClick={handleCancelSubscription}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-        >
-          Cancel Subscription
-        </button>
+      <button
+  onClick={() => setShowCancelModal(true)}
+  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+>
+  Cancel Subscription
+</button>
         {/* <RefundButton /> */}
       </div>
     </div>
@@ -1191,12 +1196,12 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
 })()}
         {(isExpired || isCancelled) && (
           <div className="mt-4">
-            <button
-              onClick={reactivateSubscription}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
-            >
-              Reactivate Subscription
-            </button>
+           <button
+  onClick={() => setShowReactivateModal(true)}
+  className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
+>
+  Reactivate Subscription
+</button>
           </div>
         )}
       </div>
@@ -1481,6 +1486,28 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
           onClick={handleOptionClick}
         />
       </div>
+      {/* Confirmation Modals */}
+<ConfirmationModal
+  isOpen={showCancelModal}
+  onClose={() => setShowCancelModal(false)}
+  onConfirm={handleCancelSubscription}
+  title="Cancel Subscription"
+  message="Are you sure you want to cancel your subscription? This action cannot be undone and you will lose access to premium features."
+  confirmText="Yes, Cancel"
+  cancelText="Keep Subscription"
+  type="danger"
+/>
+
+<ConfirmationModal
+  isOpen={showReactivateModal}
+  onClose={() => setShowReactivateModal(false)}
+  onConfirm={reactivateSubscription}
+  title="Reactivate Subscription"
+  message="Are you sure you want to reactivate your subscription? You will be charged for the current billing period."
+  confirmText="Yes, Reactivate"
+  cancelText="Cancel"
+  type="success"
+/>
     </div>
   );
 }
