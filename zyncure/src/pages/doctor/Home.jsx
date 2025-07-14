@@ -1,34 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Eye, Share2, Bell, Calendar, FileText, Users } from 'lucide-react';
-import { supabase } from '../../client'; 
+import { Search, Eye, Share2, Bell, FileText, Users } from 'lucide-react';
+import { supabase } from '../../client';
 import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
-  // State for backend data
   const [connectedPatients, setConnectedPatients] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Keep existing hardcoded data for recent records
-  const [recentRecords] = useState([
-    { id: 1, patient: 'Jane Smith', type: 'Blood Test', date: '03/22/2025' },
-    { id: 2, patient: 'Anne Doe', type: 'Blood Test', date: '03/22/2025' },
-    { id: 3, patient: 'Maria Smith', type: 'Blood Test', date: '03/22/2025' }
-  ]);
-
+  const [patientMap, setPatientMap] = useState({});
+  const [recentRecords, setRecentRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPatients, setFilteredPatients] = useState([]);
   const navigate = useNavigate();
 
-  // Fetch unread notifications
   const fetchUnreadNotifications = async () => {
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
-      // Fetch top 4 unread notifications
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
@@ -36,104 +25,128 @@ const Dashboard = () => {
         .eq("is_read", false)
         .order("created_at", { ascending: false })
         .limit(4);
-
-      if (!error) {
-        setNotifications(data || []);
-      }
+      if (!error) setNotifications(data || []);
     } catch (err) {
       console.error('Error fetching notifications:', err);
     }
   };
 
-  // Fetch doctor's connected patients from Supabase
   const fetchConnectedPatients = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      throw userError;
+    try {
+      setLoading(true);
+      setError(null);
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error('No authenticated user found');
+      const { data, error: supabaseError } = await supabase
+        .from('doctor_connection_details')
+        .select('*')
+        .eq('med_id', user.id)
+        .eq('status', 'accepted');
+      if (supabaseError) throw supabaseError;
+      setConnectedPatients(data || []);
+    } catch (err) {
+      console.error('Error fetching connected patients:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (!user) {
-      throw new Error('No authenticated user found');
+  // limit displayed records to 4
+  const fetchRecentRecords = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error('No authenticated user found');
+      const now = new Date().toISOString();
+      const { data: shares, error: sharesError } = await supabase
+        .from('file_shares')
+        .select(`
+          id,
+          file_id,
+          owner_id,
+          shared_with_id,
+          created_at,
+          expires_at,
+          is_active,
+          medical_files!file_shares_file_id_fkey (
+            id, name
+          )
+        `)
+        .eq('shared_with_id', user.id)
+        .eq('is_active', true)
+        .or(`expires_at.is.null,expires_at.gt.${now}`)
+        .order('created_at', { ascending: false })
+        .limit(4); // Limit to 4 records only
+
+      if (sharesError) throw sharesError;
+      const ownerIds = Array.from(new Set((shares || []).map(share => share.owner_id).filter(Boolean)));
+
+      let patientMap = {};
+      if (ownerIds.length > 0) {
+        const { data: patientsData, error: patientsError } = await supabase
+          .from('patients')
+          .select('patient_id, first_name, last_name')
+          .in('patient_id', ownerIds);
+        if (!patientsError && patientsData) {
+          for (const p of patientsData) {
+            patientMap[p.patient_id] =
+              ((p.first_name || '') + ' ' + (p.last_name || '')).trim() || p.patient_id;
+          }
+        }
+      }
+      setPatientMap(patientMap);
+
+      const mapped = (shares || []).map(share => ({
+        id: share.medical_files?.id ?? share.file_id,
+        fileId: share.medical_files?.id ?? share.file_id,
+        patientId: share.owner_id,
+        patientName: patientMap[share.owner_id] || share.owner_id,
+        name: share.medical_files?.name || "Record",
+        date: share.created_at
+      }));
+
+      setRecentRecords(mapped);
+    } catch (err) {
+      console.error('Error fetching recent records:', err);
+      setRecentRecords([]);
     }
+  };
 
-    // Use the doctor_connection_details view to get connected patients
-    const { data, error: supabaseError } = await supabase
-      .from('doctor_connection_details')
-      .select('*')
-      .eq('med_id', user.id) // Get current doctor's ID
-      .eq('status', 'accepted'); // Only get accepted connections
-
-    if (supabaseError) {
-      throw supabaseError;
-    }
-
-    setConnectedPatients(data || []);
-
-  } catch (err) {
-    console.error('Error fetching connected patients:', err);
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // Filter patients based on search
   useEffect(() => {
     const filtered = connectedPatients.filter(patient =>
-      patient.patient_first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.patient_last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.patient_short_id?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredPatients(filtered);
   }, [searchTerm, connectedPatients]);
 
-  // Load data on component mount
   useEffect(() => {
     fetchConnectedPatients();
     fetchUnreadNotifications();
+    fetchRecentRecords();
   }, []);
 
-  // Helper function for notification icons
   const getNotificationIcon = (type) => {
     switch (type) {
-      case "connection_request":
-        return "👥";
-      case "connection_accepted":
-        return "✅";
-      case "connection_rejected":
-        return "❌";
+      case "connection_request": return "👥";
+      case "connection_accepted": return "✅";
+      case "connection_rejected": return "❌";
       case "appointment_created":
       case "appointment_updated":
-      case "appointment_cancelled":
-        return "📅";
-      case "announcement":
-        return "📢";
-      default:
-        return "🔔";
+      case "appointment_cancelled": return "📅";
+      case "announcement": return "📢";
+      default: return "🔔";
     }
   };
 
-  // Handle connection actions
   const handleRemoveConnection = async (connectionId) => {
-    if (!confirm('Are you sure you want to remove this patient connection?')) {
-      return;
-    }
-
+    if (!confirm('Are you sure you want to remove this patient connection?')) return;
     try {
-      const { error } = await supabase
-        .rpc('remove_connection', { connection_id: connectionId });
-
-      if (error) {
-        throw error;
-      }
-
-      // Refresh data
+      const { error } = await supabase.rpc('remove_connection', { connection_id: connectionId });
+      if (error) throw error;
       await fetchConnectedPatients();
     } catch (err) {
       console.error('Error removing connection:', err);
@@ -141,15 +154,13 @@ const Dashboard = () => {
     }
   };
 
-  // Helper functions
-  const handleViewRecord = (recordId) => {
-    console.log(`View record ${recordId}`);
-    // TODO: Navigate to record detail or open modal
+  // This ensures navigation passes both patientId and fileId for preview
+  const handleViewRecord = (fileId, patientId) => {
+    navigate(`/doctor/reports?fileId=${fileId}&patientId=${patientId}`);
   };
 
   const handleViewAlert = (notificationId) => {
     console.log(`View notification ${notificationId}`);
-    // TODO: Mark as read and navigate to notifications page
   };
 
   const handleViewPatient = (patientId) => {
@@ -158,7 +169,6 @@ const Dashboard = () => {
 
   const handleSharePatient = (patientId) => {
     console.log(`Share patient ${patientId}`);
-    // TODO: Open share dialog or functionality
   };
 
   const formatDate = (dateString) => {
@@ -171,12 +181,9 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Dashboard Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-teal-600 mb-2">Doctor Dashboard</h1>
       </div>
-
-      {/* Top Section - Recently Shared Records and Notifications */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Recently Shared Records */}
         <div className="bg-red-50 rounded-lg p-6 border border-red-100">
@@ -185,25 +192,28 @@ const Dashboard = () => {
             Recently Shared Records
           </h2>
           <div className="space-y-3">
-            {recentRecords.map((record) => (
-              <div key={record.id} className="flex items-center justify-between p-3 bg-white rounded-md border border-red-200">
-                <div className="flex-1">
-                  <span className="text-sm text-gray-700">
-                    Record for {record.patient} - {record.type} - {record.date}
-                  </span>
+            {recentRecords.length === 0 ? (
+              <div className="text-gray-400">No records have been shared recently.</div>
+            ) : (
+              recentRecords.map((record) => (
+                <div key={record.id} className="flex items-center justify-between p-3 bg-white rounded-md border border-red-200">
+                  <div className="flex-1">
+                    <span className="text-sm text-gray-700">
+                      Record for {record.patientName} - {formatDate(record.date)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleViewRecord(record.fileId, record.patientId)}
+                    className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"
+                  >
+                    <Eye className="w-3 h-3" />
+                    View
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleViewRecord(record.id)}
-                  className="px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600 transition-colors flex items-center gap-1"
-                >
-                  <Eye className="w-3 h-3" />
-                  View
-                </button>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
-
         {/* Recent Notifications */}
         <div className="bg-red-50 rounded-lg p-6 border border-red-100">
           <h2 className="text-xl font-semibold text-teal-600 mb-4 flex items-center gap-2">
@@ -252,16 +262,12 @@ const Dashboard = () => {
           )}
         </div>
       </div>
-
-      {/* Connected Patients Section */}
       <div className="bg-red-50 rounded-lg p-6 border border-red-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-teal-600 flex items-center gap-2">
             <Users className="w-5 h-5" />
             Connected Patients ({connectedPatients.length})
           </h2>
-          
-          {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -273,16 +279,12 @@ const Dashboard = () => {
             />
           </div>
         </div>
-
-        {/* Loading State */}
         {loading && (
           <div className="text-center py-8">
             <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Loading patient connections...</p>
           </div>
         )}
-
-        {/* Error State */}
         {error && (
           <div className="text-center py-8 text-red-600">
             <p>Error loading connections: {error}</p>
@@ -294,11 +296,8 @@ const Dashboard = () => {
             </button>
           </div>
         )}
-
-        {/* Connected Patients Table */}
         {!loading && !error && (
           <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
-            {/* Table Header */}
             <div className="grid grid-cols-[110px_1.5fr_2fr_160px_210px] gap-x-4 p-4 bg-red-100 border-b border-red-200">
               <div className="font-medium text-red-700">Patient ID</div>
               <div className="font-medium text-red-700">Patient Name</div>
@@ -306,13 +305,11 @@ const Dashboard = () => {
               <div className="font-medium text-red-700 whitespace-nowrap">Connected Since</div>
               <div className="font-medium text-red-700 whitespace-nowrap pr-4">Actions</div>
             </div>
-
-            {/* Table Body */}
             <div className="divide-y divide-red-100">
               {filteredPatients.map((patient) => (
                 <div key={patient.id} className="grid grid-cols-[110px_1.5fr_2fr_160px_210px] gap-x-4 p-4 hover:bg-red-25 transition-colors">
                   <div className="text-red-700 font-mono font-medium">{patient.patient_short_id?.substring(0, 4)}</div>
-                  <div className="text-red-700 font-medium">{patient.patient_first_name} {patient.patient_last_name}</div>
+                  <div className="text-red-700 font-medium">{patient.first_name} {patient.last_name}</div>
                   <div className="text-gray-600 truncate">{patient.patient_email}</div>
                   <div className="text-gray-600 whitespace-nowrap">{formatDate(patient.created_at)}</div>
                   <div className="flex gap-2 whitespace-nowrap pr-4">
@@ -340,16 +337,12 @@ const Dashboard = () => {
                 </div>
               ))}
             </div>
-
-            {/* Empty State */}
             {filteredPatients.length === 0 && !searchTerm && (
               <div className="p-8 text-center text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p>No connected patients yet.</p>
               </div>
             )}
-
-            {/* Empty State for Search */}
             {filteredPatients.length === 0 && searchTerm && (
               <div className="p-8 text-center text-gray-500">
                 <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
