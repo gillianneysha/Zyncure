@@ -63,16 +63,40 @@ const AppointmentList = ({
     );
   };
 
-const canCancel = (appointment) => {
-  // Only allow cancellation for confirmed appointments within 24 hours of creation
-  if (appointment.status !== 'confirmed') return false;
-  
-  const now = new Date();
-  const appointmentCreatedAt = new Date(appointment.created_at);
-  const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
-  
-  return hoursFromCreation <= 24;
-};
+  const canCancel = (appointment) => {
+    // Only allow cancellation for confirmed appointments
+    if (appointment.status !== 'confirmed') return false;
+    
+    // Check if created_at exists and is valid
+    if (!appointment.created_at) {
+      console.warn('No created_at field found for appointment:', appointment.id);
+      // If no created_at, allow cancellation (fallback behavior)
+      return true;
+    }
+    
+    try {
+      const now = new Date();
+      const appointmentCreatedAt = new Date(appointment.created_at);
+      
+      // Check if the date is valid
+      if (isNaN(appointmentCreatedAt.getTime())) {
+        console.warn('Invalid created_at date for appointment:', appointment.id);
+        // If invalid date, allow cancellation (fallback behavior)
+        return true;
+      }
+      
+      const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
+      
+      // Debug log
+      console.log('Appointment:', appointment.id, 'Hours from creation:', hoursFromCreation);
+      
+      return hoursFromCreation <= 24;
+    } catch (error) {
+      console.error('Error checking cancellation eligibility:', error);
+      // If error, allow cancellation (fallback behavior)
+      return true;
+    }
+  };
 
   // Show confirmation modal
   const handleRemoveClick = (appointment) => {
@@ -371,6 +395,7 @@ const canCancel = (appointment) => {
                               {appointment.reason}
                             </p>
                           </div>
+
                         </div>
 
                         {/* Action Buttons */}
