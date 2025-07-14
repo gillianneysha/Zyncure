@@ -6,6 +6,21 @@ import {
   SquarePlus, ChevronDown, MoreVertical, Trash2
 } from 'lucide-react';
 import ActionModal from "../../components/ActionModal"; // <-- reference your ActionModal
+import { useLocation } from 'react-router-dom';
+
+
+const Reports = () => {
+  const location = useLocation();
+  const { selectedPatientId, autoOpenFolder } = location.state || {};
+  
+  // Use selectedPatientId to automatically open that patient's folder
+  useEffect(() => {
+    if (autoOpenFolder && selectedPatientId) {
+      // Logic to open the specific patient's folder
+      setOpenFolderId(selectedPatientId); // or whatever your folder opening logic is
+    }
+  }, [selectedPatientId, autoOpenFolder]);
+};
 
 // Utility for truncating file names
 function truncateFileName(fileName, maxLength = 25) {
