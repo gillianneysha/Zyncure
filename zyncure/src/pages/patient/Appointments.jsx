@@ -21,6 +21,7 @@ const PersonalAppointmentTracker = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('calendar'); // New state for mobile tabs
   const [newAppointment, setNewAppointment] = useState({
     doctor_id: '',
     time: '',
@@ -149,7 +150,11 @@ const PersonalAppointmentTracker = () => {
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
-    setError(''); 
+    setError('');
+    // On mobile, automatically switch to appointments tab when date is selected
+    if (window.innerWidth < 768) {
+      setActiveTab('appointments');
+    }
   };
 
   const handleMonthNavigate = (direction) => {
@@ -262,42 +267,42 @@ const PersonalAppointmentTracker = () => {
   };
 
   const handleCancelRequest = async (appointment) => {
-  // Check if cancellation is allowed
-  if (!canCancelAppointment(appointment)) {
-    setError('Appointments can only be cancelled up to 24 hours before the scheduled time.');
-    return;
-  }
-
-  if (!window.confirm('Are you sure you want to cancel this appointment?')) {
-    return;
-  }
-  
-  setLoading(true);
-  try {
-    const { error: cancelError } = await appointmentService.updateAppointment(
-      appointment.id, 
-      { status: 'cancelled' }
-    );
-    
-    if (cancelError) {
-      setError(`Failed to cancel appointment: ${cancelError}`);
-    } else {
-      // Update local state
-      setAppointments(prevAppointments => 
-        prevAppointments.map(apt => 
-          apt.id === appointment.id 
-            ? { ...apt, status: 'cancelled' }
-            : apt
-        )
-      );
+    // Check if cancellation is allowed
+    if (!canCancelAppointment(appointment)) {
+      setError('Appointments can only be cancelled up to 24 hours before the scheduled time.');
+      return;
     }
-  } catch (err) {
-    console.error('Error cancelling appointment:', err);
-    setError('Failed to cancel appointment. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { error: cancelError } = await appointmentService.updateAppointment(
+        appointment.id, 
+        { status: 'cancelled' }
+      );
+      
+      if (cancelError) {
+        setError(`Failed to cancel appointment: ${cancelError}`);
+      } else {
+        // Update local state
+        setAppointments(prevAppointments => 
+          prevAppointments.map(apt => 
+            apt.id === appointment.id 
+              ? { ...apt, status: 'cancelled' }
+              : apt
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error cancelling appointment:', err);
+      setError('Failed to cancel appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle permanent removal of appointment from the list
   const handlePermanentRemove = (removedAppointment) => {
@@ -326,27 +331,64 @@ const PersonalAppointmentTracker = () => {
     setError('');
   };
 
-const canCancelAppointment = (appointment) => {
-  const now = new Date();
-  const appointmentCreatedAt = new Date(appointment.created_at);
-  const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
-  
-  // Allow cancellation only if within 24 hours of creation AND appointment is confirmed
-  return appointment.status === 'confirmed' && hoursFromCreation <= 24;
-};
+  const canCancelAppointment = (appointment) => {
+    const now = new Date();
+    const appointmentCreatedAt = new Date(appointment.created_at);
+    const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
+    
+    // Allow cancellation only if within 24 hours of creation AND appointment is confirmed
+    return appointment.status === 'confirmed' && hoursFromCreation <= 24;
+  };
+
+  // Get appointments for selected date
+  const selectedDateAppointments = appointments.filter(
+    (apt) => apt.date === formatDateForStorage(selectedDate)
+  );
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold text-myHeader mb-4 self-start">My Appointments</h1>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 className="text-2xl sm:text-3xl font-bold text-myHeader mb-4 sm:mb-6">My Appointments</h1>
       
       {/* Global Error Display */}
       {error && !showModal && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-red-600">{error}</p>
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-red-600 text-sm sm:text-base">{error}</p>
         </div>
       )}
+
+      {/* Mobile Tab Navigation */}
+      <div className="md:hidden mb-4">
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+              activeTab === 'calendar'
+                ? 'bg-myHeader text-white'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Calendar
+          </button>
+          <button
+            onClick={() => setActiveTab('appointments')}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors relative ${
+              activeTab === 'appointments'
+                ? 'bg-myHeader text-white'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Appointments
+            {selectedDateAppointments.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {selectedDateAppointments.length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
       
-      <div className="flex gap-8">
+      {/* Desktop Layout */}
+      <div className="hidden md:flex gap-8">
         {/* Left Calendar Section */}
         <div className="w-80">
           <Calendar
@@ -375,16 +417,84 @@ const canCancelAppointment = (appointment) => {
         {/* Right Appointments Section */}
         <div className="flex-1">
           <AppointmentList
-  selectedDate={selectedDate}
-  appointments={appointments}
-  doctors={doctors}
-  onRescheduleRequest={handleRescheduleRequest}
-  onCancelRequest={handleCancelRequest}
-  onPermanentRemove={handlePermanentRemove}
-  onRefresh={refreshAppointments}
-  canCancelAppointment={canCancelAppointment}  // Add this line
-/>
+            selectedDate={selectedDate}
+            appointments={appointments}
+            doctors={doctors}
+            onRescheduleRequest={handleRescheduleRequest}
+            onCancelRequest={handleCancelRequest}
+            onPermanentRemove={handlePermanentRemove}
+            onRefresh={refreshAppointments}
+            canCancelAppointment={canCancelAppointment}
+          />
         </div>
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="md:hidden">
+        {/* Calendar Tab */}
+        {activeTab === 'calendar' && (
+          <div className="space-y-4">
+            <Calendar
+              currentDate={currentDate}
+              selectedDate={selectedDate}
+              appointments={appointments}
+              onDateSelect={handleDateSelect}
+              onMonthNavigate={handleMonthNavigate}
+            />
+            
+            <button
+              onClick={handleSetAppointment}
+              disabled={loading || doctors.length === 0}
+              className="w-full bg-myHeader text-white py-3 px-4 rounded-xl font-semibold hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Loading...' : 'Book New Appointment'}
+            </button>
+            
+            {doctors.length === 0 && !loading && (
+              <p className="text-sm text-amber-600 text-center px-4">
+                No connected doctors found. Please connect with doctors first.
+              </p>
+            )}
+
+            {/* Quick preview of selected date appointments */}
+            {selectedDateAppointments.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">
+                      {selectedDateAppointments.length} appointment{selectedDateAppointments.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      {selectedDate.toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('appointments')}
+                    className="text-blue-600 text-sm font-medium hover:text-blue-800"
+                  >
+                    View Details →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Appointments Tab */}
+        {activeTab === 'appointments' && (
+          <div>
+            <AppointmentList
+              selectedDate={selectedDate}
+              appointments={appointments}
+              doctors={doctors}
+              onRescheduleRequest={handleRescheduleRequest}
+              onCancelRequest={handleCancelRequest}
+              onPermanentRemove={handlePermanentRemove}
+              onRefresh={refreshAppointments}
+              canCancelAppointment={canCancelAppointment}
+            />
+          </div>
+        )}
       </div>
 
       {/* Enhanced Appointment Modal */}
