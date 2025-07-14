@@ -15,9 +15,9 @@ const PeriodTracker = () => {
   const [selectedTab, setSelectedTab] = useState('Feelings');
   const [selectedValues, setSelectedValues] = useState({
     Feelings: '',
-    Cravings: [], // Changed to array for multiple selections
+    Cravings: [], 
     'Period Flow': '',
-    'Symptoms': [], // Changed to array for multiple selections
+    'Symptoms': [], 
     Energy: '',
     Weight: '',
     Custom: ''
@@ -30,7 +30,7 @@ const PeriodTracker = () => {
   const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
   const [showShareSymptom, setShowShareSymptom] = useState(false);
  
-  // Use ref to track if we should skip the next useEffect update
+  
   const skipNextUpdate = useRef(false);
   const lastUpdateDate = useRef(null);
 
@@ -41,7 +41,7 @@ const PeriodTracker = () => {
     birthdate: ''
   });
 
-  // Tier limitation system state
+
   const [userTier, setUserTier] = useState({
     current_tier: 'free',
     max_symptoms: 3,
@@ -50,10 +50,10 @@ const PeriodTracker = () => {
     can_add_symptoms: true
   });
 
-  // Define which categories are free vs premium
-  const FREE_TIER_CATEGORIES = ['Period Flow', 'Symptoms', 'Feelings'];
 
-  // Function to fetch user tier information from database
+  const FREE_TIER_CATEGORIES = ['Period Flow', 'Symptoms', 'Feelings', 'Custom'];
+
+
   const fetchUserTierInfo = async (userId) => {
     try {
       const { data, error } = await supabase
@@ -92,22 +92,22 @@ const PeriodTracker = () => {
     }
   };
 
-  // Function to check if a category can be tracked based on tier
+
   const canTrackCategory = (category) => {
     if (userTier.current_tier === 'free') {
       return FREE_TIER_CATEGORIES.includes(category) || 
              (category === 'Custom' && userTier.can_track_custom_symptoms);
     }
     
-    return true; // Premium and Pro can track everything
+    return true; 
   };
 
-  // Function to load selected values for a specific date
+ 
   const loadSelectedValuesForDate = (targetDate, entries) => {
     const normalizedDate = new Date(targetDate);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Find all entries for the selected date
+    
     const entriesForDate = entries.filter(entry => {
       const entryDate = new Date(entry.date_logged);
       entryDate.setHours(0, 0, 0, 0);
@@ -127,17 +127,17 @@ const PeriodTracker = () => {
     entriesForDate.forEach(entry => {
       if (entry.symptoms && entry.severity) {
         if (entry.symptoms === 'Symptoms') {
-          // For symptoms, collect all severity values into an array
+      
           if (!newSelectedValues['Symptoms'].includes(entry.severity)) {
             newSelectedValues['Symptoms'].push(entry.severity);
           }
         } else if (entry.symptoms === 'Cravings') {
-          // For cravings, collect all severity values into an array
+    
           if (!newSelectedValues['Cravings'].includes(entry.severity)) {
             newSelectedValues['Cravings'].push(entry.severity);
           }
         } else {
-          // For other tabs, keep single value
+      
           newSelectedValues[entry.symptoms] = entry.severity;
         }
       }
@@ -149,17 +149,17 @@ const PeriodTracker = () => {
   useEffect(() => {
     const fetchAndStoreUserData = async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('Supabase user:', user); // Debug
+      console.log('Supabase user:', user); 
       if (authError || !user) {
         console.error('User fetch failed:', authError?.message);
         return;
       }
 
-      // Fetch tier information
+    
       const tierInfo = await fetchUserTierInfo(user.id);
       setUserTier(tierInfo);
 
-      // Fetch profile info from your patients table using patient_id
+  
       const { data: profile, error: profileError } = await supabase
         .from('patients')
         .select('first_name, last_name, email, birthdate')
@@ -177,7 +177,7 @@ const PeriodTracker = () => {
         birthdate: profile.birthdate
       });
 
-      // Always fetch fresh data from Supabase instead of using localStorage
+   
       const { data, error } = await supabase
         .from('symptomlog')
         .select('date_logged, symptoms, severity')
@@ -189,7 +189,7 @@ const PeriodTracker = () => {
         return;
       }
 
-      // Normalize the data - ensure dates are properly formatted
+
       const normalized = data.map(entry => ({
         ...entry,
         date_logged: new Date(entry.date_logged),
@@ -197,7 +197,7 @@ const PeriodTracker = () => {
 
       setLoggedDates(normalized);
      
-      // Load initial selected values for current date
+  
       const initialValues = loadSelectedValuesForDate(date, normalized);
       setSelectedValues(initialValues);
       setWeightInput(initialValues.Weight || '');
@@ -207,15 +207,15 @@ const PeriodTracker = () => {
     fetchAndStoreUserData();
   }, []);
 
-  // Effect to update selected values when date changes (but not when data refreshes after save)
+
   useEffect(() => {
-    // Skip this update if we just saved data
+
     if (skipNextUpdate.current) {
       skipNextUpdate.current = false;
       return;
     }
 
-    // Only update if the date actually changed
+
     const currentDateString = date.toDateString();
     if (lastUpdateDate.current === currentDateString) {
       return;
@@ -229,7 +229,7 @@ const PeriodTracker = () => {
     setCustomInput(newSelectedValues.Custom || '');
   }, [date, loggedDates]);
 
-  // Handler for symptom toggle with tier checking
+
   const handleSymptomToggle = (category, name) => {
     if (!canTrackCategory(category)) {
       setModalContent({
@@ -242,7 +242,7 @@ const PeriodTracker = () => {
     }
 
     if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
-      // Multi-select logic
+
       setSelectedValues(prev => ({
         ...prev,
         [selectedTab]: prev[selectedTab].includes(name)
@@ -250,7 +250,7 @@ const PeriodTracker = () => {
           : [...prev[selectedTab], name]
       }));
     } else {
-      // Single-select logic
+
       setSelectedValues(prev => ({
         ...prev,
         [selectedTab]: prev[selectedTab] === name ? '' : name
@@ -259,7 +259,7 @@ const PeriodTracker = () => {
   };
 
   const handleSave = async () => {
-    // Check tier restrictions before saving
+
     if (!canTrackCategory(selectedTab)) {
       setModalContent({
         title: 'Category Locked',
@@ -291,7 +291,7 @@ const PeriodTracker = () => {
       return;
     }
 
-    // Handle multi-select tabs (Symptoms and Cravings)
+
     if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
       if (!valueToSave || valueToSave.length === 0) {
         setModalContent({ title: 'Error', message: `Please select at least one ${selectedTab.toLowerCase()} option.`, isError: true });
@@ -299,7 +299,7 @@ const PeriodTracker = () => {
         return;
       }
     } else {
-      // Handle single-select tabs
+
       if (!valueToSave && selectedTab !== 'Weight' && selectedTab !== 'Custom') {
         setModalContent({ title: 'Error', message: `Please select a ${selectedTab.toLowerCase()} option.`, isError: true });
         setShowModal(true);
@@ -313,7 +313,6 @@ const PeriodTracker = () => {
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Use the selected date but with current time for timestamp
     const now = new Date();
     const dateWithCurrentTime = new Date(date);
     dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
@@ -321,7 +320,7 @@ const PeriodTracker = () => {
     let supabaseError;
 
     if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
-      // For multi-select tabs, first delete existing entries for this date and tab
+ 
       const { error: deleteError } = await supabase
         .from('symptomlog')
         .delete()
@@ -336,7 +335,7 @@ const PeriodTracker = () => {
         return;
       }
 
-      // Then insert new entries for each selected value
+  
       const dataToInsert = valueToSave.map(value => ({
         symptoms: selectedTab,
         severity: value,
@@ -347,7 +346,7 @@ const PeriodTracker = () => {
       const { error } = await supabase.from('symptomlog').insert(dataToInsert);
       supabaseError = error;
     } else {
-      // Handle single-select tabs as before
+   
       const existingEntry = loggedDates.find(entry => {
         const entryDate = new Date(entry.date_logged);
         entryDate.setHours(0, 0, 0, 0);
@@ -362,7 +361,7 @@ const PeriodTracker = () => {
       };
 
       if (existingEntry) {
-        // Update existing entry
+    
         const { error } = await supabase
           .from('symptomlog')
           .update({
@@ -375,7 +374,7 @@ const PeriodTracker = () => {
 
         supabaseError = error;
       } else {
-        // Insert new entry
+       
         const { error } = await supabase.from('symptomlog').insert([dataToSave]);
         supabaseError = error;
       }
@@ -387,16 +386,16 @@ const PeriodTracker = () => {
       return;
     }
 
-    // Skip the next useEffect update since we're manually updating the state
+
     skipNextUpdate.current = true;
 
-    // Update the selected values immediately with the saved value
+   
     setSelectedValues(prev => ({
       ...prev,
       [selectedTab]: valueToSave
     }));
 
-    // Refresh data from Supabase after successful save
+  
     const { data, error: fetchError } = await supabase
       .from('symptomlog')
       .select('date_logged, symptoms, severity')
@@ -479,7 +478,7 @@ const PeriodTracker = () => {
       options: [
         { name: 'Happy', icon: Laugh, size: 36 },
         { name: 'Sad', icon: Frown, size: 36 },
-        { name: 'Anxiety', icon: MessageCircleWarning, size: 36 },
+        { name: 'Anxious', icon: MessageCircleWarning, size: 36 },
         { name: 'Calm', icon: Leaf, size: 36 },
         { name: 'Mood Swings', icon: CloudSun, size: 36 },
       ]
@@ -609,7 +608,7 @@ const PeriodTracker = () => {
           {currentConfig.options.map(({ name, icon, size, color }) => {
             const IconComponent = icon;
             
-            // Handle both single and multi-select tabs
+        
             let isSelected, isFromPreviousLog;
             if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
               isSelected = selectedValues[selectedTab].includes(name);
@@ -656,12 +655,12 @@ const PeriodTracker = () => {
     );
   };
 
-  // Handler for calendar date select
+
   const handleDateSelect = (date) => {
     setDate(date);
   };
 
-  // Handler for month navigation
+
   const handleMonthNavigate = (direction) => {
     setCurrentDate(prev => {
       const newDate = new Date(prev);

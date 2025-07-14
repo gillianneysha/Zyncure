@@ -80,14 +80,14 @@ export default function PatientLayout() {
           text="Notifications"
           active={isActive('/notifications')}
           onClick={() => navigate('/home/notifications')}
-          alert
+          // alert
         />
         <SidebarItem
           icon={<CalendarDays size={20} />}
           text="Appointments"
           active={isActive('/appointments')}
           onClick={() => navigate('/home/appointments')}
-          alert
+          // alert
         />
 
         <SidebarItem
