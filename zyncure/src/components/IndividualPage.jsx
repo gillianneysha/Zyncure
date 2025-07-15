@@ -497,11 +497,13 @@ export function BillingPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
 const [showReactivateModal, setShowReactivateModal] = useState(false);
 
+
   // Check for payment success/failure in URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
     const canceled = urlParams.get('canceled');
+
 
     if (success === 'true') {
       setPaymentStatus("Payment successful! Your subscription is being activated.");
@@ -514,11 +516,13 @@ const [showReactivateModal, setShowReactivateModal] = useState(false);
     }
   }, []);
 
+
   // Tier pricing (in PHP - keep as regular amounts, NOT centavos)
   const tierPricing = {
     premium: 299,
     pro: 599
   };
+
 
   // Get current user and subscription on component mount
   useEffect(() => {
@@ -527,7 +531,9 @@ const [showReactivateModal, setShowReactivateModal] = useState(false);
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
 
+
         setUser(user);
+
 
         if (user) {
           const { data: subscription, error: subError } = await supabase
@@ -538,6 +544,7 @@ const [showReactivateModal, setShowReactivateModal] = useState(false);
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
+
 
           if (subError) {
             console.error('Subscription fetch error:', subError);
@@ -550,13 +557,16 @@ const [showReactivateModal, setShowReactivateModal] = useState(false);
       }
     };
 
+
     getCurrentUser();
   }, []);
+
 
   const handleOptionClick = (option) => {
     if (option === "Subscriptions" || option === "Manage Subscription") setShowPlans(true);
     else if (option === "Contact Information") setShowContactInfo(true); // <-- Fix: make Contact Information clickable
   };
+
 
   // Calculate prorated amount for tier changes
 const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
@@ -564,38 +574,40 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
     return tierPricing[newTier];
   }
 
+
   const now = new Date();
   const subscriptionStart = new Date(currentSubscription.started_at);
   const subscriptionEnd = new Date(currentSubscription.expires_at);
-  
+ 
   // Calculate total days in current billing period
   const totalDays = Math.ceil((subscriptionEnd - subscriptionStart) / (1000 * 60 * 60 * 24));
-  
+ 
   // Calculate days used in current tier
   const daysUsed = Math.ceil((now - subscriptionStart) / (1000 * 60 * 60 * 24));
-  
+ 
   // Calculate remaining days in billing period
   const remainingDays = totalDays - daysUsed;
-  
+ 
   if (remainingDays <= 0) {
     return tierPricing[newTier];
   }
-  
+ 
   // Calculate prorated amount
   const currentTierPrice = tierPricing[currentTier] || 0;
   const newTierPrice = tierPricing[newTier];
-  
+ 
   // Amount to refund from current tier (unused days)
   const currentTierRefund = (currentTierPrice / totalDays) * remainingDays;
-  
+ 
   // Amount to charge for new tier (remaining days)
   const newTierCharge = (newTierPrice / totalDays) * remainingDays;
-  
+ 
   // Final amount to charge (difference)
   const finalAmount = newTierCharge - currentTierRefund;
-  
+ 
   return Math.max(finalAmount, 0); // Ensure non-negative
 };
+
 
   // Create PayMongo Checkout Session with improved error handling
   const createCheckoutSession = async (amount, description) => {
@@ -604,9 +616,11 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
       return;
     }
 
+
     try {
       setIsProcessing(true);
       setError("");
+
 
       // Validate inputs
       if (!amount || amount <= 0) {
@@ -616,10 +630,12 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
         throw new Error('Missing required information');
       }
 
+
       // Validate tier
       if (!tierPricing[selectedTier]) {
         throw new Error('Invalid subscription tier selected');
       }
+
 
       // Create payment record with proper data structure
       const paymentData = {
@@ -632,7 +648,9 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
         description: description
       };
 
+
       console.log('Creating payment record:', paymentData);
+
 
       const { data: paymentRecord, error: paymentError } = await supabase
         .from('payments')
@@ -640,12 +658,15 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
         .select()
         .single();
 
+
       if (paymentError) {
         console.error('Payment insert error:', paymentError);
         throw new Error(`Failed to create payment record: ${paymentError.message}`);
       }
 
+
       console.log('Payment record created:', paymentRecord);
+
 
       // Create PayMongo checkout session using edge function
       const requestBody = {
@@ -656,21 +677,27 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
         payment_record_id: paymentRecord.id
       };
 
+
       console.log('Calling edge function with:', requestBody);
+
 
       const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke('create-checkout-session', {
         body: requestBody
       });
+
 
       if (checkoutError) {
         console.error('Checkout session creation error:', checkoutError);
         throw new Error(`Failed to create checkout session: ${checkoutError.message}`);
       }
 
+
       console.log('Checkout session response:', checkoutData);
+
 
       if (checkoutData?.checkout_url) {
         console.log('Redirecting to:', checkoutData.checkout_url);
+
 
         // Redirect to PayMongo checkout
         window.location.href = checkoutData.checkout_url;
@@ -685,6 +712,7 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
     }
   };
 
+
   // Handle subscription
   const handleSubscribe = () => {
     if (!selectedTier) {
@@ -692,10 +720,12 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
       return;
     }
 
+
     if (!user) {
       setError('Please log in to continue');
       return;
     }
+
 
     const amount = tierPricing[selectedTier];
     if (!amount) {
@@ -703,10 +733,13 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
       return;
     }
 
+
     const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription`;
+
 
     createCheckoutSession(amount, description);
   };
+
 
   // Handle plan upgrade/downgrade
 const handlePlanChange = () => {
@@ -715,16 +748,20 @@ const handlePlanChange = () => {
     return;
   }
 
+
   const currentTier = getCurrentTier();
   const proratedAmount = calculateProratedAmount(selectedTier, currentTier, currentSubscription);
   const description = `ZynCure ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Subscription (Plan Change - Prorated)`;
 
+
   createCheckoutSession(proratedAmount, description);
 };
+
 
   // Handle cancellation
 const handleCancelSubscription = async () => {
   if (!currentSubscription) return;
+
 
   try {
     const { error } = await supabase
@@ -732,7 +769,9 @@ const handleCancelSubscription = async () => {
       .update({ status: 'cancelled' })
       .eq('id', currentSubscription.id);
 
+
     if (error) throw error;
+
 
     setCurrentSubscription({ ...currentSubscription, status: 'cancelled' });
     setPaymentStatus('Your subscription has been cancelled successfully.');
@@ -743,16 +782,20 @@ const handleCancelSubscription = async () => {
   }
 };
 
+
   // Handle payment success (call this when user returns from PayMongo)
   const handlePaymentSuccess = async (paymentRecordId, userId, tier) => {
     try {
       console.log('Handling payment success:', { paymentRecordId, userId, tier });
 
+
       // Wait a bit for webhook to process
       await new Promise(resolve => setTimeout(resolve, 3000));
 
+
       // Check if webhook already processed the payment
       let paymentRecord = null;
+
 
       if (paymentRecordId) {
         const { data: payment, error: fetchError } = await supabase
@@ -761,13 +804,16 @@ const handleCancelSubscription = async () => {
           .eq('id', paymentRecordId)
           .single();
 
+
         if (!fetchError && payment) {
           paymentRecord = payment;
         }
       }
 
+
       if (paymentRecord) {
         console.log('Found payment record:', paymentRecord);
+
 
         if (paymentRecord.status === 'completed') {
           // Payment already processed by webhook
@@ -783,11 +829,13 @@ const handleCancelSubscription = async () => {
             })
             .eq('id', paymentRecord.id);
 
+
           if (paymentError) {
             console.error('Payment update error:', paymentError);
             throw paymentError;
           }
         }
+
 
         // Refresh current subscription
         const { data: subscription, error: subError } = await supabase
@@ -799,12 +847,14 @@ const handleCancelSubscription = async () => {
           .limit(1)
           .maybeSingle();
 
+
         if (!subError && subscription) {
           console.log('Updated subscription:', subscription);
           setCurrentSubscription(subscription);
         }
       } else {
         console.log('No payment record found, creating subscription manually...');
+
 
         // Create subscription manually (fallback)
         const subscriptionData = {
@@ -815,24 +865,29 @@ const handleCancelSubscription = async () => {
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         };
 
+
         const { data: subscription, error: subscriptionError } = await supabase
           .from('subscriptions')
           .insert(subscriptionData)
           .select()
           .single();
 
+
         if (subscriptionError) {
           console.error('Subscription creation error:', subscriptionError);
           throw subscriptionError;
         }
 
+
         console.log('Subscription created manually:', subscription);
         setCurrentSubscription(subscription);
       }
 
+
       // Clear any errors and show success
       setError('');
       setShowPlans(false);
+
 
       // Clean up URL parameters
       const url = new URL(window.location);
@@ -843,11 +898,13 @@ const handleCancelSubscription = async () => {
       url.searchParams.delete('canceled');
       window.history.replaceState({}, document.title, url.toString());
 
+
     } catch (error) {
       console.error('Payment success handling error:', error);
       setError(`Failed to complete subscription: ${error.message}`);
     }
   };
+
 
   // Check URL parameters for payment success/failure on component mount
   useEffect(() => {
@@ -857,6 +914,7 @@ const handleCancelSubscription = async () => {
     const paymentRecordId = urlParams.get('payment_record_id');
     const userId = urlParams.get('user_id');
     const tier = urlParams.get('tier');
+
 
     if (success === 'true' && paymentRecordId) {
       handlePaymentSuccess(paymentRecordId, userId, tier);
@@ -873,10 +931,12 @@ const handleCancelSubscription = async () => {
     }
   }, []);
 
+
   // Helper function to check if user has active subscription
   const hasActiveSubscription = () => {
     return currentSubscription && currentSubscription.status === 'active';
   };
+
 
   // Helper function to get current tier
   const getCurrentTier = () => {
@@ -884,32 +944,34 @@ const handleCancelSubscription = async () => {
     return currentSubscription.tier;
   };
 
+
   // Helper function to check if subscription is expired
   const isSubscriptionExpired = () => {
     if (!currentSubscription) return false;
     return currentSubscription.expires_at && new Date(currentSubscription.expires_at) < new Date();
   };
 
+
 const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   if (!currentSubscription || !hasActiveSubscription()) return null;
-  
+ 
   const proratedAmount = calculateProratedAmount(newTier, currentTier, currentSubscription);
   const regularAmount = tierPricing[newTier];
-  
+ 
   if (proratedAmount === regularAmount) return null;
-  
+ 
   const now = new Date();
   const subscriptionStart = new Date(currentSubscription.started_at);
   const subscriptionEnd = new Date(currentSubscription.expires_at);
   const totalDays = Math.ceil((subscriptionEnd - subscriptionStart) / (1000 * 60 * 60 * 24));
   const daysUsed = Math.ceil((now - subscriptionStart) / (1000 * 60 * 60 * 24));
   const remainingDays = totalDays - daysUsed;
-  
+ 
   const currentTierPrice = tierPricing[currentTier] || 0;
   const newTierPrice = tierPricing[newTier];
   const currentTierRefund = (currentTierPrice / totalDays) * remainingDays;
   const newTierCharge = (newTierPrice / totalDays) * remainingDays;
-  
+ 
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
       <h4 className="font-semibold text-blue-800 mb-2">Prorated Billing Calculation</h4>
@@ -937,6 +999,8 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   );
 
 
+
+
   // Fetch subscription helper
   const fetchSubscription = async () => {
     if (!user) return;
@@ -953,6 +1017,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     }
   };
 
+
   const reactivateSubscription = async () => {
   try {
     // Update subscription status to active
@@ -966,10 +1031,13 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
       })
       .eq('user_id', user.id);
 
+
     if (error) throw error;
+
 
     // Refresh subscription data
     await fetchSubscription();
+
 
     // Show success message
     setPaymentStatus('Subscription reactivated successfully!');
@@ -981,24 +1049,30 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   }
 };
 
+
   // Handle refund request
   const handleRefundRequest = async (paymentId) => {
     try {
       setIsProcessing(true);
       setError("");
 
+
       const { error: refundError } = await supabase.functions.invoke('request-refund', {
         body: { payment_id: paymentId }
       });
+
 
       if (refundError) {
         throw new Error(`Refund request failed: ${refundError.message}`);
       }
 
+
       setPaymentStatus("Refund request submitted successfully. You will receive an email confirmation.");
+
 
       // Refresh subscription data
       await fetchSubscription();
+
 
     } catch (error) {
       console.error('Refund request error:', error);
@@ -1008,9 +1082,11 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     }
   };
 
+
   // Get recent payments for refund eligibility
   const getRecentPayments = async () => {
     if (!user) return [];
+
 
     const { data: payments, error } = await supabase
       .from('payments')
@@ -1020,18 +1096,22 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
       .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
       .order('created_at', { ascending: false });
 
+
     if (error) {
       console.error('Error fetching payments:', error);
       return [];
     }
 
+
     return payments || [];
   };
+
 
   // --- ADD REFUND BUTTON COMPONENT HERE ---
   const RefundButton = () => {
     const [showRefundModal, setShowRefundModal] = useState(false);
     const [recentPayments, setRecentPayments] = useState([]);
+
 
     const checkRefundEligibility = async () => {
       const payments = await getRecentPayments();
@@ -1039,11 +1119,13 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
       setShowRefundModal(true);
     };
 
+
     if (showRefundModal) {
       return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">Request Refund</h3>
+
 
             {recentPayments.length === 0 ? (
               <p className="text-gray-600 mb-4">
@@ -1076,6 +1158,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
               </div>
             )}
 
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowRefundModal(false)}
@@ -1089,6 +1172,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
       );
     }
 
+
     return (
       <button
         onClick={checkRefundEligibility}
@@ -1099,13 +1183,17 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     );
   };
 
+
   // Enhanced subscription status display
   const renderSubscriptionStatus = () => {
     if (!currentSubscription) return null;
 
+
     const isActive = currentSubscription.status === 'active';
     const isExpired = isSubscriptionExpired();
     const isCancelled = currentSubscription.status === 'cancelled';
+
+
 
 
     let statusText = 'Active';
@@ -1113,7 +1201,9 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     let textColor = 'text-green-800';
     let statusIcon = '✓';
 
+
     if (isCancelled) {
+
 
       statusText = 'Cancelled';
       bgColor = 'bg-red-50 border-red-200';
@@ -1121,11 +1211,13 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
       statusIcon = '✗';
     } else if (isExpired) {
 
+
       statusText = 'Expired';
       bgColor = 'bg-orange-50 border-orange-200';
       textColor = 'text-orange-800';
       statusIcon = '⚠';
     }
+
 
     return (
       <div className={`${bgColor} border rounded-lg p-6 mb-6`}>
@@ -1141,6 +1233,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
           )}
         </div>
 
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <p className={`${textColor} font-medium`}>
@@ -1150,6 +1243,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
               Monthly fee: ₱{tierPricing[currentSubscription.tier] || 0}
             </p>
           </div>
+
 
           <div>
             {currentSubscription.expires_at && (
@@ -1165,15 +1259,16 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
           </div>
         </div>
 
+
         {isActive && !isExpired && (() => {
   const currentTier = getCurrentTier();
   return (
     <div className="mt-4 space-y-3">
       {selectedTier && selectedTier !== currentTier && (
-        <ProratedBillingInfo 
-          newTier={selectedTier} 
-          currentTier={currentTier} 
-          currentSubscription={currentSubscription} 
+        <ProratedBillingInfo
+          newTier={selectedTier}
+          currentTier={currentTier}
+          currentSubscription={currentSubscription}
         />
       )}
       <div className="flex gap-3 flex-wrap">
@@ -1208,13 +1303,16 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     );
   };
 
+
   // Payment status message component
   const renderPaymentStatus = () => {
     if (!paymentStatus) return null;
 
+
     const isSuccess = paymentStatus.includes('successful');
     const bgColor = isSuccess ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200';
     const textColor = isSuccess ? 'text-green-800' : 'text-orange-800';
+
 
     return (
       <div className={`${bgColor} border rounded-lg p-4 mb-6`}>
@@ -1234,8 +1332,10 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     );
   };
 
+
   const renderError = () => {
     if (!error) return null;
+
 
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -1253,13 +1353,16 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     );
   };
 
+
   // Testing mode indicator
   const renderTestingNotice = () => {
     const isTestEnvironment = import.meta.env.DEV ||
       window.location.hostname === 'localhost' ||
       import.meta.env.VITE_PAYMONGO_MODE === 'test';
 
+
     if (!isTestEnvironment) return null;
+
 
     // return (
     //   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
@@ -1273,10 +1376,12 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     // );
   };
 
+
   // Enhanced subscriptions page
   if (showPlans) {
     const currentTier = getCurrentTier();
     const isUpgrading = hasActiveSubscription();
+
 
     return (
       <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
@@ -1287,17 +1392,25 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
           <ArrowLeft className="mr-2" size={20} /> Back to Billing
         </button>
 
+
         {renderTestingNotice()}
         {renderPaymentStatus()}
         {renderError()}
         {renderSubscriptionStatus()}
 
+
         <h2 className="text-4xl text-teal-600 font-bold mb-2">
-          {isUpgrading ? 'Change Your Plan' : 'Upgrade to Premium'}
-        </h2>
-        <p className="text-teal-600 mb-8">
-          {isUpgrading ? 'Select a new plan to switch to' : 'Enjoy an enhanced experience'}
-        </p>
+  {isUpgrading ? 'Change Your Plan' : 'Upgrade to Premium'}
+</h2>
+<p className="text-teal-600 mb-4">
+  {isUpgrading ? 'Select a new plan to switch to' : 'Enjoy an enhanced experience'}
+</p>
+<div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-8">
+  <p className="text-teal-800 text-sm">
+    <strong>Important:</strong> By subscribing to our services, you acknowledge and agree that all subscription payments are non-refundable and non-transferable. This means that once a payment is made, it cannot be reversed, refunded, or transferred to another individual or account under any circumstance. Please review all features and terms carefully before completing your subscription.
+  </p>
+</div>
+
 
         <div className="flex gap-6">
           {/* Tier 1 - Free */}
@@ -1329,6 +1442,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
               </button>
             )}
           </div>
+
 
           {/* Tier 2 - Premium */}
           <div className={`rounded-2xl p-6 flex-1 relative ${currentTier === 'premium' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
@@ -1364,6 +1478,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
               <li>✓ Share records with unlimited healthcare providers.</li>
             </ul>
           </div>
+
 
           {/* Tier 3 - Pro */}
           <div className={`rounded-2xl p-6 flex-1 relative ${currentTier === 'pro' ? 'bg-teal-50 border-2 border-teal-500' : 'bg-orange-50'
@@ -1401,7 +1516,8 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
           </div>
         </div>
 
-        
+
+       
 {!hasActiveSubscription() ? (
   <div className="flex justify-center mt-8">
     <button
@@ -1421,11 +1537,13 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     >
       {isProcessing ? 'Processing...' :
         !user ? 'Please log in' :
-          selectedTier === getCurrentTier() ? 'Current Plan' : 
+          selectedTier === getCurrentTier() ? 'Current Plan' :
           selectedTier ? `Pay ₱${calculateProratedAmount(selectedTier, getCurrentTier(), currentSubscription).toFixed(2)}` : 'Change Plan'}
     </button>
   </div>
 )}
+
+
 
 
         <div className="text-center mt-4">
@@ -1450,10 +1568,14 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   }
 
 
+
+
   // Default Billing Home
   if (showContactInfo) {
     return <ContactInformationPage onBack={() => setShowContactInfo(false)} />;
   }
+
+
 
 
   return (
@@ -1471,10 +1593,12 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
         </p>
       </div>
 
+
       {renderTestingNotice()}
       {renderPaymentStatus()}
       {renderError()}
       {renderSubscriptionStatus()}
+
 
       <div className="mt-8">
         <SecurityOption
@@ -1498,6 +1622,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   type="danger"
 />
 
+
 <ConfirmationModal
   isOpen={showReactivateModal}
   onClose={() => setShowReactivateModal(false)}
@@ -1512,146 +1637,6 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   );
 }
 
-export function TermsOfServicePage({ onBack }) {
-  return (
-    <div className="bg-profileBg rounded-xl p-8 h-[700px] overflow-y-auto">
-      <button onClick={onBack} className="flex items-center text-mySidebar mb-6 hover:underline">
-        <ArrowLeft className="mr-2" size={20} /> Back to Policies
-      </button>
-      <h2 className="text-4xl text-profileHeader font-bold mb-4">ZynCure’s Terms and Conditions</h2>
-      <div className="text-mySidebar space-y-4 text-base max-w-3xl">
-        <h3 className="font-bold text-lg mt-4 mb-2">I. Introduction</h3>
-        <p>
-          Welcome to ZynCure! ZynCure is a patient-centered digital health record system designed to enhance accessibility and management of electronic health records (EHR) for patients and medical professionals. By using ZynCure, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions. If you do not agree, please discontinue use immediately.
-        </p>
-        <h3 className="font-bold text-lg mt-4 mb-2">II. User Agreement</h3>
-        <ul className="list-disc ml-6">
-          <li>You are at least 18 years old or have legal capacity to enter into contracts.</li>
-          <li>You have provided accurate and truthful information when registering for an account.</li>
-          <li>You will not use the platform for unlawful or harmful purposes.</li>
-          <li>You will not violate the intellectual property rights of others.</li>
-          <li>You agree to ZynCure’s privacy policy and data security practices.</li>
-          <li>You agree to be bound by ZynCure’s dispute resolution process.</li>
-        </ul>
-        <p>
-          ZynCure may modify these Terms and Conditions at any time. Users will be notified via email or in-app notifications. Continued use of ZynCure after modifications implies acceptance of the updated terms.
-        </p>
-        <h3 className="font-bold text-lg mt-4 mb-2">III. Patient Registration and Services</h3>
-        <ul className="list-disc ml-6">
-          <li><b>Overview:</b> ZynCure provides an online platform where patients can upload, store, and access personal health records.</li>
-          <li><b>Registration:</b> Patients must provide complete and accurate personal information. Any falsification may result in account suspension or termination.</li>
-          <li><b>Data Access:</b> Patients can view their medical records, including medical professional notes and past consultations. Medical providers can only access patient records with explicit patient permission.</li>
-          <li><b>System Features:</b>
-            <ul className="list-decimal ml-6">
-              <li>Account Creation and Management: Users can create and manage personal accounts.</li>
-              <li>Medical Record Viewing: Patients can view, update, and download their medical records.</li>
-              <li>Data Sharing: Patients can grant time-limited, revocable access to healthcare providers to ensure controlled data sharing.</li>
-              <li>Security and Encryption: All data transmissions are encrypted to protect sensitive health information.</li>
-              <li>Medical Professional’s Consultation Tracking: Patients can track their consultation history, including diagnoses and prescribed treatments.</li>
-              <li>User Role Management: Different access levels for patients and healthcare providers to ensure secure system interactions.</li>
-              <li>Audit Logs: Tracks all user activity within the system for security and compliance purposes.</li>
-              <li>Multi-Factor Authentication (MFA): Provides an extra layer of security for user accounts.</li>
-              <li>Offline Data Access: Limited offline functionality for reviewing previously downloaded records.</li>
-              <li>Automated Notifications: Alerts and reminders for patients regarding updates or access requests.</li>
-            </ul>
-          </li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">IV. Data Privacy and Security</h3>
-        <ul className="list-disc ml-6">
-          <li>ZynCure complies with relevant data privacy laws, including the Data Privacy Act of 2012.</li>
-          <li><b>Data Collection:</b> ZynCure collects personal and medical information for service delivery, system improvements, and compliance with legal obligations.</li>
-          <li><b>Data Protection:</b>
-            <ul className="list-decimal ml-6">
-              <li>Encryption: All health records are encrypted using end-to-end encryption (E2EE).</li>
-              <li>Role-Based Access Control (RBAC): Only authorized personnel can access patient records, reducing data breaches.</li>
-              <li>Multi-Factor Authentication (MFA): Users must verify their identity before accessing or modifying records.</li>
-              <li>Data Storage: ZynCure stores records in secure cloud-based servers with continuous monitoring.</li>
-            </ul>
-          </li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">V. Patient Control and Record Management</h3>
-        <ul className="list-disc ml-6">
-          <li>Patient-Controlled Access: Patients have full control over who can view and edit their records.</li>
-          <li>Permission-Based Sharing: Patients can grant and revoke access to medical professionals through unique time-limited access links.</li>
-          <li>Medical Record Updates: Medical professionals can update patient records only with patient consent.</li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">VI. Payment and Fees</h3>
-        <ul className="list-disc ml-6">
-          <li><b>Freemium Model & Subscription Tiers:</b> ZynCure operates on a freemium model, where basic access is free, and additional premium features require a subscription.
-            <ul className="list-decimal ml-6">
-              <li>
-                <b>Tier 1: Free (Basic Access)</b> – View and manage personal health records.
-                <ul className="list-disc ml-6">
-                  <li>Upload and store up to 2GB of medical files.</li>
-                  <li>Share records with up to 3 healthcare providers.</li>
-                  <li>Track up to 3 symptoms with the ability to add custom symptoms.</li>
-                  <li>Basic notifications for upcoming medical appointments.</li>
-                  <li>Access to a health dashboard.</li>
-                  <li>Ability to export health records in a standard format (e.g., PDF).</li>
-                </ul>
-              </li>
-              <li>
-                <b>Tier 2: Premium (Enhanced Access)</b> – Paid Subscription
-                <ul className="list-disc ml-6">
-                  <li>All features in the Free tier</li>
-                  <li>Increased storage capacity up to 5GB.</li>
-                  <li>Track all predefined symptoms and custom symptoms.</li>
-                  <li>Share records with unlimited healthcare providers.</li>
-                </ul>
-              </li>
-              <li>
-                <b>Tier 3: Pro (Comprehensive Access)</b> – Paid Subscription
-                <ul className="list-disc ml-6">
-                  <li>All features in the Premium tier</li>
-                  <li>Priority support for technical issues</li>
-                  <li>Early access to future feature expansions and integrations.</li>
-                  <li>Unlimited storage for medical files.</li>
-                </ul>
-              </li>
-            </ul>
-          </li>
-          <li>Transactions: All payments must be processed through Maya’s secure payment gateway.</li>
-          <li>Refunds: Any payment disputes will be resolved through ZynCure’s support team.</li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">VII. Intellectual Property</h3>
-        <ul className="list-disc ml-6">
-          <li>All content, including software, text, graphics, and logos, is the property of ZynCure or its licensors. Users may not copy, distribute, or modify content without permission.</li>
-          <li>If you believe your intellectual property rights have been infringed, contact ZynCure with supporting documentation.</li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">VIII. Limitations of Liability</h3>
-        <ul className="list-disc ml-6">
-          <li>ZynCure provides services "as is" and does not guarantee uninterrupted or error-free service.</li>
-          <li>ZynCure is not responsible for inaccuracies in user-provided data.</li>
-          <li>ZynCure is not liable for indirect, incidental, or consequential damages resulting from platform use.</li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">IX. Account Termination and Suspension</h3>
-        <ul className="list-disc ml-6">
-          <li>ZynCure may suspend or terminate accounts that violate these terms or engage in prohibited activities.</li>
-          <li>Users may request account deletion by contacting ZynCure’s support team.</li>
-          <li>Inactive accounts may be archived, but user data will be maintained according to data retention policies.</li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">X. Dispute Resolution</h3>
-        <ul className="list-disc ml-6">
-          <li>Users are encouraged to resolve disputes through ZynCure’s support channels.</li>
-          <li>If a resolution is not reached, disputes may be escalated to arbitration or legal proceedings as permitted by law.</li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">XI. Governing Law</h3>
-        <ul className="list-disc ml-6">
-          <li>These Terms and Conditions shall be governed by and interpreted in accordance with the laws of the Philippines.</li>
-        </ul>
-        <h3 className="font-bold text-lg mt-4 mb-2">XII. Amendments and Contact Information</h3>
-        <ul className="list-disc ml-6">
-          <li>ZynCure reserves the right to amend these Terms and Conditions at any time.</li>
-          <li>Users will be notified of significant changes through email or in-app notifications.</li>
-          <li>For questions or concerns, contact ZynCure Support at <a className="underline" href="mailto:zyncure2025@gmail.com">zyncure2025@gmail.com</a>.</li>
-        </ul>
-        <p>
-          By using ZynCure, you acknowledge and agree to these Terms and Conditions. If you do not agree, please discontinue use immediately.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export function PrivacyPolicyPage({ onBack }) {
   return (
