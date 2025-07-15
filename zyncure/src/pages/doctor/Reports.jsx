@@ -282,7 +282,7 @@ export default function DoctorsPatientsFolders() {
 
   const [doctorMap, setDoctorMap] = useState({});
 
-  // PATCH: states for any file deletion and note deletion
+  // states for any file deletion and note deletion
   const [deleteFileTarget, setDeleteFileTarget] = useState(null);
   const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
 
@@ -520,7 +520,7 @@ export default function DoctorsPatientsFolders() {
     setPreviewFile(null);
   };
 
-  // PATCH: handleDelete triggers modal for ALL deletions, now with success modal
+  // handleDelete triggers modal for ALL deletions, now with success modal
   async function handleDelete(file) {
     if (!currentUser || currentUser.id !== file.owner_id) return;
     setDeleteFileTarget(file);
@@ -557,12 +557,11 @@ export default function DoctorsPatientsFolders() {
     setDropdownOpen(v => !v);
   }
 
-  // PATCH: handleSaveNote now uses generateConsultationNotesPDF for PDF format and filename
   async function handleSaveNote(noteText) {
     if (!currentUser || !selectedPatient) return;
     let now = new Date();
 
-    // Gather doctor info for the PDF
+
     const doctorInfo = {
       first_name: currentUser.user_metadata?.first_name,
       last_name: currentUser.user_metadata?.last_name,
@@ -570,7 +569,7 @@ export default function DoctorsPatientsFolders() {
       email: currentUser.email
     };
 
-    // Gather patient info for the PDF
+    
     const patientInfo = {
       name: selectedPatient.name,
       email: selectedPatient.email
@@ -715,7 +714,7 @@ export default function DoctorsPatientsFolders() {
     }
   }
 
-  // PATCH: Delete Note Handler with success modal
+  // Delete Note Handler with success modal
   async function handleDeleteNote(note) {
     if (!note?.id) return;
     const { error } = await supabase.from('consultation_notes').delete().eq('id', note.id);
@@ -810,7 +809,7 @@ export default function DoctorsPatientsFolders() {
                   Download
                 </a>
               )}
-              {/* PATCH: Lone doctor note PDF delete button */}
+              {/* Lone doctor note PDF delete button */}
               {isLoneDoctorNote && currentUser && currentUser.id === file.owner_id && (
                 <button
                   className="inline-block ml-2 px-4 py-2 bg-[#E36464] text-white rounded hover:bg-[#c64a4a]"
@@ -840,7 +839,7 @@ export default function DoctorsPatientsFolders() {
                       {note.created_at ? ` on ${new Date(note.created_at).toLocaleString()}` : ""}
                     </span>
                     <div className="relative flex items-center">
-                      {/* PATCH: Only doctors can delete notes */}
+                      {/* Only doctors can delete notes */}
                       {currentUser && currentUser.id === note.doctor_id && (
                         <button
                           className="ml-2 p-1 rounded hover:bg-gray-200"
