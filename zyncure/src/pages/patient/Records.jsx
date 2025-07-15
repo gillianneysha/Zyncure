@@ -242,7 +242,7 @@ function FolderCard({
   );
 }
 
-// --- FileCard (Patient-side, download-only for doctor-note PDFs not owned by patient) ---
+// --- FileCard ---
 function FileCard({
   file,
   onRename,
@@ -285,7 +285,7 @@ function FileCard({
   // Only show Download for doctor-note PDFs not owned by patient
   const isDoctorSharedNotePdf =
     typeof name === "string" &&
-    name.startsWith("doctor-note-") &&
+    name.startsWith("Consultation Notes - DR.") &&
     ext === "pdf" &&
     owner_id &&
     currentUserId &&
@@ -411,174 +411,8 @@ function FileCard({
 }
 
 // --- FileListItem ---
-function FileListItem({
-  file,
-  onRename,
-  onDelete,
-  maxFileNameLength,
-  onPreview,
-  onShare,
-  currentUserId,
-}) {
-  if (!file) return null;
-  const {
-    name = "",
-    preview_url: previewUrl = "",
-    created_at: createdAt = "",
-    id,
-    file_path: filePath = "",
-    owner_id,
-  } = file;
-
-  const ext = typeof name === "string" && name.includes(".") ? name.split(".").pop().toLowerCase() : "";
-  const formattedDate = createdAt ? new Date(createdAt).toLocaleDateString() : "";
-
-  const [dropdown, setDropdown] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdown(false);
-      }
-    }
-    if (dropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [dropdown]);
-
-  const isDoctorSharedNotePdf =
-    typeof name === "string" &&
-    name.startsWith("doctor-note-") &&
-    ext === "pdf" &&
-    owner_id &&
-    currentUserId &&
-    owner_id !== currentUserId;
-
-  return (
-    <div className="bg-[#55A1A4] rounded-lg shadow-md">
-      <div className="flex p-2">
-        <div
-          className="w-16 h-16 bg-white rounded mr-3 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden"
-          onClick={() => onPreview(file)}
-        >
-          {previewUrl ? (
-            ext === "pdf" ? (
-              <iframe
-                src={previewUrl}
-                title={`Preview of ${name}`}
-                className="w-full h-full rounded border"
-                style={{ border: "none" }}
-              />
-            ) : (
-              <img
-                src={previewUrl}
-                alt={`Preview of ${name}`}
-                className="w-full h-full object-cover rounded cursor-pointer"
-              />
-            )
-          ) : (
-            <div className="w-full h-full rounded bg-gray-100 flex items-center justify-center text-gray-300">
-              No Preview
-            </div>
-          )}
-        </div>
-        <div className="flex-grow min-w-0">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center min-w-0 flex-1">
-              <FileText className="mr-1 text-white flex-shrink-0" />
-              <button
-                type="button"
-                className="text-white text-sm font-medium hover:text-indigo-200 transition truncate text-left"
-                title={name}
-                onClick={() => onPreview(file)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  margin: 0,
-                }}
-              >
-                {typeof name === "string" ? truncateFileName(name, maxFileNameLength) : ""}
-              </button>
-            </div>
-            <div className="relative" ref={dropdownRef} style={{ zIndex: 50 }}>
-              <button onClick={() => setDropdown(!dropdown)}>
-                <MoreVertical className="w-5 h-5 text-white" />
-              </button>
-              {dropdown && (
-                <div className="absolute right-0 top-full w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                  {isDoctorSharedNotePdf ? (
-                    <a
-                      href={previewUrl || file.file_url}
-                      download={name}
-                      className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
-                      onClick={() => setDropdown(false)}
-                    >
-                      <Download size={16} className="text-indigo-500" />
-                      Download
-                    </a>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setDropdown(false);
-                          onRename(id, name);
-                        }}
-                        className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
-                      >
-                        <Edit size={16} className="text-blue-500" />
-                        Rename
-                      </button>
-                      <button
-                        onClick={() => {
-                          setDropdown(false);
-                          onDelete(id, name, filePath);
-                        }}
-                        className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 size={16} className="text-red-500" />
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => {
-                          setDropdown(false);
-                          if (onShare)
-                            onShare({ id, name, type: "file" });
-                        }}
-                        className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-teal-50 transition-colors"
-                      >
-                        <Share size={16} className="text-teal-500" />
-                        Share File
-                      </button>
-                      <a
-                        href={previewUrl || file.file_url}
-                        download={name}
-                        className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
-                        onClick={() => setDropdown(false)}
-                      >
-                        <Download size={16} className="text-indigo-500" />
-                        Download
-                      </a>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="text-white">
-            <div className="flex justify-between items-center mt-1">
-              <div className="text-xs">Date: {formattedDate}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* --- Hide notes for doctor-note- PDFs and for patients --- */}
-    </div>
-  );
+function FileListItem(props) {
+  return <FileCard {...props} />;
 }
 
 // --- Fetch doctor names by IDs for consultation notes ---
@@ -616,9 +450,8 @@ async function fetchConsultationNotes(fileIds) {
   }, {});
 }
 
-// --- Main Records Component ---
 export default function Records({ currentUserId: propUserId, isPatient: propIsPatient }) {
-  // STATE
+  // --- State ---
   const [doctorMap, setDoctorMap] = useState({});
   const isPatient = typeof propIsPatient !== "undefined" ? propIsPatient : true;
   const [currentUserId, setCurrentUserId] = useState(propUserId || null);
@@ -665,7 +498,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
   });
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
 
-  // AUTH
+  // --- Effects ---
   useEffect(() => {
     if (!propUserId) {
       supabase.auth.getUser().then(({ data }) => {
@@ -684,7 +517,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
   useEffect(() => {
     fetchFolders();
     fetchFiles();
-    // eslint-disable-next-line
   }, [currentUserId]);
 
   useEffect(() => {
@@ -736,10 +568,9 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
       }
     }
     getDoctorNames();
-    // eslint-disable-next-line
   }, [previewFile]);
 
-  // DATA LOADERS
+  // --- Data Loaders ---
   const fetchStorageInfo = async () => {
     const { data, error } = await supabase
       .from('user_tier_status')
@@ -768,13 +599,11 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
     if (!currentUserId) return;
     setLoading(true);
 
-    // 1. Files the patient owns
     const { data: ownedFiles = [] } = await supabase
       .from("medical_files")
       .select("*")
       .eq("owner_id", currentUserId);
 
-    // 2. Files shared with the patient (doctor notes, etc)
     const { data: sharedFileShares = [] } = await supabase
       .from("file_shares")
       .select("file_id")
@@ -792,13 +621,11 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
       sharedFiles = filesFromShares;
     }
 
-    // Merge/deduplicate
     const allFiles = [...ownedFiles, ...sharedFiles];
     const dedupedFiles = allFiles.filter(
-      (file, idx, arr) => arr.findIndex(f => f.id === file.id) === idx
+      (file, idx, arr) => arr.findIndex(f2 => f2.id === file.id) === idx
     );
 
-    // Attach consultation notes
     const fileIds = dedupedFiles.map(f => f.id).filter(Boolean);
     const notesByFileId = await fetchConsultationNotes(fileIds);
     const filesWithNotes = dedupedFiles.map(file => ({
@@ -810,7 +637,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
     setLoading(false);
   }
 
-  // TIER CHECK
+  // --- Tier Check ---
   const checkTierLimits = async (newFileSize) => {
     try {
       const { data: tierStatus, error } = await supabase
@@ -856,7 +683,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
     }
   };
 
-  // FILE UPLOADS
+  // --- File Uploads ---
   const handleFileChange = async (e, folder_id = null) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -910,7 +737,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
     e.target.value = "";
   };
 
-  // UI HANDLERS
+  // --- UI Handlers ---
   const handleDropdownToggle = () => setDropdownOpen((v) => !v);
 
   const handleRenameFile = (fileId, currentName) => {
@@ -946,7 +773,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
     return name.slice(lastDot + 1).toLowerCase();
   };
 
-  // RENAME/DELETE LOGIC
+  // --- Rename/Delete Logic ---
   const doRename = async (newName) => {
     if (!renameModal.open) return;
     if (renameModal.type === "file") {
@@ -1113,12 +940,11 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
     setShareModal({ open: true, file: { id, name, type } });
   }
 
-  // --- Folders only show those owned by current user
+  // --- Displayed Folders/Files ---
   const displayedFolders = folders.filter(folder =>
     folderMatchesAllFilter(folder, allFilter, currentUserId, files)
   );
 
-  // --- Files: Only show files in selected folder if folder is owned by current user.
   let displayedFiles = [];
   if (activeFolderId) {
     displayedFiles = files.filter(
@@ -1147,7 +973,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
   const activeFolder = folders.find((f) => f.id === activeFolderId);
   const maxFileNameLength = useMaxFileNameLength();
 
-  // RENDER
   if (!currentUserId) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -1160,6 +985,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         {activeFolderId ? (
           <div className="flex justify-between items-center mb-4">
@@ -1320,7 +1146,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
           </button>
         </div>
       </div>
-
       {storageInfo && (
         <div className="inline-flex items-center gap-2 text-xs text-gray-500">
           <div className="w-12 h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -1347,21 +1172,18 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
           </span>
         </div>
       )}
-
       {fileName && (
         <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
           <span className="font-medium">Selected file:</span>
           <span className="ml-2">{fileName}</span>
         </div>
       )}
-
       <div className="flex-1 flex gap-4 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           {!activeFolderId && (
             <>
               {/* Filter Row */}
               <div className="flex flex-row flex-wrap gap-1 mb-4 items-stretch">
-                {/* Type Filter Dropdown */}
                 <div className="relative flex" ref={typeDropdownRef}>
                   <button
                     className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center hover:border-[#549294] transition-colors"
@@ -1405,7 +1227,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
                     </div>
                   )}
                 </div>
-                {/* History Filter Dropdown */}
                 <div className="relative flex" ref={historyDropdownRef}>
                   <button
                     className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center hover:border-[#549294] transition-colors"
@@ -1449,7 +1270,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
                     </div>
                   )}
                 </div>
-                {/* All Filter Dropdown */}
                 <div className="relative flex" ref={allDropdownRef}>
                   <button
                     className="border border-[#e37859] rounded-md px-2 py-1 bg-transparent text-[#a95e4b] text-sm flex items-center hover:border-[#549294] transition-colors"
@@ -1485,7 +1305,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
                   )}
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 {folders.length === 0 && !loading && (
                   <div className="col-span-4 text-center text-gray-400">
@@ -1562,7 +1381,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
           <span className="text-xs">Share Report</span>
         </button>
       </div>
-      {/* Share Modal */}
       <ShareModal
         isOpen={shareModal.open}
         onClose={() => setShareModal({ open: false, file: null })}
@@ -1570,10 +1388,9 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
         currentUserId={currentUserId}
         supabase={supabase}
       />
-
       {/* --- FILE PREVIEW MODAL --- */}
       {previewFile && (() => {
-        const isLoneNotePdf = previewFile?.name?.startsWith('doctor-note-');
+        const isLoneNotePdf = previewFile?.name?.startsWith('Consultation Notes - DR.');
         const showNotesSidebar = !isLoneNotePdf && previewFile.consultation_notes && previewFile.consultation_notes.length > 0;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -1618,6 +1435,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
                   </a>
                 </div>
               </div>
+              {/* Show notes sidebar ONLY if not a generated pdf note */}
               {showNotesSidebar && (
                 <div className="w-full md:w-96 border-l bg-gray-50 p-4 flex-shrink-0 overflow-y-auto">
                   <div className="font-semibold text-[#55A1A4] mb-2">Consultation Notes</div>
@@ -1640,8 +1458,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
           </div>
         );
       })()}
-
-      {/* --- Rename Modal --- */}
       <RenameModal
         open={renameModal.open}
         currentName={renameModal.currentName}
@@ -1654,8 +1470,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
           renameModal.type === "file" ? "New file name" : "New folder name"
         }
       />
-
-      {/* --- Delete Confirmation Modal --- */}
       <ActionModal
         open={deleteModal.open}
         title={`Delete ${deleteModal.type === "file" ? "File" : "Folder"}?`}
@@ -1674,8 +1488,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
         }
         onClose={() => setDeleteModal(false)}
       />
-
-      {/* --- Create Folder Modal --- */}
       <CreateFolderModal
         open={createFolderModalOpen}
         onCreate={async (folderName) => {
@@ -1695,8 +1507,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
         }}
         onClose={() => setCreateFolderModalOpen(false)}
       />
-
-      {/* --- Success Modal --- */}
       {/* Uncomment if you want to show success messages
       <SuccessModal
         open={successModal.open}

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../client';
-import { jsPDF } from "jspdf";
 import {
   X, Folder, FileText, Download, ArrowLeft, User, Clock,
   SquarePlus, ChevronDown, MoreVertical, Trash2
 } from 'lucide-react';
 
-import ActionModal from "../../components/ActionModal"; 
+import ActionModal from "../../components/ActionModal";
+import { generateConsultationNotesPDF } from '../../utils/generateConsultationNotes';
+
 
 
 // Utility for truncating file names
@@ -66,8 +67,11 @@ function FileCard({ file, onPreview, onAddNote, onDelete, currentUser }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
 
-  // PATCH: Only show Add Consultation Notes for files shared by patient, not lone doctor-note PDFs
-  const isLoneDoctorNote = file.name && file.name.startsWith('doctor-note-');
+  // Lone doctor note PDF: owned by doctor, mime_type PDF, and new filename format
+  const isLoneDoctorNote = file.owner_id === currentUser?.id
+    && file.mime_type === "application/pdf"
+    && file.name && file.name.startsWith('Consultation Notes - DR.');
+
   const showAddNoteOption = !isLoneDoctorNote && file.owner_id !== currentUser?.id;
 
   return (
@@ -280,13 +284,12 @@ export default function DoctorsPatientsFolders() {
 
   const [doctorMap, setDoctorMap] = useState({});
 
-  // PATCH: state for note deletion
+  // PATCH: states for any file deletion and note deletion
+  const [deleteFileTarget, setDeleteFileTarget] = useState(null);
+  const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
+
   const [deleteNoteTarget, setDeleteNoteTarget] = useState(null);
   const [showDeleteNoteModal, setShowDeleteNoteModal] = useState(false);
-
-  // PATCH: state for lone PDF note deletion modal
-  const [deleteLonePdfTarget, setDeleteLonePdfTarget] = useState(null);
-  const [showDeleteLonePdfModal, setShowDeleteLonePdfModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -512,24 +515,17 @@ export default function DoctorsPatientsFolders() {
     setPreviewFile(null);
   };
 
-  // PATCH: handleDelete now triggers ActionModal for lone PDF notes
+  // PATCH: handleDelete triggers modal for ALL deletions
   async function handleDelete(file) {
     if (!currentUser || currentUser.id !== file.owner_id) return;
-    const isLoneDoctorNote = file.name && file.name.startsWith('doctor-note-');
-    if (isLoneDoctorNote) {
-      setDeleteLonePdfTarget(file);
-      setShowDeleteLonePdfModal(true);
-      return;
-    }
-    if (!window.confirm('Are you sure you want to delete this file?')) return;
-    await supabase.from('medical_files').delete().eq('id', file.id);
-    await loadPatientsWithInfo();
+    setDeleteFileTarget(file);
+    setShowDeleteFileModal(true);
   }
 
-  async function confirmDeleteLonePdf(file) {
+  async function confirmDeleteFile(file) {
     await supabase.from('medical_files').delete().eq('id', file.id);
-    setDeleteLonePdfTarget(null);
-    setShowDeleteLonePdfModal(false);
+    setDeleteFileTarget(null);
+    setShowDeleteFileModal(false);
     await loadPatientsWithInfo();
     if (openedFolder) {
       await handleOpenSharedFolder(openedFolder);
@@ -543,9 +539,25 @@ export default function DoctorsPatientsFolders() {
     setDropdownOpen(v => !v);
   }
 
+  // PATCH: handleSaveNote now uses generateConsultationNotesPDF for PDF format and filename
   async function handleSaveNote(noteText) {
     if (!currentUser || !selectedPatient) return;
     let now = new Date();
+
+    // Gather doctor info for the PDF
+    const doctorInfo = {
+      first_name: currentUser.user_metadata?.first_name,
+      last_name: currentUser.user_metadata?.last_name,
+      name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name,
+      email: currentUser.email
+    };
+
+    // Gather patient info for the PDF
+    const patientInfo = {
+      name: selectedPatient.name,
+      email: selectedPatient.email
+    };
+
     if (notesFileTarget && notesFileTarget.id) {
       const { error } = await supabase.from('consultation_notes').insert([
         {
@@ -562,34 +574,21 @@ export default function DoctorsPatientsFolders() {
         return;
       }
     } else if (notesFolderTarget && notesFolderTarget.id) {
-      let doctorName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email || "Doctor";
-      let formattedDateTime = now.toLocaleString();
-      let doc;
+      let pdfResult;
       try {
-        doc = new jsPDF();
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text(doctorName, 105, 20, { align: "center" });
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "italic");
-        doc.text(formattedDateTime, 105, 30, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
-        doc.text("Consultation Notes:", 20, 50);
-        doc.setFontSize(13);
-        doc.text(doc.splitTextToSize(noteText, 170), 20, 60);
+        pdfResult = await generateConsultationNotesPDF(
+          noteText,
+          doctorInfo,
+          patientInfo,
+          { returnBlob: true }
+        );
       } catch (err) {
         alert("Failed to create PDF. jsPDF error: " + err.message);
         return;
       }
-      let pdfBlob;
-      try {
-        pdfBlob = doc.output("blob");
-      } catch (err) {
-        alert("Failed to convert PDF to blob: " + err.message);
-        return;
-      }
-      const filename = `doctor-note-folder-${notesFolderTarget.id}-${Date.now()}.pdf`;
+      const pdfBlob = pdfResult.blob;
+      const filename = pdfResult.filename;
+
       const storagePath = `doctor-notes/${selectedPatient.id}/${filename}`;
       let uploadResponse = await supabase.storage
         .from("medical-files")
@@ -646,34 +645,21 @@ export default function DoctorsPatientsFolders() {
         return;
       }
     } else {
-      let doctorName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email || "Doctor";
-      let formattedDateTime = now.toLocaleString();
-      let doc;
+      let pdfResult;
       try {
-        doc = new jsPDF();
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text(doctorName, 105, 20, { align: "center" });
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "italic");
-        doc.text(formattedDateTime, 105, 30, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
-        doc.text("Consultation Notes:", 20, 50);
-        doc.setFontSize(13);
-        doc.text(doc.splitTextToSize(noteText, 170), 20, 60);
+        pdfResult = await generateConsultationNotesPDF(
+          noteText,
+          doctorInfo,
+          patientInfo,
+          { returnBlob: true }
+        );
       } catch (err) {
         alert("Failed to create PDF. jsPDF error: " + err.message);
         return;
       }
-      let pdfBlob;
-      try {
-        pdfBlob = doc.output("blob");
-      } catch (err) {
-        alert("Failed to convert PDF to blob: " + err.message);
-        return;
-      }
-      const filename = `doctor-note-${selectedPatient.id}-${Date.now()}.pdf`;
+      const pdfBlob = pdfResult.blob;
+      const filename = pdfResult.filename;
+
       const storagePath = `doctor-notes/${selectedPatient.id}/${filename}`;
       let uploadResponse = await supabase.storage
         .from("medical-files")
@@ -738,7 +724,7 @@ export default function DoctorsPatientsFolders() {
     }
   }
 
-  // PATCH: Delete Note Handler
+  // PATCH: Delete Note Handler unchanged
   async function handleDeleteNote(note) {
     if (!note?.id) return;
     await supabase.from('consultation_notes').delete().eq('id', note.id);
@@ -761,8 +747,13 @@ export default function DoctorsPatientsFolders() {
 
   const renderPreviewModal = (file) => {
     if (!file) return null;
-    const isLoneDoctorNote = file.name && file.name.startsWith('doctor-note-');
-    const showNotesSidebar = !isLoneDoctorNote
+    // Lone doctor note PDF: owned by doctor, mime_type PDF, and new filename format
+    const isLoneDoctorNote = file.owner_id === currentUser?.id
+      && file.mime_type === "application/pdf"
+      && file.name && file.name.startsWith('Consultation Notes - DR.');
+
+    // Only show sidebar for files owned by patient (not by doctor)
+    const showNotesSidebar = file.owner_id !== currentUser?.id
       && file.consultation_notes
       && file.consultation_notes.length > 0;
     const sortedNotes = (file.consultation_notes || []).slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -820,8 +811,8 @@ export default function DoctorsPatientsFolders() {
                 <button
                   className="inline-block ml-2 px-4 py-2 bg-[#E36464] text-white rounded hover:bg-[#c64a4a]"
                   onClick={() => {
-                    setDeleteLonePdfTarget(file);
-                    setShowDeleteLonePdfModal(true);
+                    setDeleteFileTarget(file);
+                    setShowDeleteFileModal(true);
                   }}
                 >
                   <Trash2 size={18} className="inline-block mr-1" />
@@ -884,19 +875,18 @@ export default function DoctorsPatientsFolders() {
             setDeleteNoteTarget(null);
           }}
         />
-        {/* PATCH: Lone PDF note modal */}
         <ActionModal
-          open={showDeleteLonePdfModal && !!deleteLonePdfTarget}
-          title="Delete Consultation Note PDF"
-          message="Are you sure you want to delete this generated PDF consultation note? This action cannot be undone."
+          open={showDeleteFileModal && !!deleteFileTarget}
+          title={`Delete File${deleteFileTarget?.name ? `: ${deleteFileTarget.name}` : ""}`}
+          message="Are you sure you want to delete this file? This action cannot be undone."
           confirmLabel="Delete"
           cancelLabel="Cancel"
           onConfirm={async () => {
-            await confirmDeleteLonePdf(deleteLonePdfTarget);
+            await confirmDeleteFile(deleteFileTarget);
           }}
           onCancel={() => {
-            setShowDeleteLonePdfModal(false);
-            setDeleteLonePdfTarget(null);
+            setShowDeleteFileModal(false);
+            setDeleteFileTarget(null);
           }}
         />
       </div>
@@ -1031,19 +1021,18 @@ export default function DoctorsPatientsFolders() {
                 ))}
             </div>
             {previewFile && renderPreviewModal(previewFile)}
-            {/* PATCH: Lone PDF delete modal at top view */}
             <ActionModal
-              open={showDeleteLonePdfModal && !!deleteLonePdfTarget}
-              title="Delete Consultation Note PDF"
-              message="Are you sure you want to delete this generated PDF consultation note? This action cannot be undone."
+              open={showDeleteFileModal && !!deleteFileTarget}
+              title={`Delete File${deleteFileTarget?.name ? `: ${deleteFileTarget.name}` : ""}`}
+              message="Are you sure you want to delete this file? This action cannot be undone."
               confirmLabel="Delete"
               cancelLabel="Cancel"
               onConfirm={async () => {
-                await confirmDeleteLonePdf(deleteLonePdfTarget);
+                await confirmDeleteFile(deleteFileTarget);
               }}
               onCancel={() => {
-                setShowDeleteLonePdfModal(false);
-                setDeleteLonePdfTarget(null);
+                setShowDeleteFileModal(false);
+                setDeleteFileTarget(null);
               }}
             />
           </div>
@@ -1072,19 +1061,18 @@ export default function DoctorsPatientsFolders() {
               )}
             </div>
             {previewFile && renderPreviewModal(previewFile)}
-            {/* PATCH: Lone PDF delete modal for folder view */}
             <ActionModal
-              open={showDeleteLonePdfModal && !!deleteLonePdfTarget}
-              title="Delete Consultation Note PDF"
-              message="Are you sure you want to delete this generated PDF consultation note? This action cannot be undone."
+              open={showDeleteFileModal && !!deleteFileTarget}
+              title={`Delete File${deleteFileTarget?.name ? `: ${deleteFileTarget.name}` : ""}`}
+              message="Are you sure you want to delete this file? This action cannot be undone."
               confirmLabel="Delete"
               cancelLabel="Cancel"
               onConfirm={async () => {
-                await confirmDeleteLonePdf(deleteLonePdfTarget);
+                await confirmDeleteFile(deleteFileTarget);
               }}
               onCancel={() => {
-                setShowDeleteLonePdfModal(false);
-                setDeleteLonePdfTarget(null);
+                setShowDeleteFileModal(false);
+                setDeleteFileTarget(null);
               }}
             />
           </div>

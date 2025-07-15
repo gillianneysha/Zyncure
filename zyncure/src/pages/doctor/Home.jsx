@@ -3,6 +3,7 @@ import { Search, Eye, Share2, Bell, FileText, Users } from 'lucide-react';
 import { supabase } from '../../client';
 import { useNavigate } from "react-router-dom";
 
+
 const Dashboard = () => {
   const [connectedPatients, setConnectedPatients] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -13,6 +14,7 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPatients, setFilteredPatients] = useState([]);
   const navigate = useNavigate();
+
 
   const fetchUnreadNotifications = async () => {
     try {
@@ -30,6 +32,7 @@ const Dashboard = () => {
       console.error('Error fetching notifications:', err);
     }
   };
+
 
   const fetchConnectedPatients = async () => {
     try {
@@ -85,6 +88,7 @@ const Dashboard = () => {
     }
   };
 
+
   // limit displayed records to 4
   const fetchRecentRecords = async () => {
     try {
@@ -112,8 +116,10 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(4); // Limit to 4 records only
 
+
       if (sharesError) throw sharesError;
       const ownerIds = Array.from(new Set((shares || []).map(share => share.owner_id).filter(Boolean)));
+
 
       let patientMap = {};
       if (ownerIds.length > 0) {
@@ -130,6 +136,7 @@ const Dashboard = () => {
       }
       setPatientMap(patientMap);
 
+
       const mapped = (shares || []).map(share => ({
         id: share.medical_files?.id ?? share.file_id,
         fileId: share.medical_files?.id ?? share.file_id,
@@ -139,12 +146,14 @@ const Dashboard = () => {
         date: share.created_at
       }));
 
+
       setRecentRecords(mapped);
     } catch (err) {
       console.error('Error fetching recent records:', err);
       setRecentRecords([]);
     }
   };
+
 
   useEffect(() => {
     const filtered = connectedPatients.filter(patient =>
@@ -155,11 +164,13 @@ const Dashboard = () => {
     setFilteredPatients(filtered);
   }, [searchTerm, connectedPatients]);
 
+
   useEffect(() => {
     fetchConnectedPatients();
     fetchUnreadNotifications();
     fetchRecentRecords();
   }, []);
+
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -174,6 +185,7 @@ const Dashboard = () => {
     }
   };
 
+
   const handleRemoveConnection = async (connectionId) => {
     if (!confirm('Are you sure you want to remove this patient connection?')) return;
     try {
@@ -186,24 +198,27 @@ const Dashboard = () => {
     }
   };
 
+
   // This ensures navigation passes both patientId and fileId for preview
   const handleViewRecord = (fileId, patientId) => {
     navigate(`/doctor/reports?fileId=${fileId}&patientId=${patientId}`);
   };
 
+
   const handleViewAlert = (notificationId) => {
     console.log(`View notification ${notificationId}`);
   };
 
-  // FIXED: Changed to navigate to reports instead of patient profile
   const handleViewPatient = (patientId) => {
     // Navigate to reports page with patientId parameter
     navigate(`/doctor/reports?patientId=${patientId}`);
   };
 
+
   const handleSharePatient = (patientId) => {
     console.log(`Share patient ${patientId}`);
   };
+
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -212,6 +227,7 @@ const Dashboard = () => {
       day: '2-digit'
     });
   };
+
 
   return (
     <div className="space-y-6">
@@ -395,4 +411,6 @@ const Dashboard = () => {
   );
 };
 
+
 export default Dashboard;
+
