@@ -38,13 +38,45 @@ const Dashboard = () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) throw new Error('No authenticated user found');
-      const { data, error: supabaseError } = await supabase
+      
+      // First, get the connection details
+      const { data: connections, error: connectionsError } = await supabase
         .from('doctor_connection_details')
         .select('*')
         .eq('med_id', user.id)
         .eq('status', 'accepted');
-      if (supabaseError) throw supabaseError;
-      setConnectedPatients(data || []);
+      
+      if (connectionsError) throw connectionsError;
+      
+      if (!connections || connections.length === 0) {
+        setConnectedPatients([]);
+        return;
+      }
+      
+      // Get patient IDs from connections
+      const patientIds = connections.map(conn => conn.patient_id);
+      
+      // Fetch patient details from the patients table
+      const { data: patients, error: patientsError } = await supabase
+        .from('patients')
+        .select('patient_id, first_name, last_name, email')
+        .in('patient_id', patientIds);
+      
+      if (patientsError) throw patientsError;
+      
+      // Merge connection data with patient data
+      const mergedData = connections.map(connection => {
+        const patient = patients.find(p => p.patient_id === connection.patient_id);
+        return {
+          ...connection,
+          first_name: patient?.first_name || '',
+          last_name: patient?.last_name || '',
+          patient_email: patient?.email || '',
+          patient_short_id: connection.patient_id?.substring(0, 8) || connection.patient_id
+        };
+      });
+      
+      setConnectedPatients(mergedData);
     } catch (err) {
       console.error('Error fetching connected patients:', err);
       setError(err.message);
@@ -118,7 +150,7 @@ const Dashboard = () => {
     const filtered = connectedPatients.filter(patient =>
       patient.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.patient_short_id?.toLowerCase().includes(searchTerm.toLowerCase())
+      patient.patient_id?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredPatients(filtered);
   }, [searchTerm, connectedPatients]);
@@ -163,8 +195,10 @@ const Dashboard = () => {
     console.log(`View notification ${notificationId}`);
   };
 
+  // FIXED: Changed to navigate to reports instead of patient profile
   const handleViewPatient = (patientId) => {
-    navigate(`/doctor/patients/${patientId}`);
+    // Navigate to reports page with patientId parameter
+    navigate(`/doctor/reports?patientId=${patientId}`);
   };
 
   const handleSharePatient = (patientId) => {
@@ -309,7 +343,12 @@ const Dashboard = () => {
               {filteredPatients.map((patient) => (
                 <div key={patient.id} className="grid grid-cols-[110px_1.5fr_2fr_160px_210px] gap-x-4 p-4 hover:bg-red-25 transition-colors">
                   <div className="text-red-700 font-mono font-medium">{patient.patient_short_id?.substring(0, 4)}</div>
-                  <div className="text-red-700 font-medium">{patient.first_name} {patient.last_name}</div>
+                  <div className="text-red-700 font-medium">
+                    {patient.first_name && patient.last_name 
+                      ? `${patient.first_name} ${patient.last_name}`
+                      : patient.first_name || patient.last_name || 'No Name'
+                    }
+                  </div>
                   <div className="text-gray-600 truncate">{patient.patient_email}</div>
                   <div className="text-gray-600 whitespace-nowrap">{formatDate(patient.created_at)}</div>
                   <div className="flex gap-2 whitespace-nowrap pr-4">
