@@ -170,8 +170,8 @@ export function PersonalInfoForm() {
           birthdate: formData.birthdate,
           contact_no: formData.mobileNumber,
           email: formData.email,
-          // Keep existing status if it exists, otherwise set default
-          status: 'active', // You might want to preserve existing status
+          user_type: 'patient', // Add user_type
+          status: 'active',
         };
       } else if (userType === 'doctor') {
         updateData = {
@@ -181,12 +181,12 @@ export function PersonalInfoForm() {
           birthdate: formData.birthdate,
           contact_no: formData.mobileNumber,
           email: formData.email,
-          // Keep existing status if it exists, otherwise set default
-          status: 'active', // You might want to preserve existing status
+          user_type: 'doctor', // Add user_type
+          status: 'active',
         };
       }
 
-      console.log(`Updating ${tableName} with data:`, updateData); // Debug log
+      console.log(`Updating ${tableName} with data:`, updateData);
 
       const { data, error: updateError } = await supabase
         .from(tableName)
@@ -198,12 +198,16 @@ export function PersonalInfoForm() {
         console.error("Database error:", updateError);
         setError(`Failed to save changes: ${updateError.message}`);
       } else {
-        console.log("Save successful:", data); // Debug log
+        console.log("Save successful:", data);
         setSuccess("");
         setShowSuccessModal(true);
         setIsEditing(false);
-        // Update originalData to reflect the saved state
         setOriginalData({ ...formData });
+
+        // Trigger a custom event to notify navbar of the update
+        window.dispatchEvent(new CustomEvent('profile-updated', {
+          detail: { type: 'profile-updated' }
+        }));
       }
     } catch (err) {
       console.error("Unexpected error in handleSave:", err);
@@ -495,7 +499,7 @@ export function BillingPage() {
   const [paymentStatus, setPaymentStatus] = useState("");
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
-const [showReactivateModal, setShowReactivateModal] = useState(false);
+  const [showReactivateModal, setShowReactivateModal] = useState(false);
 
 
   // Check for payment success/failure in URL params
@@ -569,10 +573,11 @@ const [showReactivateModal, setShowReactivateModal] = useState(false);
 
 
   // Calculate prorated amount for tier changes
-const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
-  if (!currentSubscription || !currentSubscription.expires_at) {
-    return tierPricing[newTier];
-  }
+  const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
+    if (!currentSubscription || !currentSubscription.expires_at) {
+      return tierPricing[newTier];
+    }
+
 
 
   const now = new Date();
@@ -607,6 +612,7 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
  
   return Math.max(finalAmount, 0); // Ensure non-negative
 };
+
 
 
   // Create PayMongo Checkout Session with improved error handling
@@ -742,11 +748,12 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
 
 
   // Handle plan upgrade/downgrade
-const handlePlanChange = () => {
-  if (!selectedTier) {
-    setError('Please select a new subscription tier');
-    return;
-  }
+  const handlePlanChange = () => {
+    if (!selectedTier) {
+      setError('Please select a new subscription tier');
+      return;
+    }
+
 
 
   const currentTier = getCurrentTier();
@@ -758,9 +765,11 @@ const handlePlanChange = () => {
 };
 
 
+
   // Handle cancellation
-const handleCancelSubscription = async () => {
-  if (!currentSubscription) return;
+  const handleCancelSubscription = async () => {
+    if (!currentSubscription) return;
+
 
 
   try {
@@ -781,6 +790,7 @@ const handleCancelSubscription = async () => {
     setShowCancelModal(false);
   }
 };
+
 
 
   // Handle payment success (call this when user returns from PayMongo)
@@ -952,6 +962,7 @@ const handleCancelSubscription = async () => {
   };
 
 
+
 const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   if (!currentSubscription || !hasActiveSubscription()) return null;
  
@@ -984,10 +995,10 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
         <p>• Refund for unused {currentTier}: -₱{currentTierRefund.toFixed(2)}</p>
         <p>• Charge for {newTier} ({remainingDays} days): +₱{newTierCharge.toFixed(2)}</p>
         <p className="font-semibold">• Total amount to pay: ₱{proratedAmount.toFixed(2)}</p>
+
       </div>
-    </div>
-  );
-};
+    );
+  };
   const SecurityOption = ({ title, onClick }) => (
     <div
       className="flex items-center justify-between rounded-xl border border-mySidebar px-5 py-4 mb-4 cursor-pointer hover:bg-red-200 transition-colors"
@@ -1019,6 +1030,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
 
 
   const reactivateSubscription = async () => {
+
   try {
     // Update subscription status to active
     const { error } = await supabase
@@ -1048,6 +1060,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     setShowReactivateModal(false);
   }
 };
+
 
 
   // Handle refund request
@@ -1261,6 +1274,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
 
 
         {isActive && !isExpired && (() => {
+
   const currentTier = getCurrentTier();
   return (
     <div className="mt-4 space-y-3">
@@ -1289,14 +1303,15 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     </div>
   );
 })()}
+
         {(isExpired || isCancelled) && (
           <div className="mt-4">
-           <button
-  onClick={() => setShowReactivateModal(true)}
-  className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
->
-  Reactivate Subscription
-</button>
+            <button
+              onClick={() => setShowReactivateModal(true)}
+              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition text-sm"
+            >
+              Reactivate Subscription
+            </button>
           </div>
         )}
       </div>
@@ -1454,16 +1469,16 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
             )}
             {currentTier !== 'premium' && (
               <input
-  type="radio"
-  name="subscriptionTier"
-  value="premium"
-  checked={selectedTier === "premium"}
-  onClick={() =>
-    setSelectedTier(selectedTier === "premium" ? "" : "premium")
-  }
-  className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-  aria-label="Select Premium"
-/>
+                type="radio"
+                name="subscriptionTier"
+                value="premium"
+                checked={selectedTier === "premium"}
+                onClick={() =>
+                  setSelectedTier(selectedTier === "premium" ? "" : "premium")
+                }
+                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+                aria-label="Select Premium"
+              />
             )}
             <h3 className={`font-bold mb-2 ${currentTier === 'premium' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 2: Premium <span className="font-normal text-sm">(Enhanced Access)</span>
@@ -1490,16 +1505,16 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
             )}
             {currentTier !== 'pro' && (
               <input
-  type="radio"
-  name="subscriptionTier"
-  value="pro"
-  checked={selectedTier === "pro"}
-  onClick={() =>
-    setSelectedTier(selectedTier === "pro" ? "" : "pro")
-  }
-  className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
-  aria-label="Select Pro"
-/>
+                type="radio"
+                name="subscriptionTier"
+                value="pro"
+                checked={selectedTier === "pro"}
+                onClick={() =>
+                  setSelectedTier(selectedTier === "pro" ? "" : "pro")
+                }
+                className="absolute top-6 right-6 w-5 h-5 accent-orange-600 cursor-pointer"
+                aria-label="Select Pro"
+              />
             )}
             <h3 className={`font-bold mb-2 ${currentTier === 'pro' ? 'text-teal-600' : 'text-orange-600'}`}>
               Tier 3: Pro <span className="font-normal text-sm">(Comprehensive Access)</span>
@@ -1515,6 +1530,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
             </ul>
           </div>
         </div>
+
 
 
        
@@ -1542,6 +1558,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     </button>
   </div>
 )}
+
 
 
 
@@ -1611,6 +1628,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
         />
       </div>
       {/* Confirmation Modals */}
+
 <ConfirmationModal
   isOpen={showCancelModal}
   onClose={() => setShowCancelModal(false)}
@@ -1633,6 +1651,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   cancelText="Cancel"
   type="success"
 />
+
     </div>
   );
 }
@@ -1906,7 +1925,7 @@ export function DeleteAccountPage() {
           >
             {showPassword ? <Eye size={22} /> : <EyeClosed size={22} />}
           </button>
-               </div>
+        </div>
 
         <div className="flex justify-center py-5">
           <button
