@@ -17,7 +17,7 @@ const DoctorConnectionsPage = () => {
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState(''); // 'accept', 'decline', 'remove', or 'confirm-remove'
+  const [modalType, setModalType] = useState(''); // 'accept', 'decline', 'remove', 'confirm-remove', or 'request-sent'
   const [modalPatientName, setModalPatientName] = useState('');
   const [pendingRemoveConnectionId, setPendingRemoveConnectionId] = useState(null);
 
@@ -171,7 +171,11 @@ const loadConnections = async () => {
       
       setSearchResults(prev => prev.filter(p => p.patient_id !== patient.patient_id));
       
-      alert('Connection request sent successfully!');
+      // Show success modal instead of alert
+      const patientName = formatPatientName(patient.first_name, patient.last_name);
+      setModalType('request-sent');
+      setModalPatientName(patientName);
+      setShowModal(true);
       
     } catch (error) {
       console.error('Error sending connection request:', error);
@@ -335,9 +339,20 @@ const cancelRemoveConnection = () => {
     const isDecline = modalType === 'reject';
     const isRemove = modalType === 'remove';
     const isConfirmRemove = modalType === 'confirm-remove';
+    const isRequestSent = modalType === 'request-sent';
     
     const getModalConfig = () => {
-      if (isAccept) {
+      if (isRequestSent) {
+        return {
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-600',
+          buttonColor: 'bg-blue-600 hover:bg-blue-700',
+          icon: <Send className="w-8 h-8 text-blue-600" />,
+          title: 'Connection Request Sent',
+          message: `Your connection request has been sent to ${modalPatientName}. They will be notified and can choose to accept or decline your request. You'll be notified once they respond.`,
+          showSingleButton: true
+        };
+      } else if (isAccept) {
         return {
           bgColor: 'bg-green-100',
           textColor: 'text-green-600',
