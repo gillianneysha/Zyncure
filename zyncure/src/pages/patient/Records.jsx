@@ -1036,7 +1036,6 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
 
  return (
    <div className="flex flex-col h-full">
-     {/* Header */}
      <div className="flex justify-between items-center mb-4">
        {activeFolderId ? (
          <div className="flex justify-between items-center mb-4">
@@ -1426,12 +1425,13 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
          )}
        </div>
      </div>
-     <div className="fixed bottom-4 right-4">
+     {/*<div className="fixed bottom-4 right-4">
        <button className="bg-red-50 text-red-400 p-4 rounded-lg shadow-md flex flex-col items-center">
          <Share className="w-6 h-6 mb-1" />
          <span className="text-xs">Share Report</span>
        </button>
-     </div>
+     </div>*/}
+
      <ShareModal
        isOpen={shareModal.open}
        onClose={() => setShareModal({ open: false, file: null })}
@@ -1439,6 +1439,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
        currentUserId={currentUserId}
        supabase={supabase}
      />
+     
      {/* --- FILE PREVIEW MODAL --- */}
      {previewFile && (() => {
        const isLoneNotePdf = previewFile?.name?.startsWith('Consultation Notes - DR.');
@@ -1486,7 +1487,7 @@ export default function Records({ currentUserId: propUserId, isPatient: propIsPa
                  </a>
                </div>
              </div>
-             {/* Show notes sidebar ONLY if not a generated pdf note */}
+             {/* Show sidebar only if its a note attached to a file */}
              {showNotesSidebar && (
                <div className="w-full md:w-96 border-l bg-gray-50 p-4 flex-shrink-0 overflow-y-auto">
                  <div className="font-semibold text-[#55A1A4] mb-2">Consultation Notes</div>
