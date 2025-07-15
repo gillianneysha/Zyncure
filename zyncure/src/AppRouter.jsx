@@ -57,7 +57,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   
   if (requiredRole && user.role !== requiredRole) {
     
-    if (user.role === "admin") return <Navigate to="/admin/profile" replace />;
+    if (user.role === "admin") return <Navigate to="/admin/home" replace />;
     const redirectPath = user.role === "patient" ? "/home" : "/doctor";
     return <Navigate to={redirectPath} replace />;
   }
@@ -90,7 +90,7 @@ export default function AppRouter() {
             <Navigate
               to={
                 user?.role === "admin"
-                  ? "/admin/profile"
+                  ? "/admin/home"
                   : user?.role === "patient"
                   ? "/home"
                   : "/doctor"
@@ -179,7 +179,7 @@ export default function AppRouter() {
             to={
               isAuthenticated
                 ? user?.role === "admin"
-                  ? "/admin/profile"
+                  ? "/admin/home"
                   : user?.role === "patient"
                   ? "/home"
                   : "/doctor"
