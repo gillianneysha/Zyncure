@@ -4,8 +4,11 @@ import {
   X, Folder, FileText, Download, ArrowLeft, User, Clock,
   SquarePlus, ChevronDown, MoreVertical, Trash2
 } from 'lucide-react';
+
 import ActionModal from "../../components/ActionModal";
 import { generateConsultationNotesPDF } from '../../utils/generateConsultationNotes';
+
+
 
 // Utility for truncating file names
 function truncateFileName(fileName, maxLength = 25) {
