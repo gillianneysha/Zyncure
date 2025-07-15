@@ -1,4 +1,5 @@
 import React, { useCallback, useState, memo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../client";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
@@ -49,6 +50,7 @@ const FormField = memo(
 
 export default function RegistrationForm() {
   console.log("RegistrationForm rendered");
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -189,9 +191,6 @@ export default function RegistrationForm() {
     setHasAcceptedPrivacy(false);
   }, []);
 
-  // Main form submission handler
-  // Updated handleSubmit function for your RegistrationForm component
-
   const handleSubmit = useCallback(async (event) => {
     event.preventDefault();
 
@@ -223,17 +222,6 @@ export default function RegistrationForm() {
 
       // Step 2: Insert user data into appropriate table based on user type
       if (authData.user) {
-        const userData = {
-          med_id: authData.user.id, // Use auth user ID as foreign key
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          user_type: formData.userType,
-          birthdate: formData.birthdate,
-          contact_no: formData.contactNumber,
-          email: formData.email,
-          status: 'active' // or whatever default status you want
-        };
-
         let insertError;
 
         if (formData.userType === 'patient') {
@@ -241,7 +229,7 @@ export default function RegistrationForm() {
           const { error } = await supabase
             .from('patients')
             .insert([{
-              patient_id: authData.user.id, // Use auth user ID as patient_id
+              patient_id: authData.user.id,
               first_name: formData.firstName,
               last_name: formData.lastName,
               user_type: formData.userType,
@@ -256,23 +244,38 @@ export default function RegistrationForm() {
           // Insert into medicalprofessionals table
           const { error } = await supabase
             .from('medicalprofessionals')
-            .insert([userData]);
+            .insert([{
+              med_id: authData.user.id,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              user_type: formData.userType,
+              birthdate: formData.birthdate,
+              contact_no: formData.contactNumber,
+              email: formData.email,
+              status: 'active'
+            }]);
 
           insertError = error;
         }
 
         if (insertError) {
           console.error('Database insertion error:', insertError);
-          // If database insertion fails, we might want to clean up the auth user
-          // but for now, we'll just log the error and continue
           throw new Error(`Failed to create user profile: ${insertError.message}`);
         }
       }
 
+      // Step 3: Show success message and redirect after a delay
       setSuccessMessage(
         "Registration successful! Please check your email and click the confirmation link to activate your account."
       );
+
+      // Reset form and redirect to login after showing success message
       resetForm();
+
+      // Redirect to login page after 3 seconds
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
 
     } catch (error) {
       console.error("Registration error:", error);
@@ -282,7 +285,7 @@ export default function RegistrationForm() {
     } finally {
       setIsLoading(false);
     }
-  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy, validateForm, resetForm]);
+  }, [formData, hasAcceptedTerms, hasAcceptedPrivacy, validateForm, resetForm, navigate]);
 
   const handleGoogleSignUp = useCallback(async () => {
     if (!hasAcceptedTerms) {
@@ -298,7 +301,7 @@ export default function RegistrationForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/complete-profile`,
         },
       });
 
@@ -331,7 +334,7 @@ export default function RegistrationForm() {
   const handleAcceptPrivacy = useCallback(() => {
     setHasAcceptedPrivacy(true);
     setIsPrivacyModalOpen(false);
-    setHasAcceptedTerms(true); // This is your original flag for form validation
+    setHasAcceptedTerms(true);
     setErrors((prev) => {
       const newErrors = { ...prev };
       delete newErrors.terms;
@@ -494,8 +497,8 @@ export default function RegistrationForm() {
           type="submit"
           disabled={isLoading}
           className={`w-4/5 block mx-auto py-2 mt-8 text-white border-none rounded-[15.5px] font-semibold transition-colors duration-200 ${isLoading
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#55A1A4] hover:bg-[#368487]"
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-[#55A1A4] hover:bg-[#368487]"
             }`}
         >
           {isLoading ? "Creating Account..." : "Sign Up"}
