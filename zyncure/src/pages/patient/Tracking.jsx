@@ -258,176 +258,180 @@ const PeriodTracker = () => {
     }
   };
 
-  const handleSave = async () => {
-
-    if (!canTrackCategory(selectedTab)) {
-      setModalContent({
-        title: 'Category Locked',
-        message: `The ${selectedTab} category is only available for premium users. Upgrade to access all tracking categories.`,
-        isError: true
-      });
-      setShowModal(true);
-      return;
-    }
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setModalContent({ title: 'Error', message: 'You must be logged in to save.', isError: true });
-      setShowModal(true);
-      return;
-    }
-
-    let valueToSave = selectedValues[selectedTab];
-
-    if (selectedTab === 'Weight' && !weightInput.trim()) {
-      setModalContent({ title: 'Error', message: 'Please enter your weight.', isError: true });
-      setShowModal(true);
-      return;
-    }
-
-    if (selectedTab === 'Custom' && !customInput.trim()) {
-      setModalContent({ title: 'Error', message: 'Please enter custom data.', isError: true });
-      setShowModal(true);
-      return;
-    }
-
-
-    if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
-      if (!valueToSave || valueToSave.length === 0) {
-        setModalContent({ title: 'Error', message: `Please select at least one ${selectedTab.toLowerCase()} option.`, isError: true });
-        setShowModal(true);
-        return;
-      }
-    } else {
-
-      if (!valueToSave && selectedTab !== 'Weight' && selectedTab !== 'Custom') {
-        setModalContent({ title: 'Error', message: `Please select a ${selectedTab.toLowerCase()} option.`, isError: true });
-        setShowModal(true);
-        return;
-      }
-    }
-
-    if (selectedTab === 'Weight') valueToSave = weightInput;
-    if (selectedTab === 'Custom') valueToSave = customInput;
-
-    const normalizedDate = new Date(date);
-    normalizedDate.setHours(0, 0, 0, 0);
-
-    const now = new Date();
-    const dateWithCurrentTime = new Date(date);
-    dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-
-    let supabaseError;
-
-    if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
- 
-      const { error: deleteError } = await supabase
-        .from('symptomlog')
-        .delete()
-        .eq('patients_id', user.id)
-        .eq('symptoms', selectedTab)
-        .gte('date_logged', normalizedDate.toISOString())
-        .lt('date_logged', new Date(normalizedDate.getTime() + 24 * 60 * 60 * 1000).toISOString());
-
-      if (deleteError) {
-        setModalContent({ title: 'Error', message: `Failed to save: ${deleteError.message}`, isError: true });
-        setShowModal(true);
-        return;
-      }
-
-  
-      const dataToInsert = valueToSave.map(value => ({
-        symptoms: selectedTab,
-        severity: value,
-        date_logged: dateWithCurrentTime.toISOString(),
-        patients_id: user.id,
-      }));
-
-      const { error } = await supabase.from('symptomlog').insert(dataToInsert);
-      supabaseError = error;
-    } else {
-   
-      const existingEntry = loggedDates.find(entry => {
-        const entryDate = new Date(entry.date_logged);
-        entryDate.setHours(0, 0, 0, 0);
-        return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === selectedTab;
-      });
-
-      const dataToSave = {
-        symptoms: selectedTab,
-        severity: valueToSave,
-        date_logged: dateWithCurrentTime.toISOString(),
-        patients_id: user.id,
-      };
-
-      if (existingEntry) {
-    
-        const { error } = await supabase
-          .from('symptomlog')
-          .update({
-            severity: valueToSave,
-            date_logged: dateWithCurrentTime.toISOString()
-          })
-          .eq('patients_id', user.id)
-          .eq('symptoms', selectedTab)
-          .eq('date_logged', existingEntry.date_logged.toISOString());
-
-        supabaseError = error;
-      } else {
-       
-        const { error } = await supabase.from('symptomlog').insert([dataToSave]);
-        supabaseError = error;
-      }
-    }
-
-    if (supabaseError) {
-      setModalContent({ title: 'Error', message: `Failed to save: ${supabaseError.message}`, isError: true });
-      setShowModal(true);
-      return;
-    }
-
-
-    skipNextUpdate.current = true;
-
-   
-    setSelectedValues(prev => ({
-      ...prev,
-      [selectedTab]: valueToSave
-    }));
-
-  
-    const { data, error: fetchError } = await supabase
-      .from('symptomlog')
-      .select('date_logged, symptoms, severity')
-      .eq('patients_id', user.id)
-      .order('date_logged', { ascending: false });
-
-    if (!fetchError) {
-      const normalized = data.map(entry => ({
-        ...entry,
-        date_logged: new Date(entry.date_logged),
-      }));
-      setLoggedDates(normalized);
-    }
-
-    const formattedDate = normalizedDate.toDateString();
-    const formattedTime = now.toLocaleTimeString();
-    
-    let saveMessage;
-    if (selectedTab === 'Symptoms' || selectedTab === 'Cravings') {
-      saveMessage = `${selectedTab} saved as "${valueToSave.join(', ')}" on ${formattedDate} at ${formattedTime}`;
-    } else {
-      saveMessage = `${selectedTab} saved as "${valueToSave}" on ${formattedDate} at ${formattedTime}`;
-    }
-
-    setModalContent({
-      title: 'Success!',
-      message: saveMessage,
-      isError: false
-    });
-
+ const handleSave = async () => {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    setModalContent({ title: 'Error', message: 'You must be logged in to save.', isError: true });
     setShowModal(true);
-  };
+    return;
+  }
+
+  // Check if there's anything to save
+  const hasDataToSave = Object.entries(selectedValues).some(([category, value]) => {
+    if (category === 'Weight') return weightInput.trim();
+    if (category === 'Custom') return customInput.trim();
+    if (category === 'Symptoms' || category === 'Cravings') return value.length > 0;
+    return value;
+  });
+
+  if (!hasDataToSave) {
+    setModalContent({ 
+      title: 'Nothing to Save', 
+      message: 'Please select or enter some data before saving.', 
+      isError: true 
+    });
+    setShowModal(true);
+    return;
+  }
+
+  const normalizedDate = new Date(date);
+  normalizedDate.setHours(0, 0, 0, 0);
+
+  const now = new Date();
+  const dateWithCurrentTime = new Date(date);
+  dateWithCurrentTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+
+  const savedCategories = [];
+  let hasError = false;
+
+  // Process each category
+  for (const [category, value] of Object.entries(selectedValues)) {
+    // Skip if no data for this category
+    let dataToSave = value;
+    if (category === 'Weight') {
+      if (!weightInput.trim()) continue;
+      dataToSave = weightInput;
+    }
+    if (category === 'Custom') {
+      if (!customInput.trim()) continue;
+      dataToSave = customInput;
+    }
+    if ((category === 'Symptoms' || category === 'Cravings') && (!value || value.length === 0)) {
+      continue;
+    }
+    if (!dataToSave && category !== 'Weight' && category !== 'Custom') {
+      continue;
+    }
+
+    // Check if user can track this category
+    if (!canTrackCategory(category)) {
+      continue; // Skip locked categories
+    }
+
+    try {
+      if (category === 'Symptoms' || category === 'Cravings') {
+        // Delete existing entries for this category and date
+        const { error: deleteError } = await supabase
+          .from('symptomlog')
+          .delete()
+          .eq('patients_id', user.id)
+          .eq('symptoms', category)
+          .gte('date_logged', normalizedDate.toISOString())
+          .lt('date_logged', new Date(normalizedDate.getTime() + 24 * 60 * 60 * 1000).toISOString());
+
+        if (deleteError) throw deleteError;
+
+        // Insert new entries
+        const dataToInsert = dataToSave.map(symptom => ({
+          symptoms: category,
+          severity: symptom,
+          date_logged: dateWithCurrentTime.toISOString(),
+          patients_id: user.id,
+        }));
+
+        const { error } = await supabase.from('symptomlog').insert(dataToInsert);
+        if (error) throw error;
+      } else {
+        // Handle single-value categories
+        const existingEntry = loggedDates.find(entry => {
+          const entryDate = new Date(entry.date_logged);
+          entryDate.setHours(0, 0, 0, 0);
+          return entryDate.getTime() === normalizedDate.getTime() && entry.symptoms === category;
+        });
+
+        const dataToSaveObj = {
+          symptoms: category,
+          severity: dataToSave,
+          date_logged: dateWithCurrentTime.toISOString(),
+          patients_id: user.id,
+        };
+
+        if (existingEntry) {
+          // Update existing entry
+          const { error } = await supabase
+            .from('symptomlog')
+            .update({
+              severity: dataToSave,
+              date_logged: dateWithCurrentTime.toISOString()
+            })
+            .eq('patients_id', user.id)
+            .eq('symptoms', category)
+            .eq('date_logged', existingEntry.date_logged.toISOString());
+
+          if (error) throw error;
+        } else {
+          // Insert new entry
+          const { error } = await supabase.from('symptomlog').insert([dataToSaveObj]);
+          if (error) throw error;
+        }
+      }
+      
+      savedCategories.push(category);
+    } catch (error) {
+      console.error(`Error saving ${category}:`, error);
+      hasError = true;
+    }
+  }
+
+  if (hasError) {
+    setModalContent({ 
+      title: 'Partial Save Error', 
+      message: 'Some data could not be saved. Please try again.', 
+      isError: true 
+    });
+    setShowModal(true);
+    return;
+  }
+
+  if (savedCategories.length === 0) {
+    setModalContent({ 
+      title: 'Nothing to Save', 
+      message: 'No valid data found to save.', 
+      isError: true 
+    });
+    setShowModal(true);
+    return;
+  }
+
+  // Skip next update to prevent overwriting
+  skipNextUpdate.current = true;
+
+  // Refresh data from database
+  const { data, error: fetchError } = await supabase
+    .from('symptomlog')
+    .select('date_logged, symptoms, severity')
+    .eq('patients_id', user.id)
+    .order('date_logged', { ascending: false });
+
+  if (!fetchError) {
+    const normalized = data.map(entry => ({
+      ...entry,
+      date_logged: new Date(entry.date_logged),
+    }));
+    setLoggedDates(normalized);
+  }
+
+  const formattedDate = normalizedDate.toDateString();
+  const formattedTime = now.toLocaleTimeString();
+  
+  setModalContent({
+    title: 'Success!',
+    message: `${savedCategories.length} categories saved successfully on ${formattedDate} at ${formattedTime}`,
+    isError: false
+  });
+
+  setShowModal(true);
+};
 
   const handleDownload = async () => {
     if (!userInfo.name) {
