@@ -21,14 +21,13 @@ const PersonalAppointmentTracker = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('calendar'); // New state for mobile tabs
+  const [activeTab, setActiveTab] = useState('calendar'); 
   const [newAppointment, setNewAppointment] = useState({
     doctor_id: '',
     time: '',
     reason: ''
   });
 
-  // Function to refresh appointments from the database
   const refreshAppointments = async () => {
     if (!userData.id || userData.id === "----") return;
     
@@ -84,7 +83,7 @@ const PersonalAppointmentTracker = () => {
       }
     };
 
-    // Set up real-time notification subscription
+    
     const setupNotificationSubscription = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
@@ -105,10 +104,10 @@ const PersonalAppointmentTracker = () => {
                 filter: `user_id=eq.${user.id}`
               }, 
               (payload) => {
-                // Show a toast notification or update UI when new notification arrives
+                
                 if (payload.new.type.includes('appointment')) {
                   console.log('New appointment notification:', payload.new);
-                  // You can add a toast notification here
+                  
                 }
               }
             )
@@ -123,7 +122,7 @@ const PersonalAppointmentTracker = () => {
       return null;
     };
 
-    // Initialize data and set up subscription
+  
     initializeData();
     
     let notificationSubscription = null;
@@ -131,7 +130,7 @@ const PersonalAppointmentTracker = () => {
       notificationSubscription = subscription;
     });
 
-    // Cleanup function
+   
     return () => {
       if (notificationSubscription) {
         notificationSubscription.unsubscribe();
@@ -140,7 +139,7 @@ const PersonalAppointmentTracker = () => {
   }, []);
 
   const formatDateForStorage = (date) => {
-    // Create a new date object to avoid timezone issues
+   
     const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
     const year = localDate.getFullYear();
     const month = String(localDate.getMonth() + 1).padStart(2, '0');
@@ -151,7 +150,7 @@ const PersonalAppointmentTracker = () => {
   const handleDateSelect = (date) => {
     setSelectedDate(date);
     setError('');
-    // On mobile, automatically switch to appointments tab when date is selected
+   
     if (window.innerWidth < 768) {
       setActiveTab('appointments');
     }
@@ -232,7 +231,7 @@ const PersonalAppointmentTracker = () => {
           reason: ''
         });
 
-        // Refresh appointments after a short delay
+       
         setTimeout(refreshAppointments, 1000);
 
         return true;
@@ -267,7 +266,7 @@ const PersonalAppointmentTracker = () => {
   };
 
   const handleCancelRequest = async (appointment) => {
-    // Check if cancellation is allowed
+   
     if (!canCancelAppointment(appointment)) {
       setError('Appointments can only be cancelled up to 24 hours before the scheduled time.');
       return;
@@ -287,7 +286,7 @@ const PersonalAppointmentTracker = () => {
       if (cancelError) {
         setError(`Failed to cancel appointment: ${cancelError}`);
       } else {
-        // Update local state
+      
         setAppointments(prevAppointments => 
           prevAppointments.map(apt => 
             apt.id === appointment.id 
@@ -304,7 +303,7 @@ const PersonalAppointmentTracker = () => {
     }
   };
 
-  // Handle permanent removal of appointment from the list
+
   const handlePermanentRemove = (removedAppointment) => {
     setAppointments(prevAppointments => 
       prevAppointments.filter(apt => apt.id !== removedAppointment.id)
@@ -312,7 +311,7 @@ const PersonalAppointmentTracker = () => {
   };
 
   const handleRescheduleComplete = (updatedAppointment) => {
-    // Update the appointments list with the rescheduled appointment
+  
     setAppointments(prevAppointments => 
       prevAppointments.map(apt => 
         apt.id === updatedAppointment.id 
@@ -340,7 +339,7 @@ const PersonalAppointmentTracker = () => {
     return appointment.status === 'confirmed' && hoursFromCreation <= 24;
   };
 
-  // Get appointments for selected date
+ 
   const selectedDateAppointments = appointments.filter(
     (apt) => apt.date === formatDateForStorage(selectedDate)
   );
@@ -497,7 +496,7 @@ const PersonalAppointmentTracker = () => {
         )}
       </div>
 
-      {/* Enhanced Appointment Modal */}
+      
       <AppointmentModal
         isOpen={showModal}
         onClose={handleCloseModal}

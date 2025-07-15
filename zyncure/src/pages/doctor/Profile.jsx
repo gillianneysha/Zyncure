@@ -8,26 +8,26 @@ import { NotificationPage } from "../../components/IndividualPage.jsx";
 // import { BillingPage } from "../../components/IndividualPage.jsx";
 import { PoliciesPage } from "../../components/IndividualPage.jsx";
 import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
-import { supabase } from "../../client"; // adjust path if needed
+import { supabase } from "../../client";
 
 export default function ProfilePage({ setIsAuthenticated }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("My Profile");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Show modal instead of logging out immediately
+  
   const handleLogoutClick = () => {
     setShowLogoutModal(true);
   };
 
-  // Called when user confirms logout
+  
   const handleLogoutConfirm = async () => {
     await supabase.auth.signOut();
     setShowLogoutModal(false);
     navigate('/', { replace: true });
 };
 
-  // Called when user cancels logout
+  
   const handleLogoutCancel = () => {
     setShowLogoutModal(false);
   };

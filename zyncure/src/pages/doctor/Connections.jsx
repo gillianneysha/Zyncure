@@ -17,7 +17,7 @@ const DoctorConnectionsPage = () => {
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState(''); // 'accept', 'decline', 'remove', 'confirm-remove', or 'request-sent'
+  const [modalType, setModalType] = useState(''); 
   const [modalPatientName, setModalPatientName] = useState('');
   const [pendingRemoveConnectionId, setPendingRemoveConnectionId] = useState(null);
 
@@ -41,12 +41,12 @@ const DoctorConnectionsPage = () => {
   // ========================================
   // DATA LOADING FUNCTIONS
   // ========================================
-// Replace your existing doctor loadConnections function with this fixed version
+
 const loadConnections = async () => {
   try {
     setIsLoading(true);
     
-    // Get the current user
+   
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) {
@@ -60,7 +60,7 @@ const loadConnections = async () => {
     const { data, error } = await supabase
       .from('doctor_connection_details')
       .select('*')
-      .eq('med_id', user.id) // Filter for the logged-in doctor
+      .eq('med_id', user.id) 
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -70,7 +70,7 @@ const loadConnections = async () => {
     console.log('Total doctor connections returned:', allConnections.length);
     console.log('All doctor connections data:', allConnections);
     
-    // Debug: Log the requester_type and request_direction for each connection
+    
     allConnections.forEach(conn => {
       console.log(`Doctor Connection ${conn.id}:`, {
         requester_type: conn.requester_type,
@@ -80,15 +80,14 @@ const loadConnections = async () => {
       });
     });
     
-    // FIXED: Show pending requests where the PATIENT requested to connect with the DOCTOR
-    // This means requester_type = 'patient' and status = 'pending'
+    
     const pendingIncoming = allConnections.filter(
       conn => conn.status === 'pending' && conn.requester_type === 'patient'
     );
     
     console.log('Pending incoming requests for doctor:', pendingIncoming);
     
-    // All other connections (accepted, rejected, or outgoing pending requests)
+   
     const otherConnections = allConnections.filter(
       conn => !(conn.status === 'pending' && conn.requester_type === 'patient')
     );
@@ -171,7 +170,7 @@ const loadConnections = async () => {
       
       setSearchResults(prev => prev.filter(p => p.patient_id !== patient.patient_id));
       
-      // Show success modal instead of alert
+      
       const patientName = formatPatientName(patient.first_name, patient.last_name);
       setModalType('request-sent');
       setModalPatientName(patientName);
@@ -210,13 +209,13 @@ const handleConnectionRequest = async (connectionId, action) => {
       throw error;
     }
 
-    // Find the patient name for the modal
+    
     const connection = pendingRequests.find(req => req.id === connectionId);
     const patientName = connection ? formatPatientName(connection.patient_first_name, connection.patient_last_name) : 'Patient';
 
     await loadConnections();
     
-    // Show modal instead of alert
+    
     setModalType(action);
     setModalPatientName(patientName);
     setShowModal(true);
@@ -239,7 +238,7 @@ const handleConnectionRequest = async (connectionId, action) => {
 // FIXED CONNECTION REMOVAL MANAGEMENT
 // ========================================
 const showRemoveConfirmation = (connectionId) => {
-  // Find the connection details for the modal
+  
   const connection = connections.find(conn => conn.id === connectionId);
   const patientName = connection ? formatPatientName(connection.patient_first_name, connection.patient_last_name) : 'Patient';
   
@@ -265,16 +264,16 @@ const confirmRemoveConnection = async () => {
     
     await loadConnections();
     
-    // Show success modal
+    
     setModalType('remove');
-    // modalPatientName is already set
+    
     setPendingRemoveConnectionId(null);
-    // Keep modal open to show success message
+   
     
   } catch (error) {
     console.error('Error removing connection:', error);
     
-    // Close modal and show error
+    
     setShowModal(false);
     setPendingRemoveConnectionId(null);
     

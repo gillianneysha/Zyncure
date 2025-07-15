@@ -179,15 +179,15 @@ export default function CompleteProfile() {
     setIsLoading(true);
 
     try {
-      console.log("Submitting form with data:", form); // Debug log
-      console.log("User ID:", user.id); // Debug log
-      console.log("User email:", user.email); // Debug log
+      console.log("Submitting form with data:", form); 
+      console.log("User ID:", user.id); 
+      console.log("User email:", user.email); 
 
       let insertError;
 
       if (form.userType === 'patient') {
-        console.log("Inserting patient profile"); // Debug log
-        // Insert into patients table
+        console.log("Inserting patient profile"); 
+        
         const { data, error } = await supabase
           .from('patients')
           .insert([{
@@ -200,13 +200,13 @@ export default function CompleteProfile() {
             email: user.email,
             status: 'active'
           }])
-          .select(); // Add select to get the inserted data
+          .select(); 
 
-        console.log("Patient insert result:", { data, error }); // Debug log
+        console.log("Patient insert result:", { data, error }); 
         insertError = error;
       } else if (form.userType === 'doctor') {
-        console.log("Inserting doctor profile"); // Debug log
-        // Insert into medicalprofessionals table
+        console.log("Inserting doctor profile"); 
+        
         const { data, error } = await supabase
           .from('medicalprofessionals')
           .insert([{
@@ -219,9 +219,9 @@ export default function CompleteProfile() {
             email: user.email,
             status: 'active'
           }])
-          .select(); // Add select to get the inserted data
+          .select(); 
 
-        console.log("Doctor insert result:", { data, error }); // Debug log
+        console.log("Doctor insert result:", { data, error }); 
         insertError = error;
       }
 
@@ -231,7 +231,7 @@ export default function CompleteProfile() {
         return;
       }
 
-      // Update user metadata in auth (optional, but good for consistency)
+      
       try {
         const { error: updateError } = await supabase.auth.updateUser({
           data: {
@@ -245,15 +245,15 @@ export default function CompleteProfile() {
 
         if (updateError) {
           console.error('Metadata update error:', updateError);
-          // Don't throw error here since profile was saved successfully
+          
         }
       } catch (metaError) {
         console.error('Metadata update failed:', metaError);
-        // Continue anyway since profile was saved
+      
       }
 
       console.log("Profile saved successfully, navigating to dashboard"); // Debug log
-      // Navigate to dashboard on success
+    
       navigate('/dashboard');
 
     } catch (error) {
@@ -264,7 +264,7 @@ export default function CompleteProfile() {
     }
   };
 
-  // Show loading while checking authentication
+ 
   if (isInitialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F46B5D]">
@@ -273,7 +273,7 @@ export default function CompleteProfile() {
     );
   }
 
-  // Show loading if no user (shouldn't happen due to redirect)
+  
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F46B5D]">
@@ -376,7 +376,7 @@ export default function CompleteProfile() {
                 <option value="patient" className="text-black">Patient</option>
                 <option value="doctor" className="text-black">Doctor</option>
               </select>
-              {/* Custom down arrow */}
+              
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b0b0]">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

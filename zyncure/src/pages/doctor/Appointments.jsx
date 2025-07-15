@@ -36,19 +36,17 @@ const formatTimeForDisplay = (timeString) => {
   console.log('Type of timeString:', typeof timeString);
   
   try {
-    // If already in 12-hour format, return as is
+   
     if (timeString.includes('AM') || timeString.includes('PM')) {
       console.log('Already in 12-hour format, returning as is');
       return timeString;
     }
     
-    // Handle your database format: "2025-07-13 08:30:00:00"
     let timePart;
     
     if (timeString.includes(' ')) {
-      // Split by space and get the time part
       const parts = timeString.split(' ');
-      timePart = parts[1]; // This gets "08:30:00:00"
+      timePart = parts[1]; 
       console.log('Date part:', parts[0]);
       console.log('Time part:', timePart);
     } else {
@@ -56,7 +54,7 @@ const formatTimeForDisplay = (timeString) => {
       console.log('No space found, using full string as time part:', timePart);
     }
     
-    // Remove extra seconds if present (08:30:00:00 -> 08:30:00)
+    
     const timeComponents = timePart.split(':');
     console.log('Time components:', timeComponents);
     
@@ -66,13 +64,7 @@ const formatTimeForDisplay = (timeString) => {
     console.log('Parsed hours:', hours);
     console.log('Parsed minutes:', minutes);
     
-    // IMPORTANT: Check what the patient side is expecting
-    // If patient books at 2:00 PM and it's stored as 14:00, then we should show 2:00 PM
-    // If patient books at 2:00 PM and it's stored as 22:00 (due to UTC conversion), then we need to adjust
     
-    // Let's try different approaches:
-    
-    // APPROACH 1: Just convert to 12-hour format without any adjustment
     let finalTime;
     
     if (hours === 0) {
@@ -87,18 +79,17 @@ const formatTimeForDisplay = (timeString) => {
     
     console.log('Final formatted time (no adjustment):', finalTime);
     
-    // APPROACH 2: Try with timezone adjustment (if needed)
-    // Create a Date object to handle timezone properly
+   
     let adjustedTime;
     try {
       if (timeString.includes(' ')) {
-        // Full datetime string
+      
         const fullDateTime = new Date(timeString);
         console.log('Full datetime object:', fullDateTime);
         console.log('UTC hours:', fullDateTime.getUTCHours());
         console.log('Local hours:', fullDateTime.getHours());
         
-        // Format using local time
+        
         adjustedTime = fullDateTime.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
@@ -112,7 +103,7 @@ const formatTimeForDisplay = (timeString) => {
     
     console.log('=== END DEBUG ===');
     
-    // Return the basic conversion for now
+    
     return finalTime;
     
   } catch (error) {
@@ -121,7 +112,7 @@ const formatTimeForDisplay = (timeString) => {
   }
 };
 
-// Alternative approach: Let's also try this function
+
 const formatTimeAlternative = (timeString) => {
   if (!timeString) return '';
   
@@ -129,7 +120,7 @@ const formatTimeAlternative = (timeString) => {
   console.log('Input:', timeString);
   
   try {
-    // Try to parse as a full datetime first
+    
     const date = new Date(timeString);
     
     if (!isNaN(date.getTime())) {
@@ -138,12 +129,12 @@ const formatTimeAlternative = (timeString) => {
       console.log('UTC string:', date.toUTCString());
       console.log('Local string:', date.toString());
       
-      // Format using the user's local timezone
+      
       const formatted = date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-        timeZone: 'Asia/Manila' // Adjust this to your timezone
+        timeZone: 'Asia/Manila' 
       });
       
       console.log('Formatted with timezone:', formatted);
@@ -155,12 +146,11 @@ const formatTimeAlternative = (timeString) => {
     console.log('Date parsing failed:', error);
   }
   
-  // Fallback to manual parsing
+
   return formatTimeForDisplay(timeString);
 };
 
 const formatDateForStorage = (date) => {
-  // Create a new date object to avoid timezone issues
   const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
   const year = localDate.getFullYear();
   const month = String(localDate.getMonth() + 1).padStart(2, '0');
@@ -243,8 +233,8 @@ const loadAppointments = useCallback(async () => {
       const lastDay = new Date(year, month + 1, 0);
       
      const { data, error } = await doctorAppointmentService.getDoctorAppointmentsRange(
-  formatDateForStorage(firstDay),     // ← NEW LINE
-  formatDateForStorage(lastDay)       // ← NEW LINE
+  formatDateForStorage(firstDay),     
+  formatDateForStorage(lastDay)       
       );
       
       if (!error && data) {
@@ -326,7 +316,7 @@ const loadAppointments = useCallback(async () => {
 const handleRescheduleAppointment = async (appointmentId) => {
   setLoading(true);
   try {
-    // Call cancelAppointment without any reason
+    
     const { error } = await doctorAppointmentService.rescheduleAppointment(appointmentId);
     if (error) {
       setError(`Failed to cancel appointment: ${error}`);
@@ -346,7 +336,7 @@ const handleRescheduleAppointment = async (appointmentId) => {
 const handleCancelAppointment = async (appointmentId) => {
   setLoading(true);
   try {
-    // Call cancelAppointment without any reason
+  
     const { error } = await doctorAppointmentService.cancelAppointment(appointmentId);
     if (error) {
       setError(`Failed to cancel appointment: ${error}`);
@@ -538,7 +528,7 @@ const handleViewDetails = async (appointment) => {
         {doctorData.name} - {getHeaderText()}
       </h1>
       
-      {/* Global Error Display */}
+    
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-red-600">{error}</p>
@@ -819,7 +809,7 @@ const handleViewDetails = async (appointment) => {
                
               </div>
 
-              {/* Additional patient details if loaded */}
+           
               {patientDetails && (
                 <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-200">
                   <div>

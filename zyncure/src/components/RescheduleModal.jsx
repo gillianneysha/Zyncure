@@ -15,16 +15,16 @@ const RescheduleModal = ({
   const [error, setError] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Get minimum date (today)
+  // G (today)
   const today = new Date();
   const minDate = today.toISOString().split('T')[0];
 
-  // Get maximum date (3 months from now)
+  //  (3 months from now)
   const maxDate = new Date();
   maxDate.setMonth(maxDate.getMonth() + 3);
   const maxDateStr = maxDate.toISOString().split('T')[0];
 
-  // Reset form when modal opens/closes
+  
   useEffect(() => {
     if (isOpen) {
       setSelectedDate('');
@@ -34,7 +34,7 @@ const RescheduleModal = ({
     }
   }, [isOpen]);
 
-  // Load available slots when date changes
+  
   useEffect(() => {
     if (selectedDate && appointment) {
       loadAvailableSlots();
@@ -48,7 +48,7 @@ const RescheduleModal = ({
     setSelectedTime('');
     
     try {
-      // Fetch both available slots and existing appointments
+    
       const [slotsResult, appointmentsResult] = await Promise.all([
         appointmentService.getAvailableTimeSlots(appointment.doctor_id, selectedDate),
         appointmentService.getAppointments(selectedDate, appointment.doctor_id)
@@ -58,7 +58,7 @@ const RescheduleModal = ({
         setError('Failed to load available time slots');
         setAvailableSlots([]);
       } else {
-        // Define all possible time slots
+       
         const allTimeSlots = [
           '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM',
           '11:00 AM', '11:30 AM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
@@ -68,11 +68,10 @@ const RescheduleModal = ({
         const availableSlots = slotsResult.data || [];
         const bookedTimes = appointmentsResult.data ? 
           appointmentsResult.data
-            .filter(apt => apt.id !== appointment.id) // Exclude current appointment being rescheduled
+            .filter(apt => apt.id !== appointment.id) 
             .map(apt => apt.time) : [];
         
-        // Create slots with status information
-        const slotsWithStatus = allTimeSlots.map(slot => ({
+              const slotsWithStatus = allTimeSlots.map(slot => ({
           time: slot,
           available: availableSlots.includes(slot),
           booked: bookedTimes.includes(slot)
@@ -103,7 +102,7 @@ const RescheduleModal = ({
       return;
     }
 
-    // Validate that the selected time is still available
+    
     const selectedSlot = availableSlots.find(slot => slot.time === selectedTime);
     if (!selectedSlot || selectedSlot.booked || !selectedSlot.available) {
       setError('Selected time slot is no longer available. Please choose a different time.');
@@ -115,7 +114,7 @@ const RescheduleModal = ({
     setError('');
 
     try {
-      // Final check before submission
+      
       const { data: currentSlots } = await appointmentService.getAvailableTimeSlots(
         appointment.doctor_id, 
         selectedDate
@@ -127,7 +126,7 @@ const RescheduleModal = ({
         return;
       }
 
-      // Update the appointment with new date and time
+      
       const updateData = {
         date: selectedDate,
         time: selectedTime,
@@ -144,10 +143,10 @@ const RescheduleModal = ({
         return;
       }
 
-      // Call the completion callback
+      
       onRescheduleComplete?.(data?.[0] || { ...appointment, ...updateData });
       
-      // Close modal and reset form
+      
       onClose();
       
     } catch (err) {
@@ -207,7 +206,7 @@ const RescheduleModal = ({
             </div>
           </div>
 
-          {/* Error Display */}
+       
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>

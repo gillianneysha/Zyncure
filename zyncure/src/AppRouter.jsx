@@ -54,9 +54,9 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
-  // Check if user has the required role
+  
   if (requiredRole && user.role !== requiredRole) {
-    // Redirect to appropriate home based on user's actual role
+    
     if (user.role === "admin") return <Navigate to="/admin/profile" replace />;
     const redirectPath = user.role === "patient" ? "/home" : "/doctor";
     return <Navigate to={redirectPath} replace />;
@@ -82,7 +82,7 @@ export default function AppRouter() {
 
   return (
     <Routes>
-      {/* Public route - only accessible when not authenticated */}
+      
       <Route
         path="/"
         element={
@@ -134,7 +134,7 @@ export default function AppRouter() {
         }
       >
         <Route index element={<DoctorHome />} />
-        {/* <Route path="patients" element={<DoctorPatients />} /> */}
+        
         <Route path="profile" element={<DoctorProfile />} />
         <Route path="patients">
           <Route index element={<DoctorPatients />} />
@@ -143,7 +143,7 @@ export default function AppRouter() {
         </Route>
         <Route path="connections" element={<DoctorConnections />} />
         <Route path="notifications" element={<DoctorNotifications />} />
-        {/* --- IMPORTANT: Add direct /doctor/reports route to use layout --- */}
+     
         <Route path="reports" element={<DoctorReports />} />
       </Route>
 

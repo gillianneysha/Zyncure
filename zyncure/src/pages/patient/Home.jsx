@@ -33,7 +33,7 @@ const Home = () => {
         return;
       }
 
-      // Fetch profile info from patients table
+      
       const { data: profile, error: profileError } = await supabase
         .from('patients')
         .select('first_name, last_name, email, birthdate')
@@ -57,11 +57,11 @@ const Home = () => {
 
   const fetchSymptomStats = async () => {
     try {
-      // Get current user
+    
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
         console.error('User fetch failed:', authError?.message);
-        // Fallback to demo data if user not authenticated
+      
         setSymptomStats({
           totalLogs: 47,
           lastLogged: 'Today',
@@ -71,7 +71,7 @@ const Home = () => {
         return;
       }
 
-      // Fetch all symptom logs for the current user
+   
       const { data: symptomLogs, error: fetchError } = await supabase
         .from('symptomlog')
         .select('*')
@@ -80,7 +80,7 @@ const Home = () => {
 
       if (fetchError) {
         console.error('Error fetching symptom data:', fetchError.message);
-        // Fallback to demo data on error
+
         setSymptomStats({
           totalLogs: 47,
           lastLogged: 'Today',
@@ -90,7 +90,7 @@ const Home = () => {
         return;
       }
 
-      // Store the logged dates for PDF generation
+     
       if (symptomLogs) {
         const normalizedLogs = symptomLogs.map(entry => ({
           ...entry,
@@ -99,15 +99,15 @@ const Home = () => {
         setLoggedDates(normalizedLogs);
       }
 
-      // Process the data
+     
       if (symptomLogs && symptomLogs.length > 0) {
         const totalLogs = symptomLogs.length;
 
-        // Get last logged date
+       
         const lastLoggedDate = new Date(symptomLogs[0].date_logged);
         const lastLogged = formatLastLogged(lastLoggedDate);
 
-        // Count symptom types to find most common
+        
         const symptomCounts = {};
         symptomLogs.forEach(log => {
           const symptom = log.symptoms;
@@ -118,7 +118,6 @@ const Home = () => {
           symptomCounts[a] > symptomCounts[b] ? a : b
         );
 
-        // Get most recent mood (Feelings entry)
         const recentMoodLog = symptomLogs.find(log => log.symptoms === 'Feelings');
         const recentMood = recentMoodLog ? recentMoodLog.severity : 'Not logged';
 
@@ -129,7 +128,7 @@ const Home = () => {
           recentMood
         });
       } else {
-        // No data found, demo data
+      
         setSymptomStats({
           totalLogs: 0,
           lastLogged: 'Never',
@@ -139,7 +138,7 @@ const Home = () => {
       }
     } catch (error) {
       console.error('Error in fetchSymptomStats:', error);
-      // Fallback to demo data on error
+    
       setSymptomStats({
         totalLogs: 47,
         lastLogged: 'Today',

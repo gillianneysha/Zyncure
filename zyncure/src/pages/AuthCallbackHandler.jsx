@@ -12,7 +12,7 @@ export default function AuthCallbackHandler() {
         navigate("/login", { replace: true });
         return;
       }
-      // Check if profile exists in the DB
+    
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
@@ -20,10 +20,10 @@ export default function AuthCallbackHandler() {
         .single();
 
       if (!profile || !profile.first_name || !profile.last_name || !profile.contact_number || !profile.birthdate || !profile.user_type) {
-        // Redirect to complete profile if missing
+    
         navigate("/complete-profile", { replace: true });
       } else {
-        // Redirect to dashboard/home
+        
         navigate("/home", { replace: true });
       }
     };

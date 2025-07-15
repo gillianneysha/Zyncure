@@ -42,13 +42,13 @@ export function ReportModal({ isOpen, onClose, user }) {
   const [historyData, setHistoryData] = useState({ bugs: [], tickets: [] });
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // Fetch user profile data when modal opens
+ 
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user?.id) return;
 
       try {
-        // First check if user is a patient
+      
         const { data: patientData, error: patientError } = await supabase
           .from('patients')
           .select('first_name, last_name, email')
@@ -64,7 +64,7 @@ export function ReportModal({ isOpen, onClose, user }) {
           return;
         }
 
-        // If not a patient, check if user is a medical professional
+        
         const { data: medData, error: medError } = await supabase
           .from('medicalprofessionals')
           .select('first_name, last_name, email')
@@ -80,7 +80,7 @@ export function ReportModal({ isOpen, onClose, user }) {
           return;
         }
 
-        // If not in either table, check admin table
+        
         const { data: adminData, error: adminError } = await supabase
           .from('admin')
           .select('full_name, email')
@@ -96,7 +96,7 @@ export function ReportModal({ isOpen, onClose, user }) {
           return;
         }
 
-        // Fallback to just email if no profile found
+        
         setUserProfile({
           name: user.email?.split('@')[0] || '',
           email: user.email || '',
@@ -105,7 +105,7 @@ export function ReportModal({ isOpen, onClose, user }) {
 
       } catch (error) {
         console.error('Error fetching user profile:', error);
-        // Fallback to basic auth user info
+        
         setUserProfile({
           name: user.email?.split('@')[0] || '',
           email: user.email || '',
@@ -119,20 +119,19 @@ export function ReportModal({ isOpen, onClose, user }) {
     }
   }, [isOpen, user]);
 
-  // Fetch history data
   const fetchHistory = async () => {
     if (!userProfile?.email) return;
 
     setLoadingHistory(true);
     try {
-      // Fetch bug reports
+    
       const { data: bugData, error: bugError } = await supabase
         .from('bug_reports')
         .select('*')
         .eq('reporter_email', userProfile.email)
         .order('created_at', { ascending: false });
 
-      // Fetch support tickets
+     
       const { data: ticketData, error: ticketError } = await supabase
         .from('support_tickets')
         .select('*')
@@ -267,7 +266,7 @@ function HistoryView({ historyData, loadingHistory, onBack }) {
 
   const totalCount = historyData.bugs.length + historyData.tickets.length;
 
-  // Pagination logic
+ 
   const getCurrentPageData = () => {
     const data = activeTab === 'bugs' ? historyData.bugs : historyData.tickets;
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -333,7 +332,7 @@ function HistoryView({ historyData, loadingHistory, onBack }) {
 
       {/* History Content */}
       <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-2">
-        {/* Custom scrollbar styling */}
+      
         <style jsx>{`
           div::-webkit-scrollbar {
             width: 4px;
@@ -420,7 +419,7 @@ function HistoryView({ historyData, loadingHistory, onBack }) {
         )}
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination*/}
       {getTotalPages() > 1 && (
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
           <div className="text-sm text-gray-600">
@@ -451,7 +450,7 @@ function HistoryView({ historyData, loadingHistory, onBack }) {
   );
 }
 
-// Report Type Selector
+
 function ReportTypeSelector({ onSelect, onShowHistory }) {
   return (
     <div className="space-y-4">
@@ -510,7 +509,7 @@ function ReportTypeSelector({ onSelect, onShowHistory }) {
   );
 }
 
-// Bug Report Form
+
 function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatus, userProfile }) {
   const [formData, setFormData] = useState({
     reporter_name: '',
@@ -521,7 +520,7 @@ function BugReportForm({ onSubmit, onSuccess, onError, isSubmitting, submitStatu
     device_info: `${navigator.platform} - Screen: ${screen.width}x${screen.height}`
   });
 
-  // Update form data when userProfile is loaded
+  
   useEffect(() => {
     if (userProfile) {
       setFormData(prev => ({
@@ -844,7 +843,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    // Get current user session
+
     const getCurrentUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {

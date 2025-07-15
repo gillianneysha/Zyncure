@@ -14,7 +14,7 @@ export default function DoctorVerificationModal({
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
-  // Reset form when modal opens
+ 
   useEffect(() => {
     if (open) {
       setLicenseNumber("");
@@ -89,7 +89,7 @@ export default function DoctorVerificationModal({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Get modal content based on verification status
+  
   const getModalContent = () => {
     switch (verificationStatus) {
       case 'rejected':
@@ -140,7 +140,7 @@ export default function DoctorVerificationModal({
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Rejection Reason (if applicable) */}
+          
           {modalContent.showRejectionReason && rejectionReason && (
             <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
               <XCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
@@ -222,7 +222,7 @@ export default function DoctorVerificationModal({
             </div>
           </div>
 
-          {/* Error Message */}
+          {/* Error  */}
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
               <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />

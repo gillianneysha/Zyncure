@@ -61,16 +61,16 @@ export function AdminPersonalInfoForm() {
                     return;
                 }
 
-                console.log("Admin User ID:", user.id); // Debug log
+                console.log("Admin User ID:", user.id); 
 
-                // Fetch admin data from the admin table
+                
                 let { data: adminData, error: adminError } = await supabase
                     .from("admin")
                     .select("*")
                     .eq("user_id", user.id)
                     .single();
 
-                if (adminError && adminError.code !== 'PGRST116') { // PGRST116 is "not found"
+                if (adminError && adminError.code !== 'PGRST116') { 
                     console.error("Error fetching admin data:", adminError);
                     setError("Failed to fetch admin data");
                     setLoading(false);
@@ -80,14 +80,14 @@ export function AdminPersonalInfoForm() {
                 let profile = {};
                 if (adminData) {
                     profile = adminData;
-                    console.log("Admin data found:", profile); // Debug log
+                    console.log("Admin data found:", profile); 
                 } else {
-                    // Fallback to user metadata if admin record doesn't exist
+                    
                     profile = user.user_metadata || {};
-                    console.log("Using user metadata:", profile); // Debug log
+                    console.log("Using user metadata:", profile); 
                 }
 
-                // Handle the full_name field from admin table
+               
                 let firstName = "";
                 let lastName = "";
 
@@ -144,10 +144,10 @@ export function AdminPersonalInfoForm() {
                 return;
             }
 
-            console.log("Attempting to save admin data for user:", user.id); // Debug log
-            console.log("Form data to save:", formData); // Debug log
+            console.log("Attempting to save admin data for user:", user.id); 
+            console.log("Form data to save:", formData); 
 
-            // Prepare the data for upsert
+           
             const updateData = {
                 user_id: user.id,
                 full_name: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -156,7 +156,7 @@ export function AdminPersonalInfoForm() {
                 updated_at: new Date().toISOString(),
             };
 
-            console.log("Updating admin table with data:", updateData); // Debug log
+            console.log("Updating admin table with data:", updateData); 
 
             const { data, error: updateError } = await supabase
                 .from("admin")
@@ -168,10 +168,10 @@ export function AdminPersonalInfoForm() {
                 console.error("Database error:", updateError);
                 setError(`Failed to save changes: ${updateError.message}`);
             } else {
-                console.log("Save successful:", data); // Debug log
+                console.log("Save successful:", data); 
                 setShowSuccessModal(true);
                 setIsEditing(false);
-                // Update originalData to reflect the saved state
+              
                 setOriginalData({ ...formData });
             }
         } catch (err) {

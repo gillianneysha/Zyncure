@@ -473,7 +473,7 @@ const PatientCharts = () => {
                 )}
 
 
-                {/* Energy Levels Distribution - Updated to ComposedChart */}
+                {/* Energy Levels Distribution  */}
                 {energyLevelsData.length > 0 && (
                     <div className="bg-white rounded-xl shadow-lg p-6 border border-green-100 chart-container" data-chart-title="Energy Levels Over Time">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
@@ -553,7 +553,7 @@ const PatientCharts = () => {
                 )}
 
 
-                {/* Cravings Distribution */}
+                {/* Cravings  */}
                 {cravingsData.length > 0 && (
                     <div className="bg-white rounded-xl shadow-lg p-6 border border-yellow-100 chart-container" data-chart-title="Food Cravings Pattern">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">

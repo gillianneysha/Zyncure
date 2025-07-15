@@ -2,16 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 import { appointmentService } from '../services/AppointmentService';
 
-// Add this helper function to standardize time format
+
 const normalizeTimeFormat = (time) => {
   if (!time) return '';
   
-  // If time is already in HH:MM format, return as is
+ 
   if (/^\d{2}:\d{2}$/.test(time)) {
     return time;
   }
   
-  // If time is in 12-hour format (e.g., "2:30 PM"), convert to 24-hour
+ 
   if (time.includes('AM') || time.includes('PM')) {
     const [timePart, period] = time.split(' ');
     let [hours, minutes] = timePart.split(':');
@@ -49,7 +49,7 @@ const AppointmentModal = ({
   const displayError = parentError || localError;
 
   const formatDate = useCallback((date) => {
-    // Use local date string to avoid timezone conversion
+    
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -58,7 +58,7 @@ const AppointmentModal = ({
 
 
 
-  // Fix 2: Update the time validation logic in refreshAvailableSlots
+
   const refreshAvailableSlots = useCallback(async (showRefreshingIndicator = true) => {
     if (!newAppointment.doctor_id || !selectedDate) {
       setAvailableTimeSlots([]);
@@ -103,7 +103,7 @@ const AppointmentModal = ({
         setLocalError('');
         setLastRefreshTime(new Date());
         
-        // Fix 3: Correct the time validation logic
+       
         if (newAppointment.time && availableSlots) {
           const normalizedSelectedTime = normalizeTimeFormat(newAppointment.time);
           const normalizedSlots = availableSlots.map(slot => normalizeTimeFormat(slot));
@@ -125,23 +125,23 @@ const AppointmentModal = ({
     }
   }, [newAppointment.doctor_id, selectedDate, formatDate, newAppointment.time, setNewAppointment]);
 
-  // Auto-refresh slots every 30 seconds when modal is open and doctor is selected
+  
   useEffect(() => {
     if (!isOpen || !newAppointment.doctor_id) return;
 
     const interval = setInterval(() => {
-      refreshAvailableSlots(false); //refresh
-    }, 30000); // 30 seconds
+      refreshAvailableSlots(false); 
+    }, 30000); 
 
     return () => clearInterval(interval);
   }, [isOpen, newAppointment.doctor_id, refreshAvailableSlots]);
 
-  // Update available time slots when doctor or date changes
+
   useEffect(() => {
     refreshAvailableSlots();
   }, [refreshAvailableSlots]);
 
-  // Reset time when doctor changes
+
   useEffect(() => {
     if (newAppointment.doctor_id) {
       setNewAppointment(prev => ({ ...prev, time: '' }));
@@ -149,7 +149,7 @@ const AppointmentModal = ({
     }
   }, [newAppointment.doctor_id, setNewAppointment]);
 
-  // Clear errors when modal opens
+ 
   useEffect(() => {
     if (isOpen) {
       setLocalError('');
@@ -165,13 +165,13 @@ const AppointmentModal = ({
       setParentError('');
     }
     
-    // Validate 
+    
     if (!newAppointment.doctor_id || !newAppointment.time || !newAppointment.reason) {
       setLocalError('Please fill in all required fields');
       return;
     }
 
-    // Validate 
+    
     if (newAppointment.reason.trim().length < 10) {
       setLocalError('Please provide a more detailed reason (at least 10 characters)');
       return;
@@ -190,7 +190,7 @@ const AppointmentModal = ({
     setLocalLoading(true);
     
     try {
-      // Final check before submission
+      
       const dateStr = formatDate(selectedDate);
       const { data: currentSlots } = await appointmentService.getAvailableTimeSlots(
         newAppointment.doctor_id, 

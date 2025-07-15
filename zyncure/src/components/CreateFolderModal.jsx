@@ -25,7 +25,7 @@ function CreateFolderModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
       <div className="bg-white rounded-xl px-8 py-7 w-full max-w-xs text-center shadow-2xl border relative">
-        {/* Folder icon removed here */}
+       
         <div className="font-bold text-xl mb-2" style={{ color: "#15907C" }}>{label}</div>
         <form onSubmit={handleSubmit}>
           <div className="flex items-center mb-4">

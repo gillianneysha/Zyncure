@@ -9,11 +9,11 @@ export default function Sidebar({ children }) {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Check if we're on mobile
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
-      // On mobile, default to collapsed
+     
       if (window.innerWidth < 768) {
         setExpanded(false);
       }
@@ -114,14 +114,14 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
       setIsOpen(!isOpen);
     } else if (onClick) {
       onClick();
-      // Close mobile menu after clicking
+    
       if (isMobile) {
         closeMobileMenu();
       }
     }
   };
 
-  // For floating submenu on hover when collapsed (desktop only)
+  
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -225,7 +225,7 @@ export function SidebarSubItem({ icon, text, active, onClick, submenu = false, d
     if (disabled) return;
     if (onClick) {
       onClick();
-      // Close mobile menu after clicking
+      
       if (isMobile) {
         closeMobileMenu();
       }
@@ -257,7 +257,7 @@ export function SidebarSubItem({ icon, text, active, onClick, submenu = false, d
   );
 }
 
-// Example usage component
+
 function BarItems() {
   const [activeItem, setActiveItem] = useState('dashboard');
 

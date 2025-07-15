@@ -1,4 +1,4 @@
-//For forecasting: we used basic time series forecasting principle : naive forecasting
+
 
 import React, { useState, useEffect } from "react";
 import {
@@ -48,25 +48,25 @@ export default function AdminReports() {
 
   const fetchUserDemographics = async () => {
     try {
-      // Fetch medical professionals count
+     
       const { data: medicalProfessionals, error: medError } = await supabase
         .from("medicalprofessionals")
         .select("user_type");
 
       if (medError) throw medError;
 
-      // Fetch patients count
+     
       const { data: patients, error: patientError } = await supabase
         .from("patients")
         .select("user_type");
 
       if (patientError) throw patientError;
 
-      // Count user types
+    
       const doctorCount = medicalProfessionals?.length || 0;
       const patientCount = patients?.length || 0;
 
-      // Calculate total and percentages
+      
       const total = doctorCount + patientCount;
 
       if (total > 0) {
@@ -89,7 +89,7 @@ export default function AdminReports() {
       }
     } catch (error) {
       console.error("Error fetching user demographics:", error);
-      // Fallback data if database fetch fails
+     
       setUserDemographicData([
         {
           name: "Medical Professionals",
@@ -104,7 +104,7 @@ export default function AdminReports() {
 
   const fetchTotalRevenue = async () => {
     try {
-      // Fetch all payments with paid or refunded status
+     
       const { data: payments, error } = await supabase
         .from("payments")
         .select("amount, status")
@@ -112,8 +112,7 @@ export default function AdminReports() {
 
       if (error) throw error;
 
-      // Calculate total: add paid amounts, subtract refunded amounts
-      // Convert from centavos to PHP by dividing by 100
+      
       const total =
         payments?.reduce((sum, payment) => {
           const amount = (payment.amount || 0) / 100;
@@ -137,7 +136,7 @@ export default function AdminReports() {
 
   const fetchSubscriberTiers = async () => {
     try {
-      // Get all active subscriptions
+     
       const { data: subscriptions, error: subError } = await supabase
         .from("subscriptions")
         .select("tier, status")
@@ -145,7 +144,7 @@ export default function AdminReports() {
 
       if (subError) throw subError;
 
-      // Get total user count (medical professionals + patients)
+     
       const { data: medicalProfessionals, error: medError } = await supabase
         .from("medicalprofessionals")
         .select("med_id");
@@ -159,7 +158,7 @@ export default function AdminReports() {
       const totalUsers =
         (medicalProfessionals?.length || 0) + (patients?.length || 0);
 
-      // Count subscribers by tier
+     
       const tierCounts = {
         Free: 0,
         Pro: 0,
@@ -175,11 +174,11 @@ export default function AdminReports() {
         }
       });
 
-      // Free users are total users minus subscribed users
+    
       const subscribedUsers = tierCounts.Pro + tierCounts.Premium;
       tierCounts.Free = totalUsers - subscribedUsers;
 
-      // Convert to chart format
+     
       const chartData = [
         { tier: "Free", count: tierCounts.Free },
         { tier: "Pro", count: tierCounts.Pro },
@@ -189,7 +188,7 @@ export default function AdminReports() {
       setSubscriberData(chartData);
     } catch (error) {
       console.error("Error fetching subscriber tiers:", error);
-      // Fallback data if database fetch fails
+   
       setSubscriberData([
         { tier: "Free", count: 850 },
         { tier: "Pro", count: 120 },
@@ -201,17 +200,14 @@ export default function AdminReports() {
   const fetchMonthlyActiveUsers = async () => {
     try {
       const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth(); // 0-based (0 = January, 6 = July)
+      const currentMonth = new Date().getMonth(); 
       const monthlyData = [];
 
-      // Only get data for months that have actually occurred (up to current month)
+     
       for (let month = 0; month <= currentMonth; month++) {
         const startOfMonth = new Date(currentYear, month, 1);
         const endOfMonth = new Date(currentYear, month + 1, 0, 23, 59, 59);
 
-        // Count users who were active during this specific month
-        // You might need to adjust this based on how you track "activity"
-        // For now, I'll count users who were created by this month and have active status
 
         const { data: medProfessionals, error: medError } = await supabase
           .from("medicalprofessionals")
@@ -250,7 +246,6 @@ export default function AdminReports() {
 
   const calculateUserProjections = async () => {
     try {
-      // Get current user count
       const { data: medProfessionals } = await supabase
         .from("medicalprofessionals")
         .select("med_id, createdate")
@@ -264,18 +259,18 @@ export default function AdminReports() {
       const currentUsers =
         (medProfessionals?.length || 0) + (patients?.length || 0);
 
-      // For small datasets, use conservative growth assumptions
+    
       const projectionData = [];
       const currentYear = new Date().getFullYear();
 
-      // Conservative growth rates for early-stage health apps
+ 
       const growthScenarios = {
-        conservative: 0.5, // 50% year-over-year growth
-        moderate: 1.0, // 100% year-over-year growth
-        optimistic: 2.0, // 200% year-over-year growth
+        conservative: 0.5, 
+        moderate: 1.0, 
+        optimistic: 2.0, 
       };
 
-      // Use moderate growth for projection
+     
       const growthRate = growthScenarios.moderate;
 
       for (let year = currentYear; year <= currentYear + 2; year++) {
@@ -331,9 +326,9 @@ export default function AdminReports() {
           </h1>
         </div>
 
-        {/* Top Row - Key Metrics */}
+        {/*  Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* User Demographics Pie Chart */}
+          {/* User Demographics */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wide">
               User Demographics

@@ -14,9 +14,9 @@ function RenameModal({
   onClose,
   label = "Rename",
   placeholder = "Enter new name",
-  type = "file", // pass 'file' or 'folder'
+  type = "file", // 'file' or 'folder'
 }) {
-  // For files, separate base and extension
+  // files, separate base and extension
   const { base, ext } = getBaseNameAndExt(currentName || "");
   const [name, setName] = useState(type === "file" ? base : (currentName || ""));
   const inputRef = useRef(null);
@@ -25,7 +25,7 @@ function RenameModal({
     if (open) {
       setName(type === "file" ? base : (currentName || ""));
     }
-    // eslint-disable-next-line
+    
   }, [open, currentName, type]);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ function RenameModal({
       : name.trim() !== currentName
     )) {
       onRename(type === "file" ? (name.trim() + ext) : name.trim());
-      onClose(); // Close the modal after renaming
+      onClose(); 
     }
   };
 

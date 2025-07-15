@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Singleton Supabase client
+
 let supabaseInstance = null;
 
 const getSupabaseClient = () => {
@@ -18,7 +18,7 @@ const getSupabaseClient = () => {
 };
 
 export const symptomDataService = {
-    // Real-time subscription with proper channel management
+  
     subscribeToSymptomChanges(patientId, callback) {
         const supabase = getSupabaseClient();
         const channel = supabase
@@ -47,7 +47,7 @@ export const symptomDataService = {
         }
     },
 
-    // Enhanced data fetching with error handling
+    
     async getSymptomLogs(patientId) {
         const supabase = getSupabaseClient();
         try {

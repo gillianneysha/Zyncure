@@ -11,7 +11,7 @@ export default function Patients() {
   useEffect(() => {
     async function fetchPatients() {
       setLoading(true);
-      // Fetch connected patients (adjust table/view as needed)
+      
       const { data, error } = await supabase
         .from("doctor_connection_details")
         .select("*")

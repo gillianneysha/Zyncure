@@ -8,7 +8,7 @@ const Calendar = ({
   onMonthNavigate,
   isPastDate 
 }) => {
-  // Default isPastDate function if not provided
+ 
   const checkIsPastDate = isPastDate || ((date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -23,7 +23,7 @@ const Calendar = ({
 
   const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-  // Fixed formatDate function - no timezone conversion
+  
   const formatDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');

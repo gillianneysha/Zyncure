@@ -9,7 +9,7 @@ export const useNotifications = () => {
   useEffect(() => {
     fetchUnreadCount();
     
-    // Set up real-time subscription for notification changes
+    
     const subscription = supabase
       .channel('notifications_count')
       .on('postgres_changes', 
@@ -19,7 +19,7 @@ export const useNotifications = () => {
           table: 'notifications'
         }, 
         () => {
-          // Refetch count when notifications change
+          
           fetchUnreadCount();
         }
       )

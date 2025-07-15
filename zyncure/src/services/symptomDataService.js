@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client (add your actual URL and key)
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 export const symptomDataService = {
-    // Fetch all symptom logs for a patient
+    
     async getSymptomLogs(patientId) {
         try {
             const { data, error } = await supabase
@@ -23,7 +23,7 @@ export const symptomDataService = {
         }
     },
 
-    // Fetch symptoms by type
+    
     async getSymptomsByType(patientId, symptomType) {
         try {
             const { data, error } = await supabase
@@ -41,7 +41,7 @@ export const symptomDataService = {
         }
     },
 
-    // Add new symptom log
+   
     async addSymptomLog(patientId, symptomType, severity) {
         try {
             const { data, error } = await supabase
@@ -64,7 +64,7 @@ export const symptomDataService = {
         }
     },
 
-    // Get symptom statistics
+    
     async getSymptomStats(patientId) {
         try {
             const { data, error } = await supabase
@@ -74,7 +74,7 @@ export const symptomDataService = {
 
             if (error) throw error;
 
-            // Process stats
+            
             const stats = {
                 period: { Light: 0, Moderate: 0, Heavy: 0 },
                 feelings: { Happy: 0, Fine: 0, 'Mood Swings': 0, Sad: 0 },
