@@ -134,6 +134,12 @@ export function PersonalInfoForm() {
     setSaving(true);
     setError("");
     setSuccess("");
+    
+if (!formData.firstName.trim() || !formData.lastName.trim()) {
+  setError("First name and last name are required");
+  setSaving(false);
+  return;
+}
 
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -283,6 +289,7 @@ export function PersonalInfoForm() {
             onChange={handleChange}
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
             disabled={!isEditing || loading || saving}
+            required
           />
         </div>
         <div>
@@ -294,6 +301,7 @@ export function PersonalInfoForm() {
             onChange={handleChange}
             className="w-full p-2 border border-mySidebar rounded-xl bg-profileBg"
             disabled={!isEditing || loading || saving}
+            required
           />
         </div>
         <div>
