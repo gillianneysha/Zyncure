@@ -991,7 +991,6 @@ function handleShare({ id, name, type }) {
 // --- Filtering logic ---
 const categorized = categorizeFiles(files, fileShares, currentUserId);
 
-// Show all folders regardless of file contents!
 const displayedFolders = folders;
 
 let displayedFiles = [];
