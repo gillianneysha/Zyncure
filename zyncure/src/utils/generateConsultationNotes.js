@@ -1,12 +1,12 @@
 import { jsPDF } from 'jspdf';
 
 
-// Cache for base64 logo to avoid repeated conversions
+
 let logoBase64Cache = null;
 let logoLoadPromise = null;
 
 
-// Preload and cache the logo
+
 const preloadLogo = async () => {
   if (logoBase64Cache) return logoBase64Cache;
   if (!logoLoadPromise) {
@@ -24,7 +24,7 @@ const preloadLogo = async () => {
 };
 
 
-// Optimized image conversion with timeout
+
 async function convertImageUrlToBase64(url, timeout = 3000) {
   return new Promise((resolve, reject) => {
       const img = new window.Image();
@@ -55,14 +55,14 @@ async function convertImageUrlToBase64(url, timeout = 3000) {
 }
 
 
-// Pre-calculate date strings to avoid repeated calculations
+
 const getDateTimeStrings = () => {
   const now = new Date();
-  // Timestamp for uniqueness
+
   const timestamp = now.getTime();
 
 
-  // Manila timezone date for display
+
   const fileDateStr = now.toLocaleDateString('en-CA', {
       timeZone: 'Asia/Manila',
       year: 'numeric',
@@ -115,11 +115,11 @@ export const generateConsultationNotesPDF = async (noteText, doctorInfo = {}, pa
           ? `${doctorInfo.first_name} ${doctorInfo.last_name}`
           : doctorInfo.name || doctorInfo.full_name || doctorInfo.email || "Doctor";
       const doctorNameForFile = doctorName.replace(/\s+/g, '-');
-      // Filename includes timestamp for uniqueness
+      
       const fileName = `Consultation Notes - DR. ${doctorNameForFile} - ${fileDateStr}-${timestamp}.pdf`;
 
 
-      // Initialize PDF
+      
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -239,7 +239,7 @@ export const generateConsultationNotesPDF = async (noteText, doctorInfo = {}, pa
 };
 
 
-// Convenience function for generating PDF as blob (for uploading to storage)
+
 export const generateConsultationNotesAsBlob = async (noteText, doctorInfo = {}, patientInfo = {}) => {
   const result = await generateConsultationNotesPDF(noteText, doctorInfo, patientInfo, {
       returnBlob: true,
@@ -249,7 +249,7 @@ export const generateConsultationNotesAsBlob = async (noteText, doctorInfo = {},
 };
 
 
-// Convenience function for downloading PDF directly
+
 export const downloadConsultationNotes = async (noteText, doctorInfo = {}, patientInfo = {}) => {
   return await generateConsultationNotesPDF(noteText, doctorInfo, patientInfo, {
       returnBlob: false,
@@ -258,7 +258,7 @@ export const downloadConsultationNotes = async (noteText, doctorInfo = {}, patie
 };
 
 
-// Optional: Preload logo on app initialization
+
 export const initializeConsultationNotes = () => {
   preloadLogo().catch(err => console.warn('Logo preload failed:', err));
 };

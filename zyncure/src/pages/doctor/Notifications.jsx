@@ -14,22 +14,22 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
-  // Removed unused currentUser state
+
 
   useEffect(() => {
     initializeNotifications();
   }, []);
 
-  // Update your initializeNotifications function
+  
   async function initializeNotifications() {
-    // Get current user first
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setLoading(false);
       return;
     }
     
-    // Determine user type
+   
     const userType = await getUserType(user.id);
     if (!userType) {
       setLoading(false);
@@ -38,7 +38,7 @@ export default function Notifications() {
     
     await fetchNotifications(user.id);
     
-    // Set up real-time subscription with the correct user ID
+    
     const subscription = supabase
       .channel("notifications")
       .on(
@@ -66,7 +66,7 @@ export default function Notifications() {
           setNotifications((prev) =>
             prev.map((n) => (n.id === payload.new.id ? payload.new : n))
           );
-          // Recalculate unread count
+        
           setUnreadCount((prev) => {
             const wasRead = payload.old.is_read;
             const isRead = payload.new.is_read;
@@ -79,7 +79,7 @@ export default function Notifications() {
           });
         }
       )
-      // Add DELETE event listener
+      
       .on(
         "postgres_changes",
         {
@@ -90,7 +90,7 @@ export default function Notifications() {
         },
         (payload) => {
           setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
-          // Update unread count if the deleted notification was unread
+        
           if (!payload.old.is_read) {
             setUnreadCount((prev) => Math.max(0, prev - 1));
           }
@@ -104,7 +104,7 @@ export default function Notifications() {
   }
 
   const getUserType = async (userId) => {
-    // Check if user is a doctor
+
     const { data: doctorData } = await supabase
       .from('medicalprofessionals')
       .select('med_id')
@@ -113,7 +113,7 @@ export default function Notifications() {
     
     if (doctorData) return 'doctor';
     
-    // Check if user is a patient
+    
     const { data: patientData } = await supabase
       .from('patients')
       .select('patient_id')
@@ -171,15 +171,15 @@ export default function Notifications() {
 
     if (error) {
       console.error("Error deleting notification:", error);
-      // You might want to show a user-friendly error message here
+      
       alert("Failed to delete notification. Please try again.");
       return;
     }
 
-    // Only update local state if the database operation succeeded
+  
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     
-    // Update unread count if the deleted notification was unread
+   
     const deletedNotification = notifications.find(
       (n) => n.id === notificationId
     );
@@ -237,11 +237,10 @@ export default function Notifications() {
       notification.type.includes("appointment") &&
       notification.metadata.appointment_id
     ) {
-      // You can add navigation to appointment details here
-      // For example: navigate to appointment page or show appointment details
+      
       console.log("Appointment notification clicked:", notification.metadata);
 
-      // Mark as read when user interacts with appointment notification
+     
       if (!notification.is_read) {
         await markAsRead(notification.id);
       }

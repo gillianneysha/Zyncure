@@ -21,23 +21,22 @@ export default function DoctorLayout() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [hasManuallyDismissedModal, setHasManuallyDismissedModal] = useState(false);
 
-  // Fixed: Use correct property names from useUser hook
+  
   const verificationStatus = user?.verification_status;
   const isVerified = user?.is_verified;
   const rejectionReason = user?.rejection_reason;
 
-  // Show verification modal only for doctors with no_record or rejected status
+
   const shouldShowVerificationModal = user?.role === 'doctor' &&
     (verificationStatus === 'no_record' || verificationStatus === 'rejected');
 
-  // Check if doctor features should be limited (frozen state)
-  // Only doctors with 'approved' or 'verified' status should have full access
+  
   const isDoctorUnverified = user?.role === 'doctor' &&
     verificationStatus !== 'approved' &&
     verificationStatus !== 'verified' &&
     !isVerified;
 
-  // Debug logging
+
   useEffect(() => {
     if (user) {
       console.log('DoctorLayout - User ID:', user.id);
@@ -57,7 +56,7 @@ export default function DoctorLayout() {
     setErrorMessage('');
 
     try {
-      // Validate inputs
+   
       if (!licenseNumber || !licenseFile) {
         throw new Error('License number and file are required');
       }
@@ -66,13 +65,13 @@ export default function DoctorLayout() {
         throw new Error('User ID not found');
       }
 
-      // Check file size (limit to 10MB)
-      const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+      
+      const maxSize = 10 * 1024 * 1024; 
       if (licenseFile.size > maxSize) {
         throw new Error('File size must be less than 10MB');
       }
 
-      // Check file type
+     
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
       if (!allowedTypes.includes(licenseFile.type)) {
         throw new Error('File must be a JPEG, PNG, or PDF');
@@ -85,7 +84,7 @@ export default function DoctorLayout() {
         userId: user.id
       });
 
-      // Upload license file to storage first
+     
       const fileExt = licenseFile.name.split('.').pop();
       const fileName = `${user.id}_license_${Date.now()}.${fileExt}`;
 
@@ -105,7 +104,7 @@ export default function DoctorLayout() {
 
       console.log('File uploaded successfully:', uploadData);
 
-      // Check if user already has a verification record using maybeSingle()
+     
       console.log('Checking for existing verification record...');
       const { data: existingVerification, error: selectError } = await supabase
         .from('doctor_verifications')
@@ -129,10 +128,10 @@ export default function DoctorLayout() {
             license_number: licenseNumber,
             license_file_url: fileName,
             status: 'pending',
-            admin_notes: null, // Clear previous rejection notes
+            admin_notes: null, 
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingVerification.id) // Use the record ID instead of user_id
+          .eq('id', existingVerification.id) 
           .select('id, status, admin_notes');
 
 
@@ -144,7 +143,7 @@ export default function DoctorLayout() {
         result = updateData;
         console.log('Update successful:', result);
       } else {
-        // Insert new record
+       
         console.log('Inserting new verification record...');
         const { data: insertData, error: insertError } = await supabase
           .from('doctor_verifications')
@@ -183,7 +182,7 @@ export default function DoctorLayout() {
     } catch (error) {
       console.error('Error submitting verification:', error);
 
-      // Clean up uploaded file if database operation failed
+      
       if (error.message.includes('Database')) {
         try {
           const fileExt = licenseFile.name.split('.').pop();
@@ -200,7 +199,7 @@ export default function DoctorLayout() {
       const errorMsg = error.message || 'An unexpected error occurred. Please try again.';
       setErrorMessage(errorMsg);
 
-      // Show error message
+     
       if (error.message.includes('File upload failed')) {
         alert('Failed to upload file. Please check your internet connection and try again.');
       } else if (error.message.includes('Database')) {
@@ -221,7 +220,7 @@ export default function DoctorLayout() {
 
   if (shouldShowVerificationModal && !verificationModalOpen && !hasManuallyDismissedModal) {
     console.log('Opening verification modal');
-    // Small delay to ensure proper rendering
+   
     setTimeout(() => {
       setVerificationModalOpen(true);
     }, 100);
@@ -238,9 +237,9 @@ export default function DoctorLayout() {
   }
 
 
-  // Verification status component
+ 
   const VerificationStatusBanner = () => {
-    // Don't show banner for verified doctors
+    
     if (user?.role !== 'doctor' || isVerified || verificationStatus === 'approved' || verificationStatus === 'verified') {
       return null;
     }
@@ -387,7 +386,7 @@ default:
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        user={user} // Pass the user prop here
+        user={user} 
       />
 
 

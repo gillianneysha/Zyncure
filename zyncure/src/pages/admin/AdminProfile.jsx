@@ -22,7 +22,7 @@ export default function AdminProfilePage() {
   const handleLogoutCancel = () => setShowLogoutModal(false);
 
   const tabs = [
-    { id: "My Profile", component: <AdminPersonalInfoForm /> }, // Use the new admin component
+    { id: "My Profile", component: <AdminPersonalInfoForm /> }, 
     { id: "Security", component: <SecurityPage /> },
     { id: "Policies and Standards", component: <PoliciesPage /> },
     { id: "Delete Account", component: <DeleteAccountPage /> }

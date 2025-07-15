@@ -5,7 +5,7 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
     const { returnBlob = false, download = true } = options;
     const { jsPDF } = await import('jspdf');
 
-    // Convert image URL to base64
+   
     async function convertImageUrlToBase64(url) {
         return new Promise((resolve, reject) => {
             const img = new window.Image();
@@ -167,17 +167,17 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
     };
 
     try {
-        // Wait for charts to be fully rendered
+        
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Capture charts from the DOM
+        
         const chartContainers = document.querySelectorAll('.chart-container');
         const rechartsContainers = document.querySelectorAll('.recharts-wrapper');
 
         let chartsAdded = false;
 
         if (rechartsContainers.length > 0) {
-            // Define chart titles based on the order they appear in PatientCharts
+            
             const chartTitles = [
                 'Period Flow Patterns',
                 'Most Common Symptoms',
@@ -187,7 +187,7 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
                 'Food Cravings Pattern'
             ];
 
-            // Add Charts Section header only if we have charts
+            
             let sectionHeaderAdded = false;
 
             for (let i = 0; i < Math.min(rechartsContainers.length, chartTitles.length); i++) {
@@ -195,7 +195,7 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
                 const title = chartTitles[i];
 
                 if (chartElement && chartElement.offsetParent !== null) {
-                    // Add section header only once and only if we have charts
+                    
                     if (!sectionHeaderAdded) {
                         doc.setFontSize(13);
                         doc.setTextColor(...COLORS.brown);
@@ -212,16 +212,16 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
                 }
             }
         } else if (chartContainers.length > 0) {
-            // Add Charts Section header only if we have charts
+            
             let sectionHeaderAdded = false;
 
-            // Process identified chart containers
+            
             for (let i = 0; i < chartContainers.length; i++) {
                 const chartContainer = chartContainers[i];
                 const title = chartContainer.getAttribute('data-chart-title') || `Chart ${i + 1}`;
 
                 if (chartContainer && chartContainer.offsetParent !== null) {
-                    // Add section header only once and only if we have charts
+                    
                     if (!sectionHeaderAdded) {
                         doc.setFontSize(13);
                         doc.setTextColor(...COLORS.brown);
@@ -239,10 +239,9 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
             }
         }
 
-        // Only add the "no charts" message if we're on a page that should have charts
-        // (i.e., if there are chart containers but they couldn't be captured)
+        
         if (!chartsAdded && (rechartsContainers.length > 0 || chartContainers.length > 0)) {
-            // Check if any chart containers exist but are hidden or failed to capture
+           
             const hasHiddenCharts = Array.from(rechartsContainers).some(el => el.offsetParent === null) ||
                 Array.from(chartContainers).some(el => el.offsetParent === null);
 
@@ -262,7 +261,7 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
             }
         }
 
-        // Recent Entries
+        
         doc.setFontSize(13);
         doc.setTextColor(...COLORS.brown);
         doc.setFont('helvetica', 'bold');
@@ -303,7 +302,7 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
 
         y += 8;
 
-        // Monthly Overview
+        
         doc.setFontSize(13);
         doc.setTextColor(...COLORS.brown);
         doc.setFont('helvetica', 'bold');
@@ -379,10 +378,10 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
             );
         }
 
-        // Generate filename with timestamp
+       
         const fileName = `zyncure-tracker-report-${new Date().toISOString().slice(0, 10)}.pdf`;
 
-        // Return blob if requested, otherwise save/download
+        
         if (returnBlob) {
             return {
                 blob: doc.output('blob'),
@@ -404,15 +403,14 @@ export const generatePDF = async (loggedDates, userInfo = {}, options = {}) => {
     }
 };
 
-// Enhanced chart capture function
+
 export const captureChartsForPDF = async () => {
     const chartData = [];
 
     try {
-        // Wait for charts to be fully rendered
+        
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // Find all chart containers
         const chartElements = document.querySelectorAll('.recharts-wrapper');
 
         for (let i = 0; i < chartElements.length; i++) {
@@ -451,13 +449,13 @@ export const captureChartsForPDF = async () => {
     }
 };
 
-// Convenience function for generating PDF as blob (for sharing)
+
 export const generatePDFAsBlob = async (loggedDates, userInfo = {}) => {
     const result = await generatePDF(loggedDates, userInfo, { returnBlob: true, download: false });
     return result.blob;
 };
 
-// Convenience function for downloading PDF (existing behavior)
+
 export const downloadPDF = async (loggedDates, userInfo = {}) => {
     return await generatePDF(loggedDates, userInfo, { returnBlob: false, download: true });
 };

@@ -82,7 +82,7 @@ export default function AdminSidebar() {
                 onClick={() => navigate("/admin/bugs")}
               />
             </SidebarItem>
-            {/* Log out sidebar item removed */}
+           
           </ul>
         </SidebarContext.Provider>
       </nav>
@@ -90,7 +90,7 @@ export default function AdminSidebar() {
   );
 }
 
-// --- CHANGES BELOW ---
+
 
 function SidebarItem({ icon, text, active, alert, onClick, children }) {
   const { expanded } = useContext(SidebarContext);

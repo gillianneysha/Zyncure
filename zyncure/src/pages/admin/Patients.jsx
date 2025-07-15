@@ -20,7 +20,7 @@ export default function AdminPatients() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [patientToDelete, setPatientToDelete] = useState(null);
 
-  // Loading states for operations
+
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -62,7 +62,7 @@ export default function AdminPatients() {
 
       console.log("Attempting to fetch patients...");
 
-      // Test basic connection
+    
       const { error: testError } = await supabase
         .from("patients")
         .select("count")
@@ -77,7 +77,7 @@ export default function AdminPatients() {
 
       console.log("Connection test successful");
 
-      // Fetch all patients
+     
       const { data, error, count } = await supabase
         .from("patients")
         .select("*", { count: 'exact' });
@@ -115,7 +115,7 @@ export default function AdminPatients() {
   const handleSaveEdit = async () => {
     if (!editingPatient) return;
 
-    // Basic validation
+  
     if (!editForm.first_name.trim() || !editForm.last_name.trim()) {
       setError('First name and last name are required');
       return;
@@ -141,7 +141,7 @@ export default function AdminPatients() {
           status: editForm.status
         })
         .eq('patient_id', editingPatient.patient_id)
-        .select(); // Return the updated record
+        .select(); 
 
       if (error) {
         console.error('Error updating patient:', error);
@@ -149,18 +149,18 @@ export default function AdminPatients() {
       } else {
         console.log('Update successful:', data);
 
-        // Update the local state with the returned data
+     
         setPatients(patients.map(p =>
           p.patient_id === editingPatient.patient_id
             ? { ...p, ...editForm }
             : p
         ));
 
-        // Close the modal
+      
         setEditingPatient(null);
         setEditForm({ first_name: '', last_name: '', email: '', status: 'active' });
 
-        // Show success message briefly
+       
         const successMessage = `Patient ${editForm.first_name} ${editForm.last_name} updated successfully!`;
         console.log(successMessage);
       }
@@ -203,14 +203,14 @@ export default function AdminPatients() {
       } else {
         console.log('Delete successful');
 
-        // Remove from local state
+        
         setPatients(patients.filter(p => p.patient_id !== patientToDelete.patient_id));
 
-        // Close the modal
+      
         setShowDeleteModal(false);
         setPatientToDelete(null);
 
-        // Show success message
+        
         console.log(`Patient ${patientToDelete.first_name} ${patientToDelete.last_name} deleted successfully!`);
       }
     } catch (err) {
@@ -253,7 +253,7 @@ export default function AdminPatients() {
 
   console.log("Filtered patients:", filteredPatients.length);
 
-  // Calculate pagination
+
   const totalPages = Math.ceil(filteredPatients.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
   const endIndex = startIndex + entriesPerPage;
@@ -261,13 +261,13 @@ export default function AdminPatients() {
 
   console.log("Pagination:", { totalPages, startIndex, endIndex, currentPatientsLength: currentPatients.length });
 
-  // Reset to first page when entries per page changes
+
   const handleEntriesChange = (newEntries) => {
     setEntriesPerPage(newEntries);
     setCurrentPage(1);
   };
 
-  // Reset to first page when search changes
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search]);
@@ -278,7 +278,7 @@ export default function AdminPatients() {
         Patients
       </h1>
 
-      {/* Error display */}
+   
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <strong>Error:</strong> {error}
@@ -291,7 +291,7 @@ export default function AdminPatients() {
         </div>
       )}
 
-      {/* Outer box with MORE rounded corners */}
+    
       <div className="bg-[#FEDCD2] rounded-[24px] p-6 mb-6 mt-2">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center">
@@ -311,7 +311,7 @@ export default function AdminPatients() {
           </div>
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[#F15629]">Search:</span>
-            {/* Search bar with less rounded corners */}
+         
             <div className="relative bg-[#FFEDE7] rounded-md px-4 py-2 flex items-center min-w-[250px]">
               <input
                 type="text"

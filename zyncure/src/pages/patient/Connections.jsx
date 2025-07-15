@@ -3,7 +3,7 @@ import { Search, MoreHorizontal, UserPlus, Check, UserMinus, UserCheck, X, Clock
 import { supabase } from '../../client'; 
 import { useNotifications } from '../../hooks/useNotifications'; 
 
-// Confirmation Modal Component
+
 const ConfirmationModal = ({ 
   isOpen, 
   onClose, 
@@ -61,7 +61,7 @@ const SuccessModal = ({
   buttonText = "OK",
   autoClose = true,
   autoCloseDelay = 3000,
-  variant = "success" // "success" or "warning"
+  variant = "success" 
 }) => {
   useEffect(() => {
     if (isOpen && autoClose) {
@@ -83,7 +83,7 @@ const SuccessModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
         <div className="p-6">
-          {/* Header with centered icon */}
+          
           <div className="flex flex-col items-center text-center mb-6">
             <div className={`p-3 ${iconBgColor} rounded-full mb-4`}>
               {isWarning ? (
@@ -165,7 +165,7 @@ const PatientConnectionsPage = () => {
   // ========================================
   // DATA LOADING FUNCTIONS
   // ========================================
- // Replace your existing loadConnections function with this fixed version
+ 
 const loadConnections = async () => {
   try {
     setIsLoading(true);
@@ -190,14 +190,14 @@ const loadConnections = async () => {
 
     const allConnections = data || [];
     
-    // EXPLICIT CLIENT-SIDE FILTERING - only show connections for current user
+    
     const userConnections = allConnections.filter(conn => conn.patient_id === user.id);
     
     console.log('Total connections returned:', allConnections.length);
     console.log('User connections after filtering:', userConnections.length);
     console.log('All connections data:', userConnections);
     
-    // Debug: Log the requester_type and request_direction for each connection
+    
     userConnections.forEach(conn => {
       console.log(`Connection ${conn.id}:`, {
         requester_type: conn.requester_type,
@@ -207,15 +207,14 @@ const loadConnections = async () => {
       });
     });
     
-    // FIXED: Show pending requests where the DOCTOR requested to connect with the PATIENT
-    // This means requester_type = 'doctor' and status = 'pending'
+   
     const pendingIncoming = userConnections.filter(
       conn => conn.status === 'pending' && conn.requester_type === 'doctor'
     );
     
     console.log('Pending incoming requests:', pendingIncoming);
     
-    // All other connections (accepted, rejected, or outgoing pending requests)
+    
     const otherConnections = userConnections.filter(
       conn => !(conn.status === 'pending' && conn.requester_type === 'doctor')
     );
@@ -298,7 +297,7 @@ const loadConnections = async () => {
       
       setSearchResults(prev => prev.filter(d => d.med_id !== doctor.med_id));
       
-      // Show success modal instead of alert
+      
       setSuccessModal({
         isOpen: true,
         title: 'Connection Request Sent!',
@@ -314,7 +313,7 @@ const loadConnections = async () => {
 // ========================================
 // FIXED CONNECTION REQUEST MANAGEMENT
 // ========================================
-// Update your handleConnectionRequest function
+
 const handleConnectionRequest = async (connectionId, action) => {
   try {
     let error;
@@ -341,7 +340,7 @@ const handleConnectionRequest = async (connectionId, action) => {
     await loadConnections();
     refetchNotifications(); 
     
-    // Show success modal instead of alert
+    
     const doctorName = pendingRequests.find(req => req.id === connectionId)?.doctor_first_name || 'Doctor';
     setSuccessModal({
       isOpen: true,
@@ -411,7 +410,7 @@ const confirmRemoveConnection = async () => {
 
     await loadConnections();
     
-    // Show success modal with orange styling for removal
+   
     const actionText = confirmModal.isRequestCancel ? 'cancelled' : 'removed';
     const isCancel = confirmModal.isRequestCancel;
     
@@ -472,7 +471,7 @@ const confirmRemoveConnection = async () => {
     return <Check className="w-4 h-4" />;
   };
 
-  // Check if doctor is already connected or has pending request
+  
   const isDoctorUnavailable = (doctorId) => {
     return [...connections, ...pendingRequests].some(conn => conn.med_id === doctorId);
   };

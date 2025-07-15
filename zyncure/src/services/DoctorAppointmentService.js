@@ -5,9 +5,9 @@ import { supabase } from '../client';
 // =============================================================================
 
 /**
- * Convert 24-hour time format to 12-hour format
- * @param {string} time24h - Time in 24-hour format (e.g., "14:30:00")
- * @returns {string} Time in 12-hour format (e.g., "2:30 PM")
+ * 
+ * @param {string} time24h 
+ * @returns {string} 
  */
 const convertTo12Hour = (time24h) => {
   const [hours, minutes] = time24h.split(':');
@@ -18,12 +18,12 @@ const convertTo12Hour = (time24h) => {
 };
 
 /**
- * Format appointment date and time from ISO string WITHOUT timezone conversion
- * @param {string} appointmentDate - ISO date string
- * @returns {object} Object with date and time properties
+
+ * @param {string} appointmentDate 
+ * @returns {object} 
  */
 const formatAppointmentDateTime = (appointmentDate) => {
-  // Parse the date string directly without timezone conversion
+
   const dateStr = appointmentDate.replace('Z', '').replace(/\.\d{3}/, '');
   const [datePart, timePart] = dateStr.split('T');
   
@@ -34,8 +34,8 @@ const formatAppointmentDateTime = (appointmentDate) => {
 };
 
 /**
- * Get current authenticated user
- * @returns {object} Current user object
+ * 
+ * @returns {object} 
  */
 const getCurrentUser = async () => {
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -47,29 +47,27 @@ const getCurrentUser = async () => {
 
 /**
  * Get current doctor's profile data
- * @returns {object} Doctor profile data
+ * @returns {object} 
  */
 const getCurrentDoctor = async () => {
   try {
     const user = await getCurrentUser();
     
-    console.log('Full user ID:', user.id); // Debug log
+    console.log('Full user ID:', user.id); 
     
-    // Try multiple approaches to find the doctor record
-    
-    // Approach 1: Direct match with full user ID
+
     let { data: doctorData, error } = await supabase
       .from('medicalprofessionals')
       .select('med_id, first_name, last_name, user_type, email, contact_no, createdate')
       .eq('med_id', user.id)
       .single();
 
-    console.log('Direct match result:', { doctorData, error }); // Debug log
+    console.log('Direct match result:', { doctorData, error }); 
 
-    // Approach 2: If direct match fails, try with string conversion and LIKE
+
     if (!doctorData && error) {
       console.log('Trying LIKE pattern match...');
-      const userShortId = user.id.substring(0, 8); // Use first 8 characters instead of 4
+      const userShortId = user.id.substring(0, 8); 
       
       const { data: doctorDataLike, error: errorLike } = await supabase
         .from('medicalprofessionals')
@@ -86,17 +84,16 @@ const getCurrentDoctor = async () => {
       }
     }
 
-    // Approach 3: If still no match, try searching all records and find match in JavaScript
+    
     if (!doctorData && error) {
       console.log('Trying to fetch all doctors and match in JavaScript...');
       const { data: allDoctors, error: allError } = await supabase
         .from('medicalprofessionals')
         .select('med_id, first_name, last_name, user_type, email, contact_no, createdate');
 
-      console.log('All doctors fetch result:', { allDoctors, allError }); // Debug log
+      console.log('All doctors fetch result:', { allDoctors, allError }); 
 
       if (allDoctors && allDoctors.length > 0) {
-        // Try to find a match by comparing IDs
         const userShortId = user.id.substring(0, 8);
         doctorData = allDoctors.find(doc => 
           doc.med_id === user.id || 
@@ -111,7 +108,7 @@ const getCurrentDoctor = async () => {
       }
     }
 
-    // Approach 4: Check if there's a profiles table as fallback
+
     if (!doctorData && error) {
       console.log('Checking profiles table as fallback...');
       const { data: profileData, error: profileError } = await supabase
@@ -123,7 +120,7 @@ const getCurrentDoctor = async () => {
       console.log('Profile data result:', { profileData, profileError });
       
       if (profileData) {
-        // Map profile data to doctor format if it exists
+       
         return {
           id: profileData.id,
           name: `Dr. ${profileData.first_name || 'Unknown'} ${profileData.last_name || 'User'}`,
@@ -167,7 +164,7 @@ const getCurrentDoctor = async () => {
 export const doctorAppointmentService = {
   /**
    * Get doctor's profile information
-   * @returns {object} Doctor profile data
+   * @returns {object} 
    */
   async getDoctorProfile() {
     try {
@@ -181,9 +178,9 @@ export const doctorAppointmentService = {
 
   /**
    * Get all appointments for the logged-in doctor for a specific date
-   * @param {string} date - Date in YYYY-MM-DD format
-   * @param {string} status - Filter by status ('all', 'confirmed', 'pending', 'cancelled', 'completed')
-   * @returns {object} Appointments data and error
+   * @param {string} date 
+   * @param {string} status 
+   * @returns {object} 
    */
   async getDoctorAppointments(date, status = 'all') {
     try {
@@ -195,7 +192,7 @@ export const doctorAppointmentService = {
         status
       });
 
-      // Use DATE function to filter by date part only, avoiding timezone issues
+      
       let query = supabase
         .from('appointment_details')
         .select('*')
@@ -219,7 +216,7 @@ export const doctorAppointmentService = {
         throw error;
       }
 
-      // Transform the data without timezone conversion
+      
       const transformedData = (data || []).map(apt => {
         const { time } = formatAppointmentDateTime(apt.appointment_date);
         return {
@@ -253,10 +250,10 @@ export const doctorAppointmentService = {
 
   /**
    * Get appointments for a date range
-   * @param {string} startDate - Start date in YYYY-MM-DD format
-   * @param {string} endDate - End date in YYYY-MM-DD format
-   * @param {string} status - Filter by status
-   * @returns {object} Appointments data and error
+   * @param {string} startDate 
+   * @param {string} endDate 
+   * @param {string} status 
+   * @returns {object} 
    */
   async getDoctorAppointmentsByDateRange(startDate, endDate, status = 'all') {
     try {
@@ -309,15 +306,15 @@ export const doctorAppointmentService = {
 
   /**
    * Update appointment status
-   * @param {string} appointmentId - Appointment ID
-   * @param {string} newStatus - New status ('confirmed', 'pending', 'cancelled', 'completed')
-   * @returns {object} Updated appointment data and error
+   * @param {string} appointmentId 
+   * @param {string} newStatus 
+   * @returns {object} 
    */
   async updateAppointmentStatus(appointmentId, newStatus) {
     try {
       const user = await getCurrentUser();
       
-      // First verify that this appointment belongs to the current doctor using the view
+      
       const { data: appointment, error: fetchError } = await supabase
         .from('appointment_details')
         .select('med_id')
@@ -332,7 +329,7 @@ export const doctorAppointmentService = {
         throw new Error('Unauthorized: This appointment does not belong to you');
       }
 
-      // Update the appointment status in the original appointments table
+      
       const { error } = await supabase
         .from('appointments')
         .update({ 
@@ -347,7 +344,7 @@ export const doctorAppointmentService = {
         throw error;
       }
 
-      // Fetch updated appointment details from the view
+     
       const { data: updatedAppointment, error: updatedError } = await supabase
         .from('appointment_details')
         .select('*')
@@ -378,15 +375,15 @@ export const doctorAppointmentService = {
 
   /**
    * Reschedule an appointment
-   * @param {string} appointmentId - Appointment ID
-   * @param {string} reason - Reschedule reason (optional)
-   * @returns {object} Updated appointment data and error
+   * @param {string} appointmentId 
+   * @param {string} reason 
+   * @returns {object} 
    */
   async rescheduleAppointment(appointmentId, reason = '') {
     try {
       const user = await getCurrentUser();
       
-      // Verify appointment belongs to current doctor using the view
+      
       const { data: appointment, error: fetchError } = await supabase
         .from('appointment_details')
         .select('med_id')
@@ -406,12 +403,12 @@ export const doctorAppointmentService = {
         updated_at: new Date().toISOString()
       };
 
-      // Add cancellation reason if provided
+   
       if (reason.trim()) {
         updateData.cancellation_reason = reason.trim();
       }
 
-      // Update the appointment in the original appointments table
+     
       const { error } = await supabase
         .from('appointments')
         .update(updateData)
@@ -423,7 +420,7 @@ export const doctorAppointmentService = {
         throw error;
       }
 
-      // Fetch updated appointment details from the view
+      
       const { data: updatedAppointment, error: updatedError } = await supabase
         .from('appointment_details')
         .select('*')
@@ -454,14 +451,14 @@ export const doctorAppointmentService = {
 
   /**
    * Get available time slots for the doctor on a specific date
-   * @param {string} date - Date in YYYY-MM-DD format
-   * @returns {object} Available time slots and error
+   * @param {string} date 
+   * @returns {object} 
    */
   async getAvailableTimeSlots(date) {
     try {
       const user = await getCurrentUser();
       
-      // Get existing appointments for the date using the view
+      
       const { data: existingAppointments, error } = await supabase
         .from('appointment_details')
         .select('appointment_date')
@@ -476,17 +473,17 @@ export const doctorAppointmentService = {
         throw error;
       }
 
-      // Define all possible time slots (24-hour format)
+     
       const allTimeSlots24h = [
         '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
         '11:00', '11:30', '13:00', '13:30', '14:00', '14:30',
         '15:00', '15:30', '16:00', '16:30', '17:00'
       ];
 
-      // Get booked times - extract time without timezone conversion
+      
       const bookedTimes = (existingAppointments || []).map(apt => {
         const { time } = formatAppointmentDateTime(apt.appointment_date);
-        // Convert back to 24-hour format for comparison
+        
         const [timeStr, ampm] = time.split(' ');
         let [hours, minutes] = timeStr.split(':');
         
@@ -499,7 +496,7 @@ export const doctorAppointmentService = {
         return `${hours.padStart(2, '0')}:${minutes}`;
       });
 
-      // Filter available slots and convert to 12-hour format
+      
       const availableSlots24h = allTimeSlots24h.filter(time => !bookedTimes.includes(time));
       const availableSlots12h = availableSlots24h.map(time => convertTo12Hour(time + ':00'));
 
@@ -512,15 +509,15 @@ export const doctorAppointmentService = {
 
   /**
    * Cancel an appointment
-   * @param {string} appointmentId - Appointment ID
-   * @param {string} reason - Cancellation reason (optional)
-   * @returns {object} Updated appointment data and error
+   * @param {string} appointmentId 
+   * @param {string} reason 
+   * @returns {object} 
    */
   async cancelAppointment(appointmentId, reason = '') {
     try {
       const user = await getCurrentUser();
       
-      // Verify appointment belongs to current doctor using the view
+      
       const { data: appointment, error: fetchError } = await supabase
         .from('appointment_details')
         .select('med_id')
@@ -540,12 +537,12 @@ export const doctorAppointmentService = {
         updated_at: new Date().toISOString()
       };
 
-      // Add cancellation reason if provided
+     
       if (reason.trim()) {
         updateData.cancellation_reason = reason.trim();
       }
 
-      // Update the appointment in the original appointments table
+      
       const { error } = await supabase
         .from('appointments')
         .update(updateData)
@@ -557,7 +554,7 @@ export const doctorAppointmentService = {
         throw error;
       }
 
-      // Fetch updated appointment details from the view
+      
       const { data: updatedAppointment, error: updatedError } = await supabase
         .from('appointment_details')
         .select('*')
@@ -588,9 +585,9 @@ export const doctorAppointmentService = {
 
   /**
    * Get appointment statistics for the doctor
-   * @param {string} startDate - Start date for statistics (optional)
-   * @param {string} endDate - End date for statistics (optional)
-   * @returns {object} Statistics data and error
+   * @param {string} startDate 
+   * @param {string} endDate 
+   * @returns {object} 
    */
   async getAppointmentStats(startDate = null, endDate = null) {
     try {
@@ -614,7 +611,7 @@ export const doctorAppointmentService = {
         throw error;
       }
 
-      // Calculate statistics
+      
       const stats = {
         total: data.length,
         confirmed: data.filter(apt => apt.status === 'confirmed').length,
@@ -632,8 +629,8 @@ export const doctorAppointmentService = {
 
   /**
    * Get patient details for an appointment
-   * @param {string} patientId - Patient ID
-   * @returns {object} Patient details and error
+   * @param {string} patientId 
+   * @returns {object} 
    */
   async getPatientDetails(patientId) {
     try {

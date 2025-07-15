@@ -33,7 +33,7 @@ export default function OTPModal({
         if (onResend && secondsLeft === 0) {
             onResend();
             setSecondsLeft(resendCooldown);
-            // Restart timer
+          
             clearInterval(timerRef.current);
             timerRef.current = setInterval(() => {
                 setSecondsLeft((sec) => {
@@ -49,7 +49,7 @@ export default function OTPModal({
 
     if (!open) return null;
 
-    // Format timer as mm:ss
+   
     const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
     return (

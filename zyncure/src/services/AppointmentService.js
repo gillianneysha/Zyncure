@@ -47,7 +47,7 @@ const formatAppointmentDateTime = (appointmentDate) => {
   const timePart = appointmentDate.split('T')[1];
   const [hours, minutes] = timePart.split(':');
   
-  // Convert to 12-hour format manually to avoid timezone issues
+  
   const hour24 = parseInt(hours, 10);
   const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
   const ampm = hour24 >= 12 ? 'PM' : 'AM';
@@ -89,7 +89,7 @@ async createAppointment(appointmentData) {
     const time24h = convertTo24Hour(appointmentData.time);
     const fullDateTime = `${appointmentData.date}T${time24h}`;
 
-    // Check slot availability
+    
     const { data: availableSlots } = await this.getAvailableTimeSlots(
       appointmentData.doctor_id, 
       appointmentData.date
@@ -99,7 +99,7 @@ async createAppointment(appointmentData) {
       throw new Error('This time slot is no longer available. Please select a different time.');
     }
 
-    // Direct table insertion instead of RPC
+    
     const { data, error } = await supabase
       .from('appointments')
       .insert({
@@ -188,7 +188,7 @@ async getAppointments(date, doctorId = null) {
         med_id,
         medicalprofessionals!inner(first_name, last_name, user_type)
       `)
-      .eq('patient_id', user.id)  // Always filter by current user
+      .eq('patient_id', user.id)  
       .gte('appointment_date', `${date}T00:00:00`)
       .lt('appointment_date', `${date}T23:59:59`)
       .in('status', ['confirmed', 'pending'])
@@ -285,7 +285,7 @@ async getConnectedDoctors() {
   try {
     const user = await getCurrentUser();
     
-    // Use the simplified view but filter by current user
+   
     const { data, error } = await supabase
       .from('patient_connection_details')
       .select(`
@@ -297,7 +297,7 @@ async getConnectedDoctors() {
         doctor_short_id,
         status
       `)
-      .eq('patient_id', user.id)  // This is the critical line that was missing
+      .eq('patient_id', user.id)  
       .eq('status', 'accepted')
       .order('doctor_first_name');
 
@@ -355,15 +355,15 @@ async getConnectedDoctors() {
         '15:00', '15:30', '16:00', '16:30', '17:00'
       ];
 
-      // Extract booked times and convert to 24-hour format for comparison
+      
 const bookedTimes = (existingAppointments || []).map(apt => {
   const timePart = apt.appointment_date.split('T')[1];
-  return timePart.substring(0, 5); // Get HH:MM format
+  return timePart.substring(0, 5); 
 });
 
 console.log('Booked times for date:', date, bookedTimes);
 
-// Filter out booked times
+
 const availableSlots24h = allTimeSlots24h.filter(time => !bookedTimes.includes(time));
 const availableSlots12h = availableSlots24h.map(time => convertTo12Hour(time + ':00'));
 
@@ -440,7 +440,6 @@ return { data: availableSlots12h, error: null };
   },
 
   /**
- * Cancel an appointment by updating its status
  * @param {string} appointmentId 
  * @returns {object} 
  */
@@ -640,7 +639,7 @@ export const userService = {
 
 export const appointmentNotificationService = {
   /**
-   * Get appointment notifications for current user
+   * 
    * @returns {object}
    */
   async getAppointmentNotifications() {
@@ -667,7 +666,7 @@ export const appointmentNotificationService = {
   },
 
   /**
-   * Create manual appointment notification (for edge cases)
+   * 
    * @param {string} targetUserId 
    * @param {string} type 
    * @param {string} title 

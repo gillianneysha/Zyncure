@@ -11,7 +11,7 @@ export default function PatientProfile() {
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Mock data for demonstration - replace with real data from your backend
+    
     const mockSymptoms = [
         { name: "Headache", frequency: "3 times a week", severity: "moderate" },
         { name: "Blood Pressure", value: "130/85", note: "(average)" },
@@ -34,7 +34,7 @@ export default function PatientProfile() {
         async function fetchPatient() {
             setLoading(true);
             try {
-                // Fetch patient info
+               
                 const { data: patientData } = await supabase
                     .from("patients")
                     .select("*")
@@ -45,14 +45,14 @@ export default function PatientProfile() {
                     setPatient(patientData);
                 }
 
-                // Fetch records (replace with your actual table/logic)
+                
                 const { data: recordData } = await supabase
                     .from("records")
                     .select("*")
                     .eq("patient_id", id);
                 setRecords(recordData || mockRecords);
 
-                // Fetch notes (replace with your actual table/logic)
+             
                 const { data: notesData } = await supabase
                     .from("consultation_notes")
                     .select("*")
@@ -70,12 +70,12 @@ export default function PatientProfile() {
 
     const handleViewRecord = (recordId) => {
         console.log(`View record ${recordId}`);
-        // TODO: Navigate to record detail or open modal
+       
     };
 
     const handleViewNote = (noteId) => {
         console.log(`View note ${noteId}`);
-        // TODO: Navigate to note detail or open modal
+      
     };
 
     if (loading) {

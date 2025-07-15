@@ -202,7 +202,7 @@ export default function RegistrationForm() {
     setSuccessMessage("");
 
     try {
-      // Step 1: Create the user account
+     
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -220,12 +220,12 @@ export default function RegistrationForm() {
 
       if (authError) throw authError;
 
-      // Step 2: Insert user data into appropriate table based on user type
+    
       if (authData.user) {
         let insertError;
 
         if (formData.userType === 'patient') {
-          // Insert into patients table
+         
           const { error } = await supabase
             .from('patients')
             .insert([{
@@ -241,7 +241,7 @@ export default function RegistrationForm() {
 
           insertError = error;
         } else if (formData.userType === 'doctor') {
-          // Insert into medicalprofessionals table
+        
           const { error } = await supabase
             .from('medicalprofessionals')
             .insert([{
@@ -264,15 +264,15 @@ export default function RegistrationForm() {
         }
       }
 
-      // Step 3: Show success message and redirect after a delay
+     
       setSuccessMessage(
         "Registration successful! Please check your email and click the confirmation link to activate your account."
       );
 
-      // Reset form and redirect to login after showing success message
+     
       resetForm();
 
-      // Redirect to login page after 3 seconds
+   
       setTimeout(() => {
         navigate('/login');
       }, 3000);
@@ -316,7 +316,7 @@ export default function RegistrationForm() {
     }
   }, [hasAcceptedTerms]);
 
-  // Terms modal handlers
+
   const handleOpenTermsModal = useCallback(() => {
     setIsTermsModalOpen(true);
   }, []);
@@ -326,7 +326,7 @@ export default function RegistrationForm() {
     setIsPrivacyModalOpen(true);
   }, []);
 
-  // Privacy modal handlers
+
   const handleOpenPrivacyModal = useCallback(() => {
     setIsPrivacyModalOpen(true);
   }, []);
@@ -437,7 +437,7 @@ export default function RegistrationForm() {
                 Doctor
               </option>
             </select>
-            {/* Custom down arrow */}
+            
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b0b0]">
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
                 <path

@@ -6,15 +6,15 @@ export default function NotificationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [saveStatus, setSaveStatus] = useState(''); // 'success', 'error', or ''
+  const [saveStatus, setSaveStatus] = useState(''); 
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Notification preferences state
+ 
   const [reminderNotifications, setReminderNotifications] = useState(true);
   const [reminderPush, setReminderPush] = useState(true);
   const [reminderEmail, setReminderEmail] = useState(true);
 
-  // Ref to track if we should save (prevents saving during initial load)
+ 
   const saveTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function NotificationPage() {
 
   async function initializeSettings() {
     try {
-      // Get current user
+    
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setLoading(false);
@@ -49,14 +49,14 @@ export default function NotificationPage() {
         .eq('user_id', userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      if (error && error.code !== 'PGRST116') { 
         console.error('Error loading notification settings:', error);
         setSaveStatus('error');
         return;
       }
 
       if (data) {
-        // Load existing preferences
+        
         setReminderNotifications(data.reminder_notifications ?? true);
         setReminderPush(data.reminder_push ?? true);
         setReminderEmail(data.reminder_email ?? true);
@@ -95,7 +95,7 @@ export default function NotificationPage() {
       } else {
         console.log('Notification settings saved successfully');
         setSaveStatus('success');
-        // Clear success message after 3 seconds
+       
         setTimeout(() => setSaveStatus(''), 3000);
       }
     } catch (error) {
@@ -106,24 +106,24 @@ export default function NotificationPage() {
     }
   }
 
-  // Enhanced debounced save function that only triggers after initialization
+
   useEffect(() => {
-    // Only save if we're initialized and have a current user
+  
     if (!isInitialized || !currentUser) {
       return;
     }
 
-    // Clear any existing timeout
+   
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Set a new timeout to save after 500ms (reduced from 1000ms for better UX)
+    
     saveTimeoutRef.current = setTimeout(() => {
       saveNotificationSettings();
     }, 500);
 
-    // Cleanup function
+  
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -133,14 +133,14 @@ export default function NotificationPage() {
 
 const handleReminderNotificationsToggle = (value) => {
   setReminderNotifications(value);
-  // If disabling main category, disable sub-options too
+  
   if (!value) {
     setReminderPush(false);
     setReminderEmail(false);
   }
-  // Save immediately for main toggle since this is critical
+ 
   if (isInitialized && currentUser) {
-    // Clear any existing timeout to save immediately
+    
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -150,7 +150,7 @@ const handleReminderNotificationsToggle = (value) => {
 
   const handleReminderPushToggle = (value) => {
     setReminderPush(value);
-    // If enabling push and main is disabled, enable main too
+    
     if (value && !reminderNotifications) {
       setReminderNotifications(true);
     }
@@ -158,7 +158,7 @@ const handleReminderNotificationsToggle = (value) => {
 
   const handleReminderEmailToggle = (value) => {
     setReminderEmail(value);
-    // If enabling email and main is disabled, enable main too
+   
     if (value && !reminderNotifications) {
       setReminderNotifications(true);
     }

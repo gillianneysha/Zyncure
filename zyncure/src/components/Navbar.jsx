@@ -21,7 +21,7 @@ export default function Navbar() {
   const searchRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  // Comprehensive search items based on user role with accurate paths
+
   const getSearchItems = (userType) => {
     const baseItems = [
       {
@@ -217,7 +217,7 @@ export default function Navbar() {
     }
   };
 
-  // Function to fetch user data
+
   const getUserData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -226,7 +226,7 @@ export default function Navbar() {
       let profile = {};
       let userType = "";
 
-      // Check patients table first - using patient_id instead of user_id
+     
       const { data: patientData } = await supabase
         .from("patients")
         .select("*")
@@ -237,7 +237,7 @@ export default function Navbar() {
         profile = patientData;
         userType = "patient";
       } else {
-        // Check medicalprofessionals table - using med_id instead of user_id
+      
         const { data: professionalData } = await supabase
           .from("medicalprofessionals")
           .select("*")
@@ -248,7 +248,7 @@ export default function Navbar() {
           profile = professionalData;
           userType = "doctor";
         } else {
-          // Check admin table - assuming admin uses user_id
+        
           const { data: adminData } = await supabase
             .from("admin")
             .select("*")
@@ -262,17 +262,17 @@ export default function Navbar() {
         }
       }
 
-      // Extract name based on table structure
+     
       let initialName = "";
       if (userType === "admin") {
-        // Admin table uses full_name
+      
         initialName = profile.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
       } else {
-        // Patients and medicalprofessionals tables use first_name
+        
         initialName = profile.first_name || user.user_metadata?.first_name || user.email?.split("@")[0] || "User";
       }
 
-      // Fallback to user metadata if no profile found
+    
       if (!profile.patient_id && !profile.med_id && !profile.user_id) {
         userType = user.user_metadata?.user_type || user.user_metadata?.role || "User";
         initialName = user.user_metadata?.first_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
@@ -288,7 +288,7 @@ export default function Navbar() {
     } catch (error) {
       console.error("Error fetching user data:", error);
 
-      // Fallback to user metadata on error
+     
       const { data: { user } } = await supabase.auth.getUser();
       const fallbackUserType = user?.user_metadata?.user_type || user?.user_metadata?.role || "User";
       const fallbackName = user?.user_metadata?.first_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
@@ -301,12 +301,12 @@ export default function Navbar() {
     }
   };
 
-  // Initial load
+  
   useEffect(() => {
     getUserData();
   }, []);
 
-  // Listen for profile updates via custom events
+
   useEffect(() => {
     const handleProfileUpdate = (event) => {
       if (event.detail?.type === 'profile-updated') {
@@ -321,13 +321,13 @@ export default function Navbar() {
     };
   }, []);
 
-  // Listen for database changes using Supabase realtime
+
   useEffect(() => {
     const setupRealtimeSubscriptions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Subscribe to changes in the patients table - using patient_id
+      
       const patientsSubscription = supabase
         .channel('patients-changes')
         .on('postgres_changes',
@@ -344,7 +344,7 @@ export default function Navbar() {
         )
         .subscribe();
 
-      // Subscribe to changes in the medicalprofessionals table - using med_id
+      
       const professionalsSubscription = supabase
         .channel('professionals-changes')
         .on('postgres_changes',
@@ -361,7 +361,7 @@ export default function Navbar() {
         )
         .subscribe();
 
-      // Subscribe to changes in the admin table - assuming admin uses user_id
+    
       const adminSubscription = supabase
         .channel('admin-changes')
         .on('postgres_changes',
@@ -388,7 +388,7 @@ export default function Navbar() {
     setupRealtimeSubscriptions();
   }, []);
 
-  // Refresh data when window regains focus (backup method)
+ 
   useEffect(() => {
     const handleFocus = () => {
       getUserData();
@@ -398,7 +398,7 @@ export default function Navbar() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Enhanced search functionality with multiple matching criteria
+
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setSearchResults([]);
@@ -410,7 +410,7 @@ export default function Navbar() {
     const searchItems = getSearchItems(userData.userType);
     const query = searchQuery.toLowerCase().trim();
 
-    // Enhanced filtering with multiple criteria
+  
     const filteredResults = searchItems.filter(item => {
       const titleMatch = item.title.toLowerCase().includes(query);
       const descriptionMatch = item.description.toLowerCase().includes(query);
@@ -422,16 +422,16 @@ export default function Navbar() {
       return titleMatch || descriptionMatch || categoryMatch || keywordMatch;
     });
 
-    // Sort results by relevance
+    
     const sortedResults = filteredResults.sort((a, b) => {
       const aTitle = a.title.toLowerCase();
       const bTitle = b.title.toLowerCase();
 
-      // Prioritize exact matches in title
+     
       if (aTitle.includes(query) && !bTitle.includes(query)) return -1;
       if (!aTitle.includes(query) && bTitle.includes(query)) return 1;
 
-      // Then prioritize title matches over description matches
+    
       if (aTitle.startsWith(query) && !bTitle.startsWith(query)) return -1;
       if (!aTitle.startsWith(query) && bTitle.startsWith(query)) return 1;
 
@@ -443,7 +443,7 @@ export default function Navbar() {
     setIsLoading(false);
   }, [searchQuery, userData.userType]);
 
-  // Handle click outside to close dropdown
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -491,7 +491,7 @@ export default function Navbar() {
   const toggleMobileSearch = () => {
     setIsMobileSearchOpen(!isMobileSearchOpen);
     if (!isMobileSearchOpen) {
-      // Focus the search input when opening
+    
       setTimeout(() => {
         const searchInput = searchRef.current?.querySelector('input');
         if (searchInput) {
@@ -586,7 +586,7 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile search button and user info container */}
+        {/* Mobile search button and user info */}
         <div className="flex items-center justify-between w-full md:w-auto">
           {/* Mobile search button - positioned to avoid sidebar button overlap */}
           <div className="md:hidden ml-16">

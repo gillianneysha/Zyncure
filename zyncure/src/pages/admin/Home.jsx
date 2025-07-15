@@ -23,12 +23,12 @@ export default function AdminHome() {
   useEffect(() => {
     async function fetchTotalUsers() {
       try {
-        // Get count from patients table
+       
         const { count: patientsCount, error: patientsError } = await supabase
           .from("patients")
           .select("*", { count: "exact", head: true });
 
-        // Get count from medicalprofessionals table
+       
         const { count: professionalsCount, error: professionalsError } = await supabase
           .from("medicalprofessionals")
           .select("*", { count: "exact", head: true });
@@ -54,13 +54,13 @@ export default function AdminHome() {
 }
    async function fetchReportsForReview() {
   try {
-    // Count open support tickets
+  
     const { count: supportCount, error: supportError } = await supabase
       .from("support_tickets")
       .select("*", { count: "exact", head: true })
       .in("status", ["Open", "In Progress"]);
 
-    // Count open bug reports
+
     const { count: bugCount, error: bugError } = await supabase
       .from("bug_reports")
       .select("*", { count: "exact", head: true })
@@ -95,7 +95,7 @@ export default function AdminHome() {
     }]);
 
     if (!error) {
-      // Notify all users about the new announcement
+     
       const { error: notifyError } = await supabase.rpc('notify_all_users_announcement', {
         announcement_title: newAnnouncement.title,
         announcement_content: newAnnouncement.content,
@@ -104,7 +104,7 @@ export default function AdminHome() {
 
       if (notifyError) {
         console.error('Failed to send notifications:', notifyError);
-        // You might want to show a warning that the announcement was created but notifications failed
+       
       }
 
       setShowModal(false);

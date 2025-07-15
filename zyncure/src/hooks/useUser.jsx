@@ -14,22 +14,22 @@ export function useUser() {
       try {
         console.log('Fetching user role for:', userId, 'with metadata:', userMetadata);
         
-        // First check user metadata for user_type (from registration form)
+        
         if (userMetadata?.user_type) {
           console.log('User type from metadata:', userMetadata.user_type);
           
-          // If user is a doctor, check their verification status
+          
           if (userMetadata.user_type === 'doctor') {
             try {
               const { data: doctorVerification, error: verificationError } = await supabase
                 .from('doctor_verifications')
                 .select('status, admin_notes')
                 .eq('user_id', userId)
-                .maybeSingle(); // Use maybeSingle() instead of single() to avoid errors when no record exists
+                .maybeSingle(); 
 
               if (verificationError) {
                 console.error('Error fetching doctor verification:', verificationError);
-                // If there's an error, assume no verification record exists
+                
                 return {
                   role: 'doctor',
                   user_type: 'doctor',
@@ -51,7 +51,7 @@ export function useUser() {
                   status: doctorVerification.status === 'approved' ? 'verified' : 'unverified'
                 };
               } else {
-                // Doctor exists in auth but not in doctor_verifications table
+               
                 console.log('Doctor has no verification record - should show modal');
                 return {
                   role: 'doctor',
@@ -75,7 +75,7 @@ export function useUser() {
             }
           }
           
-          // For non-doctor users (patients, etc.)
+
           return { 
             role: userMetadata.user_type,
             user_type: userMetadata.user_type,
@@ -85,7 +85,7 @@ export function useUser() {
           };
         }
 
-        // Fallback: Check if user is an admin
+      
         try {
           const { data: adminData, error: adminError } = await supabase
             .from('admin')
@@ -93,7 +93,7 @@ export function useUser() {
             .eq('user_id', userId)
             .maybeSingle();
 
-          // If admin record exists and is active, return admin role
+          // If admin record exists and is active -- return admin role
           if (!adminError && adminData && adminData.is_active) {
             console.log('User is admin:', adminData);
             return { 
@@ -106,10 +106,10 @@ export function useUser() {
           }
         } catch (error) {
           console.error('Error checking admin status:', error);
-          // Continue to next check
+          
         }
 
-        // If not admin, check doctor_verifications table for doctors
+      
         try {
           const { data: doctorVerification, error: verificationError } = await supabase
             .from('doctor_verifications')
@@ -130,10 +130,10 @@ export function useUser() {
           }
         } catch (error) {
           console.error('Error checking doctor verification:', error);
-          // Continue to next check
+         
         }
 
-        // Check if user is in medicalprofessionals table (legacy check)
+        
         try {
           const { data: medicalProfessional, error: medicalError } = await supabase
             .from('medicalprofessionals')
@@ -143,7 +143,7 @@ export function useUser() {
 
           if (!medicalError && medicalProfessional) {
             console.log('User is medical professional (legacy):', medicalProfessional);
-            // Check if they have a verification record
+         
             const { data: existingVerification } = await supabase
               .from('doctor_verifications')
               .select('status, admin_notes')
@@ -161,7 +161,7 @@ export function useUser() {
                 status: existingVerification.status === 'approved' ? 'verified' : 'unverified'
               };
             } else {
-              // Legacy doctor without verification record
+             
               console.log('Legacy doctor with no verification - should show modal');
               return {
                 role: 'doctor',
@@ -175,10 +175,10 @@ export function useUser() {
           }
         } catch (error) {
           console.error('Error checking medical professionals:', error);
-          // Continue to next check
+       
         }
 
-        // If not admin or medical professional, check patients table
+      
         try {
           const { data: patient, error: patientError } = await supabase
             .from('patients')
@@ -198,10 +198,10 @@ export function useUser() {
           }
         } catch (error) {
           console.error('Error checking patients table:', error);
-          // Continue to default
+         
         }
 
-        // If user exists in auth but not in any role tables, default to patient
+      
         console.log('User not found in role tables, defaulting to patient');
         return { 
           role: 'patient',
@@ -218,13 +218,13 @@ export function useUser() {
           is_verified: true,
           verification_status: 'approved',
           status: 'verified'
-        }; // Default fallback
+        }; 
       }
     };
 
     const initializeUser = async () => {
       try {
-        // Get the current session
+       
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -239,7 +239,7 @@ export function useUser() {
           console.log('Initializing user:', user.id, user.email);
           console.log('User metadata:', user.user_metadata);
           
-          // Fetch role from metadata first, then database tables as fallback
+        
           const userRoleData = await fetchUserRole(user.id, user.user_metadata);
           console.log('Determined user role data:', userRoleData);
           
@@ -269,7 +269,7 @@ export function useUser() {
 
     initializeUser();
 
-    // Listen for auth state changes
+  
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;

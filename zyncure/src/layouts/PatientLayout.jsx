@@ -4,7 +4,7 @@ import Sidebar, { SidebarItem, SidebarSubItem } from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import { CalendarDays, Users, Bell, Heart, House, User, ChartPie, Folders, MessageSquare } from 'lucide-react';
 import { ReportModal } from '../components/ReportModal';
-import { supabase } from '../client'; // Make sure to import your supabase client
+import { supabase } from '../client'; 
 
 export default function PatientLayout() {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export default function PatientLayout() {
   const isActive = (path) => location.pathname === `/home${path}`;
   const isHealthActive = location.pathname.includes('/home/health');
 
-  // Get current user session
+ 
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -26,7 +26,7 @@ export default function PatientLayout() {
 
     getCurrentUser();
 
-    // Listen for auth state changes
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setCurrentUser(session?.user || null);
@@ -80,14 +80,14 @@ export default function PatientLayout() {
           text="Notifications"
           active={isActive('/notifications')}
           onClick={() => navigate('/home/notifications')}
-          // alert
+    
         />
         <SidebarItem
           icon={<CalendarDays size={20} />}
           text="Appointments"
           active={isActive('/appointments')}
           onClick={() => navigate('/home/appointments')}
-          // alert
+      
         />
 
         <SidebarItem
@@ -105,7 +105,7 @@ export default function PatientLayout() {
       <ReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
-        user={currentUser} // Pass the current user here
+        user={currentUser} 
       />
     </div>
   );

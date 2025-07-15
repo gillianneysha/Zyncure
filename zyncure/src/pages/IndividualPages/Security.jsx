@@ -14,25 +14,25 @@ export default function SecurityPage() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
 
-  // For change password form
+
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Get current user
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       if (user) {
-        // Check 2FA status from user metadata
+       
         setTwoFactorEnabled(user.user_metadata?.two_factor_enabled || false);
       }
     };
     getUser();
   }, []);
 
-  // Change password handler
+  
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setError("");
@@ -82,7 +82,7 @@ export default function SecurityPage() {
     }
   };
 
-  // Toggle 2FA setting - Store in user metadata
+ 
   const handleToggle2FA = async () => {
     if (!user) return;
 
@@ -93,7 +93,7 @@ export default function SecurityPage() {
     try {
       const newStatus = !twoFactorEnabled;
 
-      // Update user metadata
+    
       const { data, error } = await supabase.auth.updateUser({
         data: {
           ...user.user_metadata,
@@ -117,7 +117,7 @@ export default function SecurityPage() {
     }
   };
 
-  // Modal close handler
+  
   const handleModalClose = () => {
     setShowSuccessModal(false);
     setShowChangePassword(false);

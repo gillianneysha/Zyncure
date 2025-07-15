@@ -266,7 +266,7 @@ const PeriodTracker = () => {
     return;
   }
 
-  // Check if there's anything to save
+
   const hasDataToSave = Object.entries(selectedValues).some(([category, value]) => {
     if (category === 'Weight') return weightInput.trim();
     if (category === 'Custom') return customInput.trim();
@@ -294,9 +294,9 @@ const PeriodTracker = () => {
   const savedCategories = [];
   let hasError = false;
 
-  // Process each category
+
   for (const [category, value] of Object.entries(selectedValues)) {
-    // Skip if no data for this category
+   
     let dataToSave = value;
     if (category === 'Weight') {
       if (!weightInput.trim()) continue;
@@ -313,14 +313,14 @@ const PeriodTracker = () => {
       continue;
     }
 
-    // Check if user can track this category
+    
     if (!canTrackCategory(category)) {
-      continue; // Skip locked categories
+      continue; 
     }
 
     try {
       if (category === 'Symptoms' || category === 'Cravings') {
-        // Delete existing entries for this category and date
+        
         const { error: deleteError } = await supabase
           .from('symptomlog')
           .delete()
@@ -331,7 +331,7 @@ const PeriodTracker = () => {
 
         if (deleteError) throw deleteError;
 
-        // Insert new entries
+        
         const dataToInsert = dataToSave.map(symptom => ({
           symptoms: category,
           severity: symptom,
@@ -342,7 +342,7 @@ const PeriodTracker = () => {
         const { error } = await supabase.from('symptomlog').insert(dataToInsert);
         if (error) throw error;
       } else {
-        // Handle single-value categories
+       
         const existingEntry = loggedDates.find(entry => {
           const entryDate = new Date(entry.date_logged);
           entryDate.setHours(0, 0, 0, 0);
@@ -357,7 +357,7 @@ const PeriodTracker = () => {
         };
 
         if (existingEntry) {
-          // Update existing entry
+         
           const { error } = await supabase
             .from('symptomlog')
             .update({
@@ -370,7 +370,7 @@ const PeriodTracker = () => {
 
           if (error) throw error;
         } else {
-          // Insert new entry
+        
           const { error } = await supabase.from('symptomlog').insert([dataToSaveObj]);
           if (error) throw error;
         }
@@ -403,10 +403,10 @@ const PeriodTracker = () => {
     return;
   }
 
-  // Skip next update to prevent overwriting
+  
   skipNextUpdate.current = true;
 
-  // Refresh data from database
+  
   const { data, error: fetchError } = await supabase
     .from('symptomlog')
     .select('date_logged, symptoms, severity')

@@ -89,7 +89,7 @@ const Dashboard = () => {
   };
 
 
-  // limit displayed records to 4
+  
   const fetchRecentRecords = async () => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -114,7 +114,7 @@ const Dashboard = () => {
         .eq('is_active', true)
         .or(`expires_at.is.null,expires_at.gt.${now}`)
         .order('created_at', { ascending: false })
-        .limit(4); // Limit to 4 records only
+        .limit(5); 
 
 
       if (sharesError) throw sharesError;
@@ -199,7 +199,7 @@ const Dashboard = () => {
   };
 
 
-  // This ensures navigation passes both patientId and fileId for preview
+  
   const handleViewRecord = (fileId, patientId) => {
     navigate(`/doctor/reports?fileId=${fileId}&patientId=${patientId}`);
   };
@@ -210,9 +210,9 @@ const Dashboard = () => {
   };
 
 
-  // FIXED: Changed to navigate to reports instead of patient profile
+  
   const handleViewPatient = (patientId) => {
-    // Navigate to reports page with patientId parameter
+   
     navigate(`/doctor/reports?patientId=${patientId}`);
   };
 

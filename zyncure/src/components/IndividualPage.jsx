@@ -25,7 +25,7 @@ export function PersonalInfoForm() {
   const [isEditing, setIsEditing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [originalData, setOriginalData] = useState(null);
-  const [userType, setUserType] = useState(null); // Track user type
+  const [userType, setUserType] = useState(null); 
 
   useEffect(() => {
     async function fetchUserInfo() {
@@ -46,9 +46,9 @@ export function PersonalInfoForm() {
           return;
         }
 
-        console.log("User ID:", user.id); // Debug log
+        console.log("User ID:", user.id); 
 
-        // First, try to get user type from profiles table
+        
         let { data: profileData, error: _profileError } = await supabase
           .from("profiles")
           .select("user_type")
@@ -59,7 +59,7 @@ export function PersonalInfoForm() {
         if (profileData && profileData.user_type) {
           currentUserType = profileData.user_type;
         } else {
-          // Fallback to user metadata if profiles table doesn't have user_type
+          
           currentUserType = user.user_metadata?.user_type;
         }
 
@@ -70,22 +70,22 @@ export function PersonalInfoForm() {
         }
 
         setUserType(currentUserType);
-        console.log("User type:", currentUserType); // Debug log
+        console.log("User type:", currentUserType); 
 
-        // Determine which table to query based on user type
+        // query based on user type
         const tableName = currentUserType === 'patient' ? 'patients' : 'medicalprofessionals';
         const idColumn = currentUserType === 'patient' ? 'patient_id' : 'med_id';
 
-        console.log("Querying table:", tableName, "with ID column:", idColumn); // Debug log
+        console.log("Querying table:", tableName, "with ID column:", idColumn); 
 
-        // Fetch user data from the appropriate table
+        // Fetch user data 
         let { data: userData, error: userDataError } = await supabase
           .from(tableName)
           .select("*")
           .eq(idColumn, user.id)
           .single();
 
-        if (userDataError && userDataError.code !== 'PGRST116') { // PGRST116 is "not found"
+        if (userDataError && userDataError.code !== 'PGRST116') { 
           console.error(`Error fetching from ${tableName}:`, userDataError);
           setError(`Failed to fetch user data from ${tableName}`);
           setLoading(false);
@@ -95,10 +95,10 @@ export function PersonalInfoForm() {
         let profile = {};
         if (userData) {
           profile = userData;
-          console.log(`${tableName} data found:`, profile); // Debug log
+          console.log(`${tableName} data found:`, profile); 
         } else {
           profile = user.user_metadata || {};
-          console.log("Using user metadata:", profile); // Debug log
+          console.log("Using user metadata:", profile); 
         }
 
         const formattedData = {
@@ -151,15 +151,15 @@ export function PersonalInfoForm() {
         return;
       }
 
-      console.log("Attempting to save for user:", user.id); // Debug log
-      console.log("User type:", userType); // Debug log
-      console.log("Form data to save:", formData); // Debug log
+      console.log("Attempting to save for user:", user.id); 
+      console.log("User type:", userType); 
+      console.log("Form data to save:", formData); 
 
-      // Determine which table to update based on user type
+      
       const tableName = userType === 'patient' ? 'patients' : 'medicalprofessionals';
       const idColumn = userType === 'patient' ? 'patient_id' : 'med_id';
 
-      // Prepare the data for upsert based on table structure
+      
       let updateData = {};
 
       if (userType === 'patient') {
@@ -170,8 +170,7 @@ export function PersonalInfoForm() {
           birthdate: formData.birthdate,
           contact_no: formData.mobileNumber,
           email: formData.email,
-          // Keep existing status if it exists, otherwise set default
-          status: 'active', // You might want to preserve existing status
+          status: 'active', 
         };
       } else if (userType === 'doctor') {
         updateData = {
@@ -181,12 +180,11 @@ export function PersonalInfoForm() {
           birthdate: formData.birthdate,
           contact_no: formData.mobileNumber,
           email: formData.email,
-          // Keep existing status if it exists, otherwise set default
-          status: 'active', // You might want to preserve existing status
+          status: 'active', 
         };
       }
 
-      console.log(`Updating ${tableName} with data:`, updateData); // Debug log
+      console.log(`Updating ${tableName} with data:`, updateData); 
 
       const { data, error: updateError } = await supabase
         .from(tableName)
@@ -198,11 +196,10 @@ export function PersonalInfoForm() {
         console.error("Database error:", updateError);
         setError(`Failed to save changes: ${updateError.message}`);
       } else {
-        console.log("Save successful:", data); // Debug log
+        console.log("Save successful:", data); 
         setSuccess("");
         setShowSuccessModal(true);
         setIsEditing(false);
-        // Update originalData to reflect the saved state
         setOriginalData({ ...formData });
       }
     } catch (err) {
@@ -378,7 +375,7 @@ export function ContactInformationPage({ onBack }) {
           return;
         }
 
-        // Get user type from profiles table
+      
         let { data: profileData, error: _profileError } = await supabase
           .from("profiles")
           .select("user_type")
@@ -393,11 +390,11 @@ export function ContactInformationPage({ onBack }) {
           return;
         }
 
-        // Determine which table to query based on user type
+      
         const tableName = currentUserType === 'patient' ? 'patients' : 'medicalprofessionals';
         const idColumn = currentUserType === 'patient' ? 'patient_id' : 'med_id';
 
-        // Fetch user data from the appropriate table
+       
         let { data: userData, error: userDataError } = await supabase
           .from(tableName)
           .select("*")
@@ -497,7 +494,7 @@ export function BillingPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
 const [showReactivateModal, setShowReactivateModal] = useState(false);
 
-  // Check for payment success/failure in URL params
+ 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
@@ -505,22 +502,22 @@ const [showReactivateModal, setShowReactivateModal] = useState(false);
 
     if (success === 'true') {
       setPaymentStatus("Payment successful! Your subscription is being activated.");
-      // Clean up URL
+      
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (canceled === 'true') {
       setPaymentStatus("Payment was canceled. Please try again.");
-      // Clean up URL
+     
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // Tier pricing (in PHP - keep as regular amounts, NOT centavos)
+  
   const tierPricing = {
     premium: 299,
     pro: 599
   };
 
-  // Get current user and subscription on component mount
+  
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
@@ -558,7 +555,7 @@ const [showReactivateModal, setShowReactivateModal] = useState(false);
     else if (option === "Contact Information") setShowContactInfo(true); // <-- Fix: make Contact Information clickable
   };
 
-  // Calculate prorated amount for tier changes
+  // Calculate prorated amount 
 const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
   if (!currentSubscription || !currentSubscription.expires_at) {
     return tierPricing[newTier];
@@ -568,27 +565,27 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
   const subscriptionStart = new Date(currentSubscription.started_at);
   const subscriptionEnd = new Date(currentSubscription.expires_at);
   
-  // Calculate total days in current billing period
+  // total days 
   const totalDays = Math.ceil((subscriptionEnd - subscriptionStart) / (1000 * 60 * 60 * 24));
   
-  // Calculate days used in current tier
+  //  days used 
   const daysUsed = Math.ceil((now - subscriptionStart) / (1000 * 60 * 60 * 24));
   
-  // Calculate remaining days in billing period
+  // remaining days
   const remainingDays = totalDays - daysUsed;
   
   if (remainingDays <= 0) {
     return tierPricing[newTier];
   }
   
-  // Calculate prorated amount
+  //  prorated amount
   const currentTierPrice = tierPricing[currentTier] || 0;
   const newTierPrice = tierPricing[newTier];
   
-  // Amount to refund from current tier (unused days)
+  // Amount to refund (unused days)
   const currentTierRefund = (currentTierPrice / totalDays) * remainingDays;
   
-  // Amount to charge for new tier (remaining days)
+  // Amount to charge (remaining days)
   const newTierCharge = (newTierPrice / totalDays) * remainingDays;
   
   // Final amount to charge (difference)
@@ -597,7 +594,7 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
   return Math.max(finalAmount, 0); // Ensure non-negative
 };
 
-  // Create PayMongo Checkout Session with improved error handling
+
   const createCheckoutSession = async (amount, description) => {
     if (!user) {
       setError('Please log in to continue');
@@ -608,7 +605,7 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
       setIsProcessing(true);
       setError("");
 
-      // Validate inputs
+  
       if (!amount || amount <= 0) {
         throw new Error('Invalid amount');
       }
@@ -616,15 +613,15 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
         throw new Error('Missing required information');
       }
 
-      // Validate tier
+   
       if (!tierPricing[selectedTier]) {
         throw new Error('Invalid subscription tier selected');
       }
 
-      // Create payment record with proper data structure
+      
       const paymentData = {
         user_id: user.id,
-        amount: Math.round(amount * 100), // Convert PHP to centavos for database storage
+        amount: Math.round(amount * 100), 
         currency: 'PHP',
         status: 'pending',
         payment_method: 'online',
@@ -647,9 +644,9 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
 
       console.log('Payment record created:', paymentRecord);
 
-      // Create PayMongo checkout session using edge function
+   
       const requestBody = {
-        amount: amount, // Send amount in PHP (not centavos) - edge function will convert
+        amount: amount, 
         description: description,
         user_id: user.id,
         tier: selectedTier,
@@ -672,7 +669,7 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
       if (checkoutData?.checkout_url) {
         console.log('Redirecting to:', checkoutData.checkout_url);
 
-        // Redirect to PayMongo checkout
+       
         window.location.href = checkoutData.checkout_url;
       } else {
         throw new Error('No checkout URL received from checkout session creation');
@@ -685,7 +682,7 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
     }
   };
 
-  // Handle subscription
+  
   const handleSubscribe = () => {
     if (!selectedTier) {
       setError('Please select a subscription tier');
@@ -708,7 +705,7 @@ const calculateProratedAmount = (newTier, currentTier, currentSubscription) => {
     createCheckoutSession(amount, description);
   };
 
-  // Handle plan upgrade/downgrade
+ 
 const handlePlanChange = () => {
   if (!selectedTier) {
     setError('Please select a new subscription tier');
@@ -722,7 +719,7 @@ const handlePlanChange = () => {
   createCheckoutSession(proratedAmount, description);
 };
 
-  // Handle cancellation
+  
 const handleCancelSubscription = async () => {
   if (!currentSubscription) return;
 
@@ -743,15 +740,15 @@ const handleCancelSubscription = async () => {
   }
 };
 
-  // Handle payment success (call this when user returns from PayMongo)
+
   const handlePaymentSuccess = async (paymentRecordId, userId, tier) => {
     try {
       console.log('Handling payment success:', { paymentRecordId, userId, tier });
 
-      // Wait a bit for webhook to process
+      
       await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Check if webhook already processed the payment
+      
       let paymentRecord = null;
 
       if (paymentRecordId) {
@@ -770,10 +767,10 @@ const handleCancelSubscription = async () => {
         console.log('Found payment record:', paymentRecord);
 
         if (paymentRecord.status === 'completed') {
-          // Payment already processed by webhook
+        
           console.log('Payment already completed by webhook');
         } else {
-          // Update payment status manually (fallback)
+         
           console.log('Updating payment status manually...');
           const { error: paymentError } = await supabase
             .from('payments')
@@ -789,7 +786,7 @@ const handleCancelSubscription = async () => {
           }
         }
 
-        // Refresh current subscription
+       
         const { data: subscription, error: subError } = await supabase
           .from('subscriptions')
           .select('*')
@@ -806,7 +803,7 @@ const handleCancelSubscription = async () => {
       } else {
         console.log('No payment record found, creating subscription manually...');
 
-        // Create subscription manually (fallback)
+        
         const subscriptionData = {
           user_id: userId,
           tier: tier,
@@ -830,11 +827,11 @@ const handleCancelSubscription = async () => {
         setCurrentSubscription(subscription);
       }
 
-      // Clear any errors and show success
+     
       setError('');
       setShowPlans(false);
 
-      // Clean up URL parameters
+     
       const url = new URL(window.location);
       url.searchParams.delete('success');
       url.searchParams.delete('payment_record_id');
@@ -849,7 +846,7 @@ const handleCancelSubscription = async () => {
     }
   };
 
-  // Check URL parameters for payment success/failure on component mount
+ 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
@@ -862,7 +859,7 @@ const handleCancelSubscription = async () => {
       handlePaymentSuccess(paymentRecordId, userId, tier);
     } else if (canceled === 'true') {
       setError('Payment was canceled');
-      // Update payment record to canceled if we have the ID
+     
       if (paymentRecordId) {
         supabase
           .from('payments')
@@ -873,18 +870,18 @@ const handleCancelSubscription = async () => {
     }
   }, []);
 
-  // Helper function to check if user has active subscription
+ 
   const hasActiveSubscription = () => {
     return currentSubscription && currentSubscription.status === 'active';
   };
 
-  // Helper function to get current tier
+
   const getCurrentTier = () => {
     if (!hasActiveSubscription()) return 'free';
     return currentSubscription.tier;
   };
 
-  // Helper function to check if subscription is expired
+  
   const isSubscriptionExpired = () => {
     if (!currentSubscription) return false;
     return currentSubscription.expires_at && new Date(currentSubscription.expires_at) < new Date();
@@ -937,7 +934,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   );
 
 
-  // Fetch subscription helper
+  
   const fetchSubscription = async () => {
     if (!user) return;
     const { data: subscription, error: subError } = await supabase
@@ -955,7 +952,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
 
   const reactivateSubscription = async () => {
   try {
-    // Update subscription status to active
+    
     const { error } = await supabase
       .from('subscriptions')
       .update({
@@ -968,10 +965,10 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
 
     if (error) throw error;
 
-    // Refresh subscription data
+
     await fetchSubscription();
 
-    // Show success message
+    
     setPaymentStatus('Subscription reactivated successfully!');
     setShowReactivateModal(false);
   } catch (error) {
@@ -981,7 +978,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
   }
 };
 
-  // Handle refund request
+
   const handleRefundRequest = async (paymentId) => {
     try {
       setIsProcessing(true);
@@ -997,7 +994,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
 
       setPaymentStatus("Refund request submitted successfully. You will receive an email confirmation.");
 
-      // Refresh subscription data
+     
       await fetchSubscription();
 
     } catch (error) {
@@ -1008,7 +1005,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     }
   };
 
-  // Get recent payments for refund eligibility
+
   const getRecentPayments = async () => {
     if (!user) return [];
 
@@ -1028,7 +1025,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     return payments || [];
   };
 
-  // --- ADD REFUND BUTTON COMPONENT HERE ---
+
   const RefundButton = () => {
     const [showRefundModal, setShowRefundModal] = useState(false);
     const [recentPayments, setRecentPayments] = useState([]);
@@ -1099,7 +1096,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     );
   };
 
-  // Enhanced subscription status display
+
   const renderSubscriptionStatus = () => {
     if (!currentSubscription) return null;
 
@@ -1208,7 +1205,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     );
   };
 
-  // Payment status message component
+  
   const renderPaymentStatus = () => {
     if (!paymentStatus) return null;
 
@@ -1253,7 +1250,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     );
   };
 
-  // Testing mode indicator
+ 
   const renderTestingNotice = () => {
     const isTestEnvironment = import.meta.env.DEV ||
       window.location.hostname === 'localhost' ||
@@ -1273,7 +1270,7 @@ const ProratedBillingInfo = ({ newTier, currentTier, currentSubscription }) => {
     // );
   };
 
-  // Enhanced subscriptions page
+  
   if (showPlans) {
     const currentTier = getCurrentTier();
     const isUpgrading = hasActiveSubscription();
@@ -1832,7 +1829,7 @@ export function DeleteAccountPage() {
     setLoading(true);
 
     try {
-      // 1. Re-authenticate user
+    
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         setError("You must be logged in.");
@@ -1850,7 +1847,7 @@ export function DeleteAccountPage() {
         return;
       }
 
-      // 2. Sign in again to verify password
+   
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -1861,7 +1858,7 @@ export function DeleteAccountPage() {
         return;
       }
 
-      // 3. Calling Edge Function to delete the user
+    
       const { error: fnError } = await supabase.functions.invoke('delete-user', {
         body: { user_id: user.id }
       });

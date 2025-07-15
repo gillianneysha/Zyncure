@@ -38,7 +38,7 @@ export default function AdminProfessionals() {
   const fetchProfessionals = async () => {
     setLoading(true);
     try {
-      // Use the database view instead of complex joins
+      
       const { data, error } = await supabase
         .from("admin_professionals_view")
         .select("*");
@@ -74,14 +74,14 @@ export default function AdminProfessionals() {
     return data.publicUrl;
   };
 
-  // FIXED VERSION -
+  
   const handleVerificationAction = async (professionalId, action, adminNotes = "") => {
     setProcessingVerification(professionalId);
 
     try {
       console.log("Starting verification action:", { professionalId, action, adminNotes });
 
-      // Find the professional to get verification details
+     
       const professional = professionals.find(p => p.med_id === professionalId);
       console.log("Professional data:", professional);
 
@@ -90,13 +90,13 @@ export default function AdminProfessionals() {
         return;
       }
 
-      // Check if verification exists
+     
       if (!professional.verification_id) {
         alert("No verification submission found for this professional");
         return;
       }
 
-      // Call the RPC function
+      
       const { data, error } = await supabase.rpc('admin_update_verification', {
         p_user_id: professionalId,
         p_status: action,
@@ -117,7 +117,7 @@ export default function AdminProfessionals() {
         return;
       }
 
-      // Refresh the data
+    
       console.log("Refreshing professionals data...");
       await fetchProfessionals();
 
@@ -192,7 +192,7 @@ export default function AdminProfessionals() {
   const handleSaveEdit = async () => {
     if (!editingProfessional) return;
 
-    // Basic validation
+ 
     if (!editForm.first_name.trim() || !editForm.last_name.trim()) {
       setError('First name and last name are required');
       return;
@@ -224,14 +224,14 @@ export default function AdminProfessionals() {
       } else {
         console.log('Update successful:', data);
 
-        // Update local state
+      
         setProfessionals(professionals.map(p =>
           p.med_id === editingProfessional.med_id
             ? { ...p, ...editForm }
             : p
         ));
 
-        // Close modal
+      
         setEditingProfessional(null);
         setEditForm({ first_name: '', last_name: '', email: '', status: 'active' });
       }
@@ -272,10 +272,10 @@ export default function AdminProfessionals() {
       } else {
         console.log('Delete successful');
 
-        // Remove from local state
+       
         setProfessionals(professionals.filter(p => p.med_id !== professionalToDelete.med_id));
 
-        // Close modal
+        
         setShowDeleteModal(false);
         setProfessionalToDelete(null);
       }
@@ -293,19 +293,19 @@ export default function AdminProfessionals() {
     setError(null);
   };
 
-  // Calculate pagination
+
   const totalPages = Math.ceil(filteredProfessionals.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
   const endIndex = startIndex + entriesPerPage;
   const currentProfessionals = filteredProfessionals.slice(startIndex, endIndex);
 
-  // Reset to first page when entries per page changes
+  
   const handleEntriesChange = (newEntries) => {
     setEntriesPerPage(newEntries);
     setCurrentPage(1);
   };
 
-  // Reset to first page when search changes
+  
   useEffect(() => {
     setCurrentPage(1);
   }, [search]);
@@ -348,7 +348,7 @@ export default function AdminProfessionals() {
         )
       }
 
-      {/* Medical Professionals heading outside the outer box */}
+     
       <h1 className="text-[#3BA4A0] font-bold text-4xl mt-1 mb-2 ml-4 relative z-10">
         Medical Professionals
       </h1>

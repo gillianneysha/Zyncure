@@ -2,21 +2,21 @@ import React from 'react';
 import { CheckCircle, Mail, X } from 'lucide-react';
 
 const EmailVerificationModal = ({ isOpen, onClose, email, isEmailVerification = false }) => {
-    console.log("EmailVerificationModal render:", { isOpen, email, isEmailVerification }); // Debug log
+    console.log("EmailVerificationModal render:", { isOpen, email, isEmailVerification }); 
 
     if (!isOpen) {
-        console.log("Modal not open, returning null"); // Debug log
+        console.log("Modal not open, returning null"); 
         return null;
     }
 
-    console.log("Modal is open, rendering..."); // Debug log
+    console.log("Modal is open, rendering..."); 
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative">
                 <button
                     onClick={() => {
-                        console.log("Modal close button clicked"); // Debug log
+                        console.log("Modal close button clicked"); 
                         onClose();
                     }}
                     className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
@@ -51,7 +51,7 @@ const EmailVerificationModal = ({ isOpen, onClose, email, isEmailVerification = 
 
                     <button
                         onClick={() => {
-                            console.log("Modal 'Got it!' button clicked"); // Debug log
+                            console.log("Modal 'Got it!' button clicked"); 
                             onClose();
                         }}
                         className="w-full bg-[#55A1A4] text-white py-2 px-4 rounded-lg hover:bg-[#368487] transition-colors"

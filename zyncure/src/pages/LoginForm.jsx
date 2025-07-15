@@ -97,7 +97,7 @@ export default function LoginForm({ setToken }) {
   }, [formData]);
 
 
-  // Simple redirect based on user metadata
+  
   const getRedirectPath = (user) => {
     const userRole = user.user_metadata?.user_type;
     if (userRole === "doctor") {
@@ -107,13 +107,13 @@ export default function LoginForm({ setToken }) {
   };
 
 
-  // Check if user has 2FA enabled from user metadata
+ 
   const check2FAEnabled = (user) => {
     return user.user_metadata?.two_factor_enabled || false;
   };
 
 
-  // Send email verification code
+  
   const sendVerificationCode = async (email) => {
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -134,7 +134,6 @@ export default function LoginForm({ setToken }) {
   };
 
 
-  // Verify email code
   const verifyEmailCode = async (email, code) => {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
@@ -153,7 +152,7 @@ export default function LoginForm({ setToken }) {
   };
 
 
-  // Regular email/password login
+  
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateForm()) return;
@@ -165,7 +164,7 @@ export default function LoginForm({ setToken }) {
 
 
     try {
-      // First, try regular login
+     
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -177,16 +176,16 @@ export default function LoginForm({ setToken }) {
       }
 
 
-      // Check if user has 2FA enabled from user metadata
+      
       const has2FA = check2FAEnabled(data.user);
 
 
       if (has2FA) {
-        // Sign out the user temporarily
+       
         await supabase.auth.signOut();
 
 
-        // Send verification code
+        
         const codeSent = await sendVerificationCode(formData.email);
 
 
@@ -200,7 +199,7 @@ export default function LoginForm({ setToken }) {
           throw new Error("Failed to send verification code");
         }
       } else {
-        // No 2FA required - proceed with login
+       
         setToken(data.session);
         const redirectPath = getRedirectPath(data.user);
         navigate(redirectPath);
@@ -218,7 +217,7 @@ export default function LoginForm({ setToken }) {
   };
 
 
-  // Handle email verification
+  
   const handleEmailVerification = async (event) => {
     event.preventDefault();
     setVerificationError("");
@@ -233,12 +232,12 @@ export default function LoginForm({ setToken }) {
 
 
     try {
-      // Verify the email code
+      
       const verificationData = await verifyEmailCode(emailVerification.email, verificationCode);
 
 
       if (verificationData.session) {
-        // Email verification successful - complete login
+        
         setToken(verificationData.session);
         const redirectPath = getRedirectPath(verificationData.user);
         navigate(redirectPath);

@@ -55,21 +55,20 @@ export default function AdminSupport() {
     }
   };
 
-  // Enhanced user lookup function
+ 
   const findUserByTicket = async (ticket) => {
     let userId = ticket.user_id;
-    // let userType = null;
+ 
 
-    // If user_id is already in the ticket, return it
     if (userId) {
       return { userId, userType: "direct" };
     }
 
-    // If no user_id, try to find user by email
+   
     if (ticket.email) {
       console.log("Searching for user by email:", ticket.email);
 
-      // Try patients table first
+     
       const { data: patientData, error: patientError } = await supabase
         .from("patients")
         .select("patient_id")
@@ -81,7 +80,7 @@ export default function AdminSupport() {
         return { userId: patientData.patient_id, userType: "patient" };
       }
 
-      // Try medical professionals table
+      
       const { data: mpData, error: mpError } = await supabase
         .from("medicalprofessionals")
         .select("med_id")
@@ -93,8 +92,7 @@ export default function AdminSupport() {
         return { userId: mpData.med_id, userType: "medical_professional" };
       }
 
-      // Try auth.users table as fallback
-      // Try auth.users table as fallback
+    
       const { data: userData } = await supabase.auth.admin.listUsers();
 
       const foundUser = userData?.users?.find(
@@ -109,7 +107,7 @@ export default function AdminSupport() {
     return { userId: null, userType: null };
   };
 
-  // Enhanced notification creation function
+  
   const createNotificationForTicket = async (ticket, responseMessage) => {
     try {
       const { userId, userType } = await findUserByTicket(ticket);
@@ -125,7 +123,7 @@ export default function AdminSupport() {
 
       console.log("Creating notification for user:", userId, "type:", userType);
 
-      // Enhanced notification message
+     
       const notificationMessage = `We've responded to your support ticket "${ticket.subject || "Support Request"
         }". 
 
@@ -193,7 +191,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         throw error;
       }
 
-      // Update local state
+      
       setTickets((prev) =>
         prev.map((ticket) =>
           ticket.id === ticketId
@@ -202,7 +200,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         )
       );
 
-      // Close modal if updating the selected ticket
+      
       if (selectedTicket && selectedTicket.id === ticketId) {
         setSelectedTicket({
           ...selectedTicket,
@@ -218,7 +216,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
     }
   };
 
-  // Update ticket priority
+  
   const updateTicketPriority = async (ticketId, newPriority) => {
     try {
       const { data, error } = await supabase
@@ -235,7 +233,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         throw error;
       }
 
-      // Update local state
+      
       setTickets((prev) =>
         prev.map((ticket) =>
           ticket.id === ticketId
@@ -256,7 +254,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
     }
   };
 
-  // Assign admin to ticket
+ 
   const assignAdminToTicket = async (ticketId, adminName) => {
     try {
       const { data, error } = await supabase
@@ -273,7 +271,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         throw error;
       }
 
-      // Update local state
+      
       setTickets((prev) =>
         prev.map((ticket) =>
           ticket.id === ticketId
@@ -314,7 +312,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         throw error;
       }
 
-      // Update local state
+      
       setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId));
       setShowModal(false);
       setSuccessMessage("Ticket deleted successfully!");
@@ -324,8 +322,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
     }
   };
 
-  // Enhanced send response function
-  // Enhanced send response function
+
   const sendResponse = async () => {
     if (!responseMessage.trim()) {
       alert("Please enter a response message.");
@@ -336,13 +333,13 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
       setSendingResponse(true);
       setError(null);
 
-      // Update ticket status to "In Progress" if it's currently "Open"
+    
       const newStatus =
         responseTicket.status?.toLowerCase() === "open"
           ? "In Progress"
           : responseTicket.status;
 
-      // Update the ticket status and timestamp (remove admin_response and responded_at)
+      
       const { data, error } = await supabase
         .from("support_tickets")
         .update({
@@ -357,13 +354,13 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         throw error;
       }
 
-      // Create notification for the user
+      
       const notificationResult = await createNotificationForTicket(
         responseTicket,
         responseMessage
       );
 
-      // Update local state (remove admin_response from state update)
+      
       setTickets((prev) =>
         prev.map((ticket) =>
           ticket.id === responseTicket.id
@@ -372,7 +369,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         )
       );
 
-      // Update selected ticket if it's the same one
+      
       if (selectedTicket && selectedTicket.id === responseTicket.id) {
         setSelectedTicket({
           ...selectedTicket,
@@ -381,12 +378,12 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
         });
       }
 
-      // Close response modal
+      
       setShowResponseModal(false);
       setResponseTicket(null);
       setResponseMessage("");
 
-      // Show success message
+     
       setSuccessMessage(notificationResult.message);
       setTimeout(() => setSuccessMessage(""), 5000);
     } catch (error) {
@@ -397,7 +394,7 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
     }
   };
 
-  // Subscribe to real-time changes
+  
   useEffect(() => {
     const channel = supabase
       .channel("support_tickets_changes")
@@ -420,12 +417,11 @@ If you have any follow-up questions, please don't hesitate to reach out to us ag
     };
   }, []);
 
-  // Fetch tickets on component mount
+
   useEffect(() => {
     fetchTickets();
   }, []);
 
-  // Filter tickets based on search
   const filteredTickets = tickets.filter(
     (ticket) =>
       ticket.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

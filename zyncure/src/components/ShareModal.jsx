@@ -27,7 +27,7 @@ function FeedbackModal({ open, title, message, onClose }) {
   );
 }
 
-// Are you sure you want to remove access?
+
 function ConfirmRevokeModal({ open, doctorName, onConfirm, onCancel }) {
   if (!open) return null;
   if (typeof window === "undefined" || typeof document === "undefined")
@@ -84,8 +84,6 @@ function SharingLimitModal({ open, message, onClose }) {
   );
 }
 
-// ----------------------------------------------------
-
 function cleanNulls(obj) {
   return Object.fromEntries(
     Object.entries(obj).filter(([v]) => v !== undefined)
@@ -106,7 +104,7 @@ const fetchUserTierStatus = async (userId) => {
     return data;
   } catch (error) {
     console.error("Error fetching user tier status:", error);
-    return { current_tier: "free" }; // Default to free tier
+    return { current_tier: "free" };
   }
 };
 
@@ -121,7 +119,7 @@ const ShareModal = ({ isOpen, onClose, item, currentUserId }) => {
   const [customDate, setCustomDate] = useState("");
   const [noExpiration, setNoExpiration] = useState(false);
   const [userTierStatus, setUserTierStatus] = useState(null);
-  const [maxDoctorsPerShare, setMaxDoctorsPerShare] = useState(3); // Default to free tier
+  const [maxDoctorsPerShare, setMaxDoctorsPerShare] = useState(3); 
   
   // Sharing limit modal state
 const [sharingLimitModal, setSharingLimitModal] = useState({
@@ -148,12 +146,12 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
       fetchActiveShares();
       fetchUserTierStatus(currentUserId).then((tierData) => {
         setUserTierStatus(tierData);
-        // Set max doctors based on tier
+ 
         const maxDoctors = tierData.current_tier === "free" ? 3 : -1; // -1 means unlimited
         setMaxDoctorsPerShare(maxDoctors);
       });
     }
-    // eslint-disable-next-line
+    
   }, [isOpen, currentUserId, item?.id]);
 
   useEffect(() => {
@@ -237,7 +235,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
     if (!item?.id) return false;
 
     try {
-      // Count current active shares for this file/folder
+      
       const { data: currentShares, error } = await supabase
         .from("file_shares")
         .select("id")
@@ -304,7 +302,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
     const isValid = await validateShareItem();
     if (!isValid) return;
 
-    // Check tier-based sharing limits
+    
     const canShare = await checkSharingLimits();
     if (!canShare) return;
 
@@ -312,13 +310,12 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
     setLoading(true);
 
     let allSuccessful = true;
-    //  let anyUpdated = false;
-    //  let anyInserted = false;
+  
     let errorDoctors = [];
     let sharedNames = [];
 
     for (const doctorId of selectedDoctorIds) {
-      // Try to find ANY share (active or not), for this file/folder+doctor+owner
+
       const { data: existing, error: fetchError } = await supabase
         .from("file_shares")
         .select("*")
@@ -334,7 +331,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
       }
 
       if (existing && existing.length > 0) {
-        // If deactivated, re-activate and update expires_at
+    
         const shareId = existing[0].id;
         const { error: updateError } = await supabase
           .from("file_shares")
@@ -350,7 +347,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
           allSuccessful = false;
           continue;
         }
-        //  anyUpdated = true;
+   
         sharedNames.push(doctorMap[doctorId] || doctorId);
       } else {
         let shareData = undefined;

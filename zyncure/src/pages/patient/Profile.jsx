@@ -8,7 +8,7 @@ import { NotificationPage } from "../../components/IndividualPage.jsx";
 import { BillingPage } from "../../components/IndividualPage.jsx";
 import { PoliciesPage } from "../../components/IndividualPage.jsx";
 import { DeleteAccountPage } from "../../components/IndividualPage.jsx";
-import { supabase } from "../../client"; // <-- Add this
+import { supabase } from "../../client"; 
 
 export default function ProfilePage() {
   const navigate = useNavigate();

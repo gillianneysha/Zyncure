@@ -9,11 +9,11 @@ const AppointmentList = ({
   emptyStateSubtext = 'Click "Book New Appointment" to schedule one',
   onRescheduleRequest,
   onCancelRequest,
-  onPermanentRemove, // This will be called after successful deletion
-  onRefresh, // Add this prop to refresh the appointments list
+  onPermanentRemove, 
+  onRefresh, 
 }) => {
   const [expandedAppointment, setExpandedAppointment] = useState(null);
-  const [isRemoving, setIsRemoving] = useState(null); // Track which appointment is being removed
+  const [isRemoving, setIsRemoving] = useState(null); 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [appointmentToRemove, setAppointmentToRemove] = useState(null);
 
@@ -64,13 +64,13 @@ const AppointmentList = ({
   };
 
   const canCancel = (appointment) => {
-    // Only allow cancellation for confirmed appointments
+    
     if (appointment.status !== 'confirmed') return false;
     
-    // Check if created_at exists and is valid
+    
     if (!appointment.created_at) {
       console.warn('No created_at field found for appointment:', appointment.id);
-      // If no created_at, allow cancellation (fallback behavior)
+     
       return true;
     }
     
@@ -78,33 +78,33 @@ const AppointmentList = ({
       const now = new Date();
       const appointmentCreatedAt = new Date(appointment.created_at);
       
-      // Check if the date is valid
+     
       if (isNaN(appointmentCreatedAt.getTime())) {
         console.warn('Invalid created_at date for appointment:', appointment.id);
-        // If invalid date, allow cancellation (fallback behavior)
+       
         return true;
       }
       
       const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
       
-      // Debug log
+      
       console.log('Appointment:', appointment.id, 'Hours from creation:', hoursFromCreation);
       
       return hoursFromCreation <= 24;
     } catch (error) {
       console.error('Error checking cancellation eligibility:', error);
-      // If error, allow cancellation (fallback behavior)
+      
       return true;
     }
   };
 
-  // Show confirmation modal
+  
   const handleRemoveClick = (appointment) => {
     setAppointmentToRemove(appointment);
     setShowConfirmModal(true);
   };
 
-  // Handle confirmed removal
+  
   const handleConfirmRemove = async () => {
     if (!appointmentToRemove) return;
 
@@ -112,7 +112,7 @@ const AppointmentList = ({
       setIsRemoving(appointmentToRemove.id);
       setShowConfirmModal(false);
 
-      // Call the delete function from the service
+     
       const { error } = await appointmentService.deleteAppointment(
         appointmentToRemove.id
       );
@@ -123,17 +123,17 @@ const AppointmentList = ({
         return;
       }
 
-      // Call the parent component's handler if provided
+     
       if (onPermanentRemove) {
         onPermanentRemove(appointmentToRemove);
       }
 
-      // Refresh the appointments list if function is provided
+      
       if (onRefresh) {
         onRefresh();
       }
 
-      // Show success message
+      
       console.log("Appointment removed successfully");
     } catch (error) {
       console.error("Error removing appointment:", error);
@@ -144,7 +144,7 @@ const AppointmentList = ({
     }
   };
 
-  // Handle cancel removal
+ 
   const handleCancelRemove = () => {
     setShowConfirmModal(false);
     setAppointmentToRemove(null);

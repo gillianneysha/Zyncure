@@ -29,11 +29,11 @@ export default function AdminBugs() {
       setAdmins(data || []);
     } catch (err) {
       console.error('Error fetching admins:', err);
-      // Don't set error state for admin fetch failure as it's not critical
+      
     }
   };
 
-  // Fetch bug reports from Supabase
+  
   const fetchBugs = async () => {
     try {
       setLoading(true);
@@ -55,13 +55,13 @@ export default function AdminBugs() {
     }
   };
 
-  // Initial load
+
   useEffect(() => {
     fetchBugs();
     fetchAdmins();
   }, []);
 
-  // Filter bugs based on search
+  
   const filteredBugs = bugs.filter(bug =>
     bug.reporter_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     bug.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -112,12 +112,12 @@ export default function AdminBugs() {
 
       if (error) throw error;
 
-      // Update local state
+      
       setBugs(prev => prev.map(bug =>
         bug.id === bugId ? { ...bug, status: newStatus, updated_at: new Date().toISOString() } : bug
       ));
 
-      // Update selected bug if it's the one being updated
+     
       if (selectedBug && selectedBug.id === bugId) {
         setSelectedBug(prev => ({ ...prev, status: newStatus }));
       }
@@ -144,12 +144,12 @@ export default function AdminBugs() {
 
       if (error) throw error;
 
-      // Update local state
+      
       setBugs(prev => prev.map(bug =>
         bug.id === bugId ? { ...bug, priority: newPriority, updated_at: new Date().toISOString() } : bug
       ));
 
-      // Update selected bug if it's the one being updated
+      
       if (selectedBug && selectedBug.id === bugId) {
         setSelectedBug(prev => ({ ...prev, priority: newPriority }));
       }
@@ -166,7 +166,7 @@ export default function AdminBugs() {
     try {
       setUpdating(true);
 
-      // Find the admin name for display
+      
       const admin = admins.find(a => a.id.toString() === adminId.toString());
       const adminName = admin ? admin.name : null;
 
@@ -181,7 +181,7 @@ export default function AdminBugs() {
 
       if (error) throw error;
 
-      // Update local state
+     
       setBugs(prev => prev.map(bug =>
         bug.id === bugId ? {
           ...bug,
@@ -191,7 +191,7 @@ export default function AdminBugs() {
         } : bug
       ));
 
-      // Update selected bug if it's the one being updated
+      
       if (selectedBug && selectedBug.id === bugId) {
         setSelectedBug(prev => ({
           ...prev,
@@ -223,10 +223,10 @@ export default function AdminBugs() {
 
       if (error) throw error;
 
-      // Remove from local state
+     
       setBugs(prev => prev.filter(bug => bug.id !== bugId));
 
-      // Close modal if this bug was selected
+      
       if (selectedBug && selectedBug.id === bugId) {
         setShowModal(false);
         setSelectedBug(null);
