@@ -485,24 +485,26 @@ export default function DoctorsPatientsFolders() {
     }));
   }
 
-  async function handleOpenSharedFolder(folder) {
-    setOpenedFolder(folder);
-    setPreviewFile(null);
-    let folderFiles = [];
-    if (sharedFiles && folder) {
-      folderFiles = sharedFiles.filter(f => f.folder_id === folder.id);
-    }
-    if (folder && selectedPatient?.id) {
-      const filesFromPatientWithNotes = await fetchFolderFilesWithNotes(folder.id, selectedPatient.id);
-      const existingFileIds = new Set(folderFiles.map(f => f.id));
-      filesFromPatientWithNotes.forEach(f => {
-        if (!existingFileIds.has(f.id)) {
-          folderFiles.push(f);
-        }
-      });
-    }
-    setFolderFiles(folderFiles);
+ async function handleOpenSharedFolder(folder) {
+  setOpenedFolder(folder);
+  setPreviewFile(null);
+  let folderFiles = [];
+
+  if (sharedFiles && folder) {
+    folderFiles = sharedFiles.filter(f => f.folder_id === folder.id);
   }
+  
+  if (folder && selectedPatient?.id) {
+    const filesFromPatientWithNotes = await fetchFolderFilesWithNotes(folder.id, selectedPatient.id);
+    const existingFileIds = new Set(folderFiles.map(f => f.id));
+    filesFromPatientWithNotes.forEach(f => {
+      if (!existingFileIds.has(f.id)) {
+        folderFiles.push(f);
+      }
+    });
+  }
+  setFolderFiles(folderFiles);
+}
 
   function handlePreviewFile(file) {
     setPreviewFile({
@@ -1006,22 +1008,23 @@ export default function DoctorsPatientsFolders() {
               {sharedFiles.length === 0 && (
                 <div className="col-span-4 text-gray-400">No files shared.</div>
               )}
-              {sharedFiles
-                .filter(file => !file.folder_id)
-                .map(file => (
-                  <FileCard
-                    key={file.id}
-                    file={file}
-                    onPreview={handlePreviewFile}
-                    onAddNote={fileObj => {
-                      setNotesFileTarget(fileObj);
-                      setNotesFolderTarget(null);
-                      setShowNotesModal(true);
-                    }}
-                    onDelete={handleDelete}
-                    currentUser={currentUser}
-                  />
-                ))}
+             
+{sharedFiles
+  .filter(() => !openedFolder) 
+  .map(file => (
+    <FileCard
+      key={file.id}
+      file={file}
+      onPreview={handlePreviewFile}
+      onAddNote={fileObj => {
+        setNotesFileTarget(fileObj);
+        setNotesFolderTarget(null);
+        setShowNotesModal(true);
+      }}
+      onDelete={handleDelete}
+      currentUser={currentUser}
+    />
+  ))}
             </div>
             {previewFile && renderPreviewModal(previewFile)}
             <ActionModal

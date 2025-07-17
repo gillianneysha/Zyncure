@@ -90,10 +90,9 @@ switch (historyFilter) {
 }
 }
 
-// --- New file/folder share logic using schemas ---
-// Helper to categorize files based on file_shares
+
 function categorizeFiles(files, fileShares, currentUserId) {
-  // Create fileId -> array of shares
+
   const sharesByFileId = {};
   for (const fs of fileShares) {
     if (!fs.file_id) continue;
@@ -101,7 +100,7 @@ function categorizeFiles(files, fileShares, currentUserId) {
     sharesByFileId[fs.file_id].push(fs);
   }
 
-  // Build categorized sets
+ 
   const allSet = new Set();
   const mine = [];
   const shared_with_me = [];
@@ -113,7 +112,7 @@ function categorizeFiles(files, fileShares, currentUserId) {
     if (file.owner_id === currentUserId) {
       mine.push(file);
       allSet.add(file.id);
-      // Shared with others: there exists a file_share with shared_with_id != currentUserId
+      
       if (
         shares.some(
           (fs) =>
@@ -125,7 +124,7 @@ function categorizeFiles(files, fileShares, currentUserId) {
         shared_with_others.push(file);
       }
     } else {
-      // Shared with me: file_share row for me and not owned by me
+    
       if (
         shares.some(
           (fs) =>
@@ -137,10 +136,10 @@ function categorizeFiles(files, fileShares, currentUserId) {
         allSet.add(file.id);
       }
     }
-    // All: also includes owned
+ 
     if (file.owner_id === currentUserId) allSet.add(file.id);
   }
-  // 'all' is all files that are owned or shared to me (deduped)
+
   const all = files.filter((f) => allSet.has(f.id));
   return { all, mine, shared_with_me, shared_with_others };
 }
