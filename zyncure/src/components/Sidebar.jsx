@@ -6,6 +6,18 @@ import { useContext, createContext, useState, useEffect } from "react";
 const SidebarContext = createContext();
 
 
+// Add CSS for hiding scrollbar
+const hiddenScrollbarStyle = `
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+
+
 export default function Sidebar({ children }) {
   const [expanded, setExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -47,6 +59,9 @@ export default function Sidebar({ children }) {
 
   return (
     <>
+      {/* Inject CSS for hiding scrollbar */}
+      <style>{hiddenScrollbarStyle}</style>
+
       {/* Mobile Menu Button */}
       {isMobile && (
         <button
@@ -76,8 +91,9 @@ export default function Sidebar({ children }) {
         }
         flex flex-col bg-mySidebar shadow-2xl drop-shadow-2xl
         ${isMobile ? 'w-64' : 'rounded-br-[120px]'}
+        ${!expanded && !isMobile ? 'overflow-visible' : ''}
       `}>
-        <nav className="h-full flex flex-col">
+        <nav className={`h-full flex flex-col ${!expanded && !isMobile ? 'overflow-visible' : ''}`}>
           <div className="p-4 pb-2 flex justify-between items-center">
             <img
               src="/zyncure_logo.png"
@@ -101,8 +117,13 @@ export default function Sidebar({ children }) {
             isMobile,
             closeMobileMenu
           }}>
-            <ul className={`flex-1 px-3 ${(isMobile && mobileMenuOpen) || (!isMobile && expanded) ? 'overflow-y-auto' : 'overflow-y-auto overflow-x-visible'
-              }`}>
+            <ul className={`flex-1 px-3 ${(isMobile && mobileMenuOpen) || (!isMobile && expanded)
+                ? 'overflow-y-auto'
+                : 'overflow-visible'
+              } ${!expanded && !isMobile ? 'scrollbar-hide' : ''}`} style={{
+                scrollbarWidth: !expanded && !isMobile ? 'none' : 'auto',
+                msOverflowStyle: !expanded && !isMobile ? 'none' : 'auto'
+              }}>
               {children}
             </ul>
           </SidebarContext.Provider>
@@ -124,6 +145,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
   const handleClick = () => {
     if (disabled) return;
 
+
     if (hasChildren && expanded) {
       setIsOpen(!isOpen);
     } else if (onClick) {
@@ -132,19 +154,6 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
       if (isMobile) {
         closeMobileMenu();
       }
-    }
-  };
-
-  const handleMouseEnter = () => {
-    if (!disabled && !isMobile && !expanded) {
-      setHovered(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (!disabled && !isMobile && !expanded) {
-      // Add a small delay to prevent flickering when moving to submenu
-      setTimeout(() => setHovered(false), 100);
     }
   };
 
@@ -169,8 +178,8 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
           ${isMobile ? 'min-h-[44px]' : ''} // Better touch target on mobile
         `}
         onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onMouseEnter={() => !disabled && !isMobile && setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         <span className="flex-shrink-0">{icon}</span>
         <span
@@ -224,7 +233,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
         {/* Floating submenu when collapsed (desktop only) */}
         {hasChildren && !expanded && hovered && !disabled && !isMobile && (
           <ul
-            className="absolute left-full top-0 ml-2 bg-white shadow-lg rounded-lg py-2 z-[60] min-w-[160px] border border-gray-200"
+            className="absolute left-full top-1/2 -translate-y-1/2 ml-6 bg-indigo-100 shadow-lg rounded-xl py-2 z-50 min-w-[160px] border border-gray-200"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
