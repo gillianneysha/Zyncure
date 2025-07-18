@@ -2,7 +2,21 @@ import React from "react";
 import { MoreVertical, ChevronLast, ChevronFirst, ChevronDown, ChevronRight, X } from "lucide-react";
 import { useContext, createContext, useState, useEffect } from "react";
 
+
 const SidebarContext = createContext();
+
+
+// Add CSS for hiding scrollbar
+const hiddenScrollbarStyle = `
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+
 
 export default function Sidebar({ children }) {
   const [expanded, setExpanded] = useState(true);
@@ -10,19 +24,22 @@ export default function Sidebar({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
 
+
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
-     
+
       if (window.innerWidth < 768) {
         setExpanded(false);
       }
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -32,14 +49,19 @@ export default function Sidebar({ children }) {
     }
   };
 
+
   const closeMobileMenu = () => {
     if (isMobile) {
       setMobileMenuOpen(false);
     }
   };
 
+
   return (
     <>
+      {/* Inject CSS for hiding scrollbar */}
+      <style>{hiddenScrollbarStyle}</style>
+
       {/* Mobile Menu Button */}
       {isMobile && (
         <button
@@ -50,6 +72,7 @@ export default function Sidebar({ children }) {
         </button>
       )}
 
+
       {/* Overlay for mobile */}
       {isMobile && mobileMenuOpen && (
         <div
@@ -58,24 +81,24 @@ export default function Sidebar({ children }) {
         />
       )}
 
+
       {/* Sidebar */}
       <aside className={`
-        ${isMobile 
-          ? `fixed top-0 left-0 h-full z-50 transform transition-transform duration-300 ${
-              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-            }`
+        ${isMobile
+          ? `fixed top-0 left-0 h-full z-50 transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`
           : 'min-h-screen relative z-50'
         }
         flex flex-col bg-mySidebar shadow-2xl drop-shadow-2xl
         ${isMobile ? 'w-64' : 'rounded-br-[120px]'}
+        ${!expanded && !isMobile ? 'overflow-visible' : ''}
       `}>
-        <nav className="h-full flex flex-col">
+        <nav className={`h-full flex flex-col ${!expanded && !isMobile ? 'overflow-visible' : ''}`}>
           <div className="p-4 pb-2 flex justify-between items-center">
             <img
               src="/zyncure_logo.png"
-              className={`overflow-hidden transition-all ${
-                (isMobile && mobileMenuOpen) || (!isMobile && expanded) ? "w-40" : "w-0"
-              }`}
+              className={`overflow-hidden transition-all ${(isMobile && mobileMenuOpen) || (!isMobile && expanded) ? "w-40" : "w-0"
+                }`}
               alt="Zyncure Logo"
             />
             {!isMobile && (
@@ -88,12 +111,21 @@ export default function Sidebar({ children }) {
             )}
           </div>
 
-          <SidebarContext.Provider value={{ 
+
+          <SidebarContext.Provider value={{
             expanded: isMobile ? mobileMenuOpen : expanded,
             isMobile,
             closeMobileMenu
           }}>
-            <ul className="flex-1 px-3 overflow-y-auto">{children}</ul>
+            <ul className={`flex-1 px-3 ${(isMobile && mobileMenuOpen) || (!isMobile && expanded)
+                ? 'overflow-y-auto'
+                : 'overflow-visible'
+              } ${!expanded && !isMobile ? 'scrollbar-hide' : ''}`} style={{
+                scrollbarWidth: !expanded && !isMobile ? 'none' : 'auto',
+                msOverflowStyle: !expanded && !isMobile ? 'none' : 'auto'
+              }}>
+              {children}
+            </ul>
           </SidebarContext.Provider>
         </nav>
       </aside>
@@ -101,28 +133,34 @@ export default function Sidebar({ children }) {
   );
 }
 
+
 export function SidebarItem({ icon, text, active, alert, onClick, children, disabled = false }) {
   const { expanded, isMobile, closeMobileMenu } = useContext(SidebarContext);
   const [isOpen, setIsOpen] = useState(false);
 
+
   const hasChildren = children && children.length > 0;
+
 
   const handleClick = () => {
     if (disabled) return;
+
 
     if (hasChildren && expanded) {
       setIsOpen(!isOpen);
     } else if (onClick) {
       onClick();
-    
+
       if (isMobile) {
         closeMobileMenu();
       }
     }
   };
 
-  
+
+
   const [hovered, setHovered] = useState(false);
+
 
   return (
     <>
@@ -145,9 +183,8 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
       >
         <span className="flex-shrink-0">{icon}</span>
         <span
-          className={`overflow-hidden transition-all ${
-            expanded ? "w-52 ml-3" : "w-0"
-          }`}
+          className={`overflow-hidden transition-all ${expanded ? "w-52 ml-3" : "w-0"
+            }`}
         >
           {text}
         </span>
@@ -158,12 +195,11 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
         )}
         {alert && !disabled && (
           <div
-            className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${
-              expanded ? "" : "top-2"
-            }`}
+            className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${expanded ? "" : "top-2"
+              }`}
           />
         )}
-        
+
         {/* Tooltip for collapsed (desktop only) */}
         {!expanded && !disabled && !isMobile && (
           <div
@@ -178,7 +214,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
             {text}
           </div>
         )}
-        
+
         {/* Disabled tooltip (desktop only) */}
         {!expanded && disabled && !isMobile && (
           <div
@@ -193,7 +229,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
             {text} - Verification Required
           </div>
         )}
-        
+
         {/* Floating submenu when collapsed (desktop only) */}
         {hasChildren && !expanded && hovered && !disabled && !isMobile && (
           <ul
@@ -207,7 +243,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
           </ul>
         )}
       </li>
-      
+
       {/* Submenu items when expanded */}
       {hasChildren && isOpen && expanded && !disabled && (
         <ul className="ml-6 mt-1 space-y-1">
@@ -218,19 +254,21 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
   );
 }
 
+
 export function SidebarSubItem({ icon, text, active, onClick, submenu = false, disabled = false }) {
   const { isMobile, closeMobileMenu } = useContext(SidebarContext);
-  
+
   const handleClick = () => {
     if (disabled) return;
     if (onClick) {
       onClick();
-      
+
       if (isMobile) {
         closeMobileMenu();
       }
     }
   };
+
 
   return (
     <li
@@ -258,8 +296,11 @@ export function SidebarSubItem({ icon, text, active, onClick, submenu = false, d
 }
 
 
+
+
 function BarItems() {
   const [activeItem, setActiveItem] = useState('dashboard');
+
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -307,14 +348,14 @@ function BarItems() {
           alert={true}
         />
       </Sidebar>
-      
+
       <main className="flex-1 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-4">
             {activeItem.charAt(0).toUpperCase() + activeItem.slice(1).replace('-', ' ')}
           </h1>
           <div className="bg-white rounded-lg shadow p-6">
-           
+
           </div>
         </div>
       </main>
@@ -322,4 +363,6 @@ function BarItems() {
   );
 }
 
+
 export { BarItems };
+
