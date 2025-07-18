@@ -2,7 +2,9 @@ import React from "react";
 import { MoreVertical, ChevronLast, ChevronFirst, ChevronDown, ChevronRight, X } from "lucide-react";
 import { useContext, createContext, useState, useEffect } from "react";
 
+
 const SidebarContext = createContext();
+
 
 export default function Sidebar({ children }) {
   const [expanded, setExpanded] = useState(true);
@@ -10,19 +12,22 @@ export default function Sidebar({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
 
+
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
-     
+
       if (window.innerWidth < 768) {
         setExpanded(false);
       }
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -32,11 +37,13 @@ export default function Sidebar({ children }) {
     }
   };
 
+
   const closeMobileMenu = () => {
     if (isMobile) {
       setMobileMenuOpen(false);
     }
   };
+
 
   return (
     <>
@@ -50,6 +57,7 @@ export default function Sidebar({ children }) {
         </button>
       )}
 
+
       {/* Overlay for mobile */}
       {isMobile && mobileMenuOpen && (
         <div
@@ -58,12 +66,12 @@ export default function Sidebar({ children }) {
         />
       )}
 
+
       {/* Sidebar */}
       <aside className={`
-        ${isMobile 
-          ? `fixed top-0 left-0 h-full z-50 transform transition-transform duration-300 ${
-              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-            }`
+        ${isMobile
+          ? `fixed top-0 left-0 h-full z-50 transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`
           : 'min-h-screen relative z-50'
         }
         flex flex-col bg-mySidebar shadow-2xl drop-shadow-2xl
@@ -73,9 +81,8 @@ export default function Sidebar({ children }) {
           <div className="p-4 pb-2 flex justify-between items-center">
             <img
               src="/zyncure_logo.png"
-              className={`overflow-hidden transition-all ${
-                (isMobile && mobileMenuOpen) || (!isMobile && expanded) ? "w-40" : "w-0"
-              }`}
+              className={`overflow-hidden transition-all ${(isMobile && mobileMenuOpen) || (!isMobile && expanded) ? "w-40" : "w-0"
+                }`}
               alt="Zyncure Logo"
             />
             {!isMobile && (
@@ -88,12 +95,16 @@ export default function Sidebar({ children }) {
             )}
           </div>
 
-          <SidebarContext.Provider value={{ 
+
+          <SidebarContext.Provider value={{
             expanded: isMobile ? mobileMenuOpen : expanded,
             isMobile,
             closeMobileMenu
           }}>
-            <ul className="flex-1 px-3 overflow-y-auto">{children}</ul>
+            <ul className={`flex-1 px-3 ${(isMobile && mobileMenuOpen) || (!isMobile && expanded) ? 'overflow-y-auto' : 'overflow-y-auto overflow-x-visible'
+              }`}>
+              {children}
+            </ul>
           </SidebarContext.Provider>
         </nav>
       </aside>
@@ -101,11 +112,14 @@ export default function Sidebar({ children }) {
   );
 }
 
+
 export function SidebarItem({ icon, text, active, alert, onClick, children, disabled = false }) {
   const { expanded, isMobile, closeMobileMenu } = useContext(SidebarContext);
   const [isOpen, setIsOpen] = useState(false);
 
+
   const hasChildren = children && children.length > 0;
+
 
   const handleClick = () => {
     if (disabled) return;
@@ -114,15 +128,30 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
       setIsOpen(!isOpen);
     } else if (onClick) {
       onClick();
-    
+
       if (isMobile) {
         closeMobileMenu();
       }
     }
   };
 
-  
+  const handleMouseEnter = () => {
+    if (!disabled && !isMobile && !expanded) {
+      setHovered(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!disabled && !isMobile && !expanded) {
+      // Add a small delay to prevent flickering when moving to submenu
+      setTimeout(() => setHovered(false), 100);
+    }
+  };
+
+
+
   const [hovered, setHovered] = useState(false);
+
 
   return (
     <>
@@ -140,14 +169,13 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
           ${isMobile ? 'min-h-[44px]' : ''} // Better touch target on mobile
         `}
         onClick={handleClick}
-        onMouseEnter={() => !disabled && !isMobile && setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <span className="flex-shrink-0">{icon}</span>
         <span
-          className={`overflow-hidden transition-all ${
-            expanded ? "w-52 ml-3" : "w-0"
-          }`}
+          className={`overflow-hidden transition-all ${expanded ? "w-52 ml-3" : "w-0"
+            }`}
         >
           {text}
         </span>
@@ -158,12 +186,11 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
         )}
         {alert && !disabled && (
           <div
-            className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${
-              expanded ? "" : "top-2"
-            }`}
+            className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${expanded ? "" : "top-2"
+              }`}
           />
         )}
-        
+
         {/* Tooltip for collapsed (desktop only) */}
         {!expanded && !disabled && !isMobile && (
           <div
@@ -178,7 +205,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
             {text}
           </div>
         )}
-        
+
         {/* Disabled tooltip (desktop only) */}
         {!expanded && disabled && !isMobile && (
           <div
@@ -193,11 +220,11 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
             {text} - Verification Required
           </div>
         )}
-        
+
         {/* Floating submenu when collapsed (desktop only) */}
         {hasChildren && !expanded && hovered && !disabled && !isMobile && (
           <ul
-            className="absolute left-full top-1/2 -translate-y-1/2 ml-6 bg-indigo-100 shadow-lg rounded-xl py-2 z-50 min-w-[160px] border border-gray-200"
+            className="absolute left-full top-0 ml-2 bg-white shadow-lg rounded-lg py-2 z-[60] min-w-[160px] border border-gray-200"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
@@ -207,7 +234,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
           </ul>
         )}
       </li>
-      
+
       {/* Submenu items when expanded */}
       {hasChildren && isOpen && expanded && !disabled && (
         <ul className="ml-6 mt-1 space-y-1">
@@ -218,19 +245,21 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
   );
 }
 
+
 export function SidebarSubItem({ icon, text, active, onClick, submenu = false, disabled = false }) {
   const { isMobile, closeMobileMenu } = useContext(SidebarContext);
-  
+
   const handleClick = () => {
     if (disabled) return;
     if (onClick) {
       onClick();
-      
+
       if (isMobile) {
         closeMobileMenu();
       }
     }
   };
+
 
   return (
     <li
@@ -258,8 +287,11 @@ export function SidebarSubItem({ icon, text, active, onClick, submenu = false, d
 }
 
 
+
+
 function BarItems() {
   const [activeItem, setActiveItem] = useState('dashboard');
+
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -307,14 +339,14 @@ function BarItems() {
           alert={true}
         />
       </Sidebar>
-      
+
       <main className="flex-1 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-4">
             {activeItem.charAt(0).toUpperCase() + activeItem.slice(1).replace('-', ' ')}
           </h1>
           <div className="bg-white rounded-lg shadow p-6">
-           
+
           </div>
         </div>
       </main>
@@ -322,4 +354,6 @@ function BarItems() {
   );
 }
 
+
 export { BarItems };
+
