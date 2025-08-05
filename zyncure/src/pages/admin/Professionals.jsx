@@ -261,6 +261,7 @@ export default function AdminProfessionals() {
       setIsDeleting(true);
       setError(null);
 
+      // Delete from medicalprofessionals table
       const { error } = await supabase
         .from('medicalprofessionals')
         .delete()
@@ -270,12 +271,16 @@ export default function AdminProfessionals() {
         console.error('Error deleting professional:', error);
         setError(`Delete error: ${error.message}`);
       } else {
-        console.log('Delete successful');
+        // Also delete from Supabase Auth using Edge Function
+        const { error: fnError } = await supabase.functions.invoke('delete-user', {
+          body: { user_id: professionalToDelete.med_id }
+        });
+        if (fnError) {
+          console.error('Error deleting user from Auth:', fnError);
+          setError(`Auth delete error: ${fnError.message}`);
+        }
 
-       
         setProfessionals(professionals.filter(p => p.med_id !== professionalToDelete.med_id));
-
-        
         setShowDeleteModal(false);
         setProfessionalToDelete(null);
       }
@@ -624,7 +629,7 @@ export default function AdminProfessionals() {
                   <div className="text-gray-400 mb-4">
                     <FileText size={48} className="mx-auto mb-4" />
                     <p className="text-lg">No verification submitted yet</p>
-                    <p className="text-sm">This doctor has not submitted verification documents.</p>
+                    <p className="text-sm mt-2">This doctor has not submitted verification documents.</p>
                   </div>
                 </div>
               )}
