@@ -119,13 +119,13 @@ const ShareModal = ({ isOpen, onClose, item, currentUserId }) => {
   const [customDate, setCustomDate] = useState("");
   const [noExpiration, setNoExpiration] = useState(false);
   const [userTierStatus, setUserTierStatus] = useState(null);
-  const [maxDoctorsPerShare, setMaxDoctorsPerShare] = useState(3); 
-  
+  const [maxDoctorsPerShare, setMaxDoctorsPerShare] = useState(3);
+
   // Sharing limit modal state
-const [sharingLimitModal, setSharingLimitModal] = useState({
-  open: false,
-  message: "",
-});
+  const [sharingLimitModal, setSharingLimitModal] = useState({
+    open: false,
+    message: "",
+  });
   // Confirmation modal state
   const [revokeModal, setRevokeModal] = useState({
     open: false,
@@ -146,12 +146,12 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
       fetchActiveShares();
       fetchUserTierStatus(currentUserId).then((tierData) => {
         setUserTierStatus(tierData);
- 
+
         const maxDoctors = tierData.current_tier === "free" ? 3 : -1; // -1 means unlimited
         setMaxDoctorsPerShare(maxDoctors);
       });
     }
-    
+
   }, [isOpen, currentUserId, item?.id]);
 
   useEffect(() => {
@@ -202,7 +202,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
         (share) => !share.expires_at || new Date(share.expires_at) > now
       );
       setActiveShares(filtered);
-    } catch {}
+    } catch { }
   };
 
   const calculateExpirationDate = () => {
@@ -235,7 +235,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
     if (!item?.id) return false;
 
     try {
-      
+
       const { data: currentShares, error } = await supabase
         .from("file_shares")
         .select("id")
@@ -251,10 +251,10 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
       if (totalAfterSharing > maxDoctorsPerShare) {
         const tierName =
           userTierStatus?.current_tier === "free" ? "Free" : "Premium";
-       setSharingLimitModal({
-  open: true,
-  message: `${tierName} tier allows sharing with a maximum of ${maxDoctorsPerShare} doctors per file/folder. You currently have ${currentActiveShares} active shares and are trying to add ${selectedDoctorIds.length} more.`,
-});
+        setSharingLimitModal({
+          open: true,
+          message: `${tierName} tier allows sharing with a maximum of ${maxDoctorsPerShare} doctors per file/folder. You currently have ${currentActiveShares} active shares and are trying to add ${selectedDoctorIds.length} more.`,
+        });
         return false;
       }
 
@@ -302,7 +302,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
     const isValid = await validateShareItem();
     if (!isValid) return;
 
-    
+
     const canShare = await checkSharingLimits();
     if (!canShare) return;
 
@@ -310,7 +310,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
     setLoading(true);
 
     let allSuccessful = true;
-  
+
     let errorDoctors = [];
     let sharedNames = [];
 
@@ -331,7 +331,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
       }
 
       if (existing && existing.length > 0) {
-    
+
         const shareId = existing[0].id;
         const { error: updateError } = await supabase
           .from("file_shares")
@@ -347,7 +347,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
           allSuccessful = false;
           continue;
         }
-   
+
         sharedNames.push(doctorMap[doctorId] || doctorId);
       } else {
         let shareData = undefined;
@@ -447,9 +447,9 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
     } else {
       alert(
         "Some shares failed: " +
-          errorDoctors
-            .map((e) => `Doctor ${e.doctorId}: ${e.reason}`)
-            .join("; ")
+        errorDoctors
+          .map((e) => `Doctor ${e.doctorId}: ${e.reason}`)
+          .join("; ")
       );
       console.error("Share errors:", errorDoctors);
     }
@@ -532,40 +532,40 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
         </div>
 
         <div className="p-4 space-y-4">
-  <div>
-    <div className="flex items-center justify-between mb-2">
-      <label className="block text-sm font-medium text-gray-700">
-        Share with Doctor(s)
-      </label>
-      {userTierStatus && (
-        <span className="text-xs text-gray-500">
-          {userTierStatus.current_tier === 'free' 
-            ? `Free tier: Max ${maxDoctorsPerShare} doctors per file`
-            : `${userTierStatus.current_tier} tier: Unlimited sharing`
-          }
-        </span>
-      )}
-    </div>
-    <select
-      multiple
-      value={selectedDoctorIds}
-      onChange={e => setSelectedDoctorIds(Array.from(e.target.selectedOptions, opt => opt.value))}
-      className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-      disabled={loading}
-    >
-      {connections.map((connection) => (
-        <option key={connection.med_id} value={connection.med_id}>
-          {connection.doctor_first_name && connection.doctor_last_name
-            ? `${connection.doctor_first_name} ${connection.doctor_last_name}`
-            : connection.doctor_email
-          }
-        </option>
-      ))}
-    </select>
-    <div className="text-xs text-gray-500 mt-1">
-      Hold Ctrl (Windows) or Cmd (Mac) to select multiple doctors.
-    </div>
-  </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Share with Doctor(s)
+              </label>
+              {userTierStatus && (
+                <span className="text-xs text-gray-500">
+                  {userTierStatus.current_tier === 'free'
+                    ? `Free tier: Max ${maxDoctorsPerShare} doctors per file`
+                    : `${userTierStatus.current_tier} tier: Unlimited sharing`
+                  }
+                </span>
+              )}
+            </div>
+            <select
+              multiple
+              value={selectedDoctorIds}
+              onChange={e => setSelectedDoctorIds(Array.from(e.target.selectedOptions, opt => opt.value))}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              disabled={loading}
+            >
+              {connections.map((connection) => (
+                <option key={connection.med_id} value={connection.med_id}>
+                  {connection.doctor_first_name && connection.doctor_last_name
+                    ? `${connection.doctor_first_name} ${connection.doctor_last_name}`
+                    : connection.doctor_email
+                  }
+                </option>
+              ))}
+            </select>
+            <div className="text-xs text-gray-500 mt-1">
+              Hold Ctrl (Windows) or Cmd (Mac) to select multiple doctors.
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -654,7 +654,7 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
                         handleAskRevokeShare(
                           share.id,
                           doctorMap[share.shared_with_id] ||
-                            share.shared_with_id
+                          share.shared_with_id
                         )
                       }
                       className="text-red-500 hover:text-red-700 p-1"
@@ -687,10 +687,10 @@ const [sharingLimitModal, setSharingLimitModal] = useState({
         }
       />
       <SharingLimitModal
-  open={sharingLimitModal.open}
-  message={sharingLimitModal.message}
-  onClose={() => setSharingLimitModal({ open: false, message: "" })}
-/>
+        open={sharingLimitModal.open}
+        message={sharingLimitModal.message}
+        onClose={() => setSharingLimitModal({ open: false, message: "" })}
+      />
     </div>
   );
 };
