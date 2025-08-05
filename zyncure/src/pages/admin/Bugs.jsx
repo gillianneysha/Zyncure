@@ -21,19 +21,17 @@ export default function AdminBugs() {
     try {
       const { data, error } = await supabase
         .from('admin')
-        .select('id, name, email')
-        .order('name', { ascending: true });
+        .select('user_id, full_name, email')
+        .order('full_name', { ascending: true });
 
       if (error) throw error;
 
       setAdmins(data || []);
     } catch (err) {
       console.error('Error fetching admins:', err);
-      
     }
   };
 
-  
   const fetchBugs = async () => {
     try {
       setLoading(true);
@@ -55,13 +53,11 @@ export default function AdminBugs() {
     }
   };
 
-
   useEffect(() => {
     fetchBugs();
     fetchAdmins();
   }, []);
 
-  
   const filteredBugs = bugs.filter(bug =>
     bug.reporter_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     bug.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -112,12 +108,10 @@ export default function AdminBugs() {
 
       if (error) throw error;
 
-      
       setBugs(prev => prev.map(bug =>
         bug.id === bugId ? { ...bug, status: newStatus, updated_at: new Date().toISOString() } : bug
       ));
 
-     
       if (selectedBug && selectedBug.id === bugId) {
         setSelectedBug(prev => ({ ...prev, status: newStatus }));
       }
@@ -144,12 +138,10 @@ export default function AdminBugs() {
 
       if (error) throw error;
 
-      
       setBugs(prev => prev.map(bug =>
         bug.id === bugId ? { ...bug, priority: newPriority, updated_at: new Date().toISOString() } : bug
       ));
 
-      
       if (selectedBug && selectedBug.id === bugId) {
         setSelectedBug(prev => ({ ...prev, priority: newPriority }));
       }
@@ -162,41 +154,43 @@ export default function AdminBugs() {
     }
   };
 
+  // Helper function to get user_id from admin name
+  const getAdminIdFromName = (adminName) => {
+    if (!adminName) return "";
+    const admin = admins.find(a => a.full_name === adminName);
+    return admin ? admin.user_id : "";
+  };
+
   const updateAssignedAdmin = async (bugId, adminId) => {
     try {
       setUpdating(true);
 
-      
-      const admin = admins.find(a => a.id.toString() === adminId.toString());
-      const adminName = admin ? admin.name : null;
+      // Find admin name from admins list
+      const admin = admins.find(a => a.user_id === adminId);
+      const adminName = admin ? admin.full_name : null;
 
       const { error } = await supabase
         .from('bug_reports')
         .update({
           assigned_admin: adminName,
-          assigned_admin_id: adminId,
           updated_at: new Date().toISOString()
         })
         .eq('id', bugId);
 
       if (error) throw error;
 
-     
       setBugs(prev => prev.map(bug =>
         bug.id === bugId ? {
           ...bug,
           assigned_admin: adminName,
-          assigned_admin_id: adminId,
           updated_at: new Date().toISOString()
         } : bug
       ));
 
-      
       if (selectedBug && selectedBug.id === bugId) {
         setSelectedBug(prev => ({
           ...prev,
-          assigned_admin: adminName,
-          assigned_admin_id: adminId
+          assigned_admin: adminName
         }));
       }
 
@@ -223,10 +217,8 @@ export default function AdminBugs() {
 
       if (error) throw error;
 
-     
       setBugs(prev => prev.filter(bug => bug.id !== bugId));
 
-      
       if (selectedBug && selectedBug.id === bugId) {
         setShowModal(false);
         setSelectedBug(null);
@@ -409,16 +401,17 @@ export default function AdminBugs() {
                       </td>
                       <td className="px-6 py-4 hidden lg:table-cell">
                         <select
-                          value={bug.assigned_admin || "Unassigned"}
-                          onChange={(e) => updateAssignedAdmin(bug.id, e.target.value === "Unassigned" ? "" : e.target.value)}
+                          value={getAdminIdFromName(bug.assigned_admin)}
+                          onChange={(e) => updateAssignedAdmin(bug.id, e.target.value)}
                           disabled={updating}
                           className="text-sm text-gray-900 border-none bg-transparent cursor-pointer hover:underline w-full disabled:opacity-50"
                         >
-                          <option value="Unassigned">Unassigned</option>
-                          <option value="Andrei">Andrei</option>
-                          <option value="Ysha">Ysha</option>
-                          <option value="Ambross">Ambross</option>
-                          <option value="Ludrein">Ludrein</option>
+                          <option value="">Unassigned</option>
+                          {admins.map((admin) => (
+                            <option key={admin.user_id} value={admin.user_id}>
+                              {admin.full_name}
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td className="px-6 py-4">
@@ -545,7 +538,6 @@ export default function AdminBugs() {
                 <p className="text-gray-900">{selectedBug.description || 'No description provided'}</p>
               </div>
 
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Browser Info</label>
@@ -579,16 +571,17 @@ export default function AdminBugs() {
                   <label className="text-sm font-medium text-gray-700">Assigned Admin</label>
                   <div className="mt-1">
                     <select
-                      value={selectedBug.assigned_admin_id || ''}
+                      value={getAdminIdFromName(selectedBug.assigned_admin)}
                       onChange={(e) => updateAssignedAdmin(selectedBug.id, e.target.value)}
                       disabled={updating}
                       className="text-gray-900 border border-gray-300 rounded px-3 py-1 focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     >
                       <option value="">Unassigned</option>
-                      <option value="Andrei">Andrei</option>
-                      <option value="Ysha">Ysha</option>
-                      <option value="Ambross">Ambross</option>
-                      <option value="Ludrein">Ludrein</option>
+                      {admins.map((admin) => (
+                        <option key={admin.user_id} value={admin.user_id}>
+                          {admin.full_name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
