@@ -6,6 +6,8 @@ import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
 
 
+
+
 const FormField = React.memo(({
   label,
   name,
@@ -43,6 +45,8 @@ const FormField = React.memo(({
 ));
 
 
+
+
 export default function LoginForm({ setToken }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -56,12 +60,16 @@ export default function LoginForm({ setToken }) {
   const [verificationError, setVerificationError] = useState("");
 
 
+
+
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+
+
 
 
     if (errors[name]) {
@@ -73,8 +81,12 @@ export default function LoginForm({ setToken }) {
   }, [errors]);
 
 
+
+
   const validateForm = useCallback(() => {
     const newErrors = {};
+
+
 
 
     if (!formData.email.trim()) {
@@ -87,9 +99,13 @@ export default function LoginForm({ setToken }) {
     }
 
 
+
+
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
     }
+
+
 
 
     setErrors(newErrors);
@@ -97,7 +113,9 @@ export default function LoginForm({ setToken }) {
   }, [formData]);
 
 
-  
+
+
+
   const getRedirectPath = (user) => {
     const userRole = user.user_metadata?.user_type;
     if (userRole === "doctor") {
@@ -107,13 +125,17 @@ export default function LoginForm({ setToken }) {
   };
 
 
- 
+
+
+
   const check2FAEnabled = (user) => {
     return user.user_metadata?.two_factor_enabled || false;
   };
 
 
-  
+
+
+
   const sendVerificationCode = async (email) => {
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -125,6 +147,8 @@ export default function LoginForm({ setToken }) {
       });
 
 
+
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -132,6 +156,8 @@ export default function LoginForm({ setToken }) {
       return false;
     }
   };
+
+
 
 
   const verifyEmailCode = async (email, code) => {
@@ -143,6 +169,8 @@ export default function LoginForm({ setToken }) {
       });
 
 
+
+
       if (error) throw error;
       return data;
     } catch (error) {
@@ -152,10 +180,14 @@ export default function LoginForm({ setToken }) {
   };
 
 
-  
+
+
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateForm()) return;
+
+
 
 
     setIsLoading(true);
@@ -163,12 +195,16 @@ export default function LoginForm({ setToken }) {
     setVerificationError("");
 
 
+
+
     try {
-     
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
+
+
 
 
       if (error) {
@@ -176,17 +212,25 @@ export default function LoginForm({ setToken }) {
       }
 
 
-      
+
+
+
       const has2FA = check2FAEnabled(data.user);
 
 
+
+
       if (has2FA) {
-       
+
         await supabase.auth.signOut();
 
 
-        
+
+
+
         const codeSent = await sendVerificationCode(formData.email);
+
+
 
 
         if (codeSent) {
@@ -199,11 +243,13 @@ export default function LoginForm({ setToken }) {
           throw new Error("Failed to send verification code");
         }
       } else {
-       
+
         setToken(data.session);
         const redirectPath = getRedirectPath(data.user);
         navigate(redirectPath);
       }
+
+
 
 
     } catch (error) {
@@ -217,11 +263,15 @@ export default function LoginForm({ setToken }) {
   };
 
 
-  
+
+
+
   const handleEmailVerification = async (event) => {
     event.preventDefault();
     setVerificationError("");
     setIsLoading(true);
+
+
 
 
     if (!verificationCode.trim()) {
@@ -231,19 +281,25 @@ export default function LoginForm({ setToken }) {
     }
 
 
+
+
     try {
-      
+
       const verificationData = await verifyEmailCode(emailVerification.email, verificationCode);
 
 
+
+
       if (verificationData.session) {
-        
+
         setToken(verificationData.session);
         const redirectPath = getRedirectPath(verificationData.user);
         navigate(redirectPath);
       } else {
         throw new Error("Email verification failed");
       }
+
+
 
 
     } catch (error) {
@@ -263,10 +319,14 @@ export default function LoginForm({ setToken }) {
   };
 
 
+
+
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrors({});
+
+
 
 
       const { error } = await supabase.auth.signInWithOAuth({
@@ -275,6 +335,8 @@ export default function LoginForm({ setToken }) {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       });
+
+
 
 
       if (error) throw error;
@@ -289,11 +351,15 @@ export default function LoginForm({ setToken }) {
   }, []);
 
 
+
+
   const handleForgotPassword = async () => {
     if (!formData.email) {
       setErrors({ email: "Please enter your email address first" });
       return;
     }
+
+
 
 
     try {
@@ -303,7 +369,11 @@ export default function LoginForm({ setToken }) {
       });
 
 
+
+
       if (error) throw error;
+
+
 
 
       alert("Password reset email sent! Please check your inbox.");
@@ -318,6 +388,8 @@ export default function LoginForm({ setToken }) {
   };
 
 
+
+
   return (
     <>
       <form onSubmit={emailVerification ? handleEmailVerification : handleSubmit}>
@@ -327,6 +399,8 @@ export default function LoginForm({ setToken }) {
             {errors.submit}
           </div>
         )}
+
+
 
 
         {/* Email Verification Form */}
@@ -363,6 +437,8 @@ export default function LoginForm({ setToken }) {
         )}
 
 
+
+
         {/* Regular Login Form */}
         {!emailVerification && (
           <>
@@ -380,6 +456,8 @@ export default function LoginForm({ setToken }) {
             />
 
 
+
+
             <div className="w-4/5 mx-auto">
               <PasswordInput
                 label="Password:"
@@ -393,6 +471,8 @@ export default function LoginForm({ setToken }) {
                 inputClassName="bg-[#FFEDE7]"
               />
             </div>
+
+
 
 
             <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
@@ -410,6 +490,8 @@ export default function LoginForm({ setToken }) {
         )}
 
 
+
+
         <button
           type="submit"
           disabled={isLoading}
@@ -420,6 +502,8 @@ export default function LoginForm({ setToken }) {
         >
           {isLoading ? "Processing..." : (emailVerification ? "Verify Code" : "Log In")}
         </button>
+
+
 
 
         {!emailVerification && (
@@ -437,12 +521,16 @@ export default function LoginForm({ setToken }) {
             </div>
 
 
+
+
             <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
               <div className="flex items-center justify-center my-4">
                 <div className="flex-grow h-px bg-[#FEDED2]"></div>
                 <span className="px-2">OR</span>
                 <div className="flex-grow h-px bg-[#FEDED2]"></div>
               </div>
+
+
 
 
               <button
