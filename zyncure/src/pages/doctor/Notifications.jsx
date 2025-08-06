@@ -7,6 +7,7 @@ import {
   User,
   Calendar,
   Clock,
+  File as FileIcon,
 } from "lucide-react";
 import { supabase } from "../../client";
 
@@ -15,30 +16,27 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
-
   useEffect(() => {
     initializeNotifications();
   }, []);
 
-  
   async function initializeNotifications() {
-    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setLoading(false);
       return;
     }
-    
-   
+
     const userType = await getUserType(user.id);
+    // Debug: log user id and type
+    console.log("Doctor user id:", user.id, userType);
     if (!userType) {
       setLoading(false);
       return;
     }
-    
+
     await fetchNotifications(user.id);
-    
-    
+
     const subscription = supabase
       .channel("notifications")
       .on(
@@ -66,7 +64,7 @@ export default function Notifications() {
           setNotifications((prev) =>
             prev.map((n) => (n.id === payload.new.id ? payload.new : n))
           );
-        
+
           setUnreadCount((prev) => {
             const wasRead = payload.old.is_read;
             const isRead = payload.new.is_read;
@@ -79,7 +77,6 @@ export default function Notifications() {
           });
         }
       )
-      
       .on(
         "postgres_changes",
         {
@@ -90,7 +87,7 @@ export default function Notifications() {
         },
         (payload) => {
           setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
-        
+
           if (!payload.old.is_read) {
             setUnreadCount((prev) => Math.max(0, prev - 1));
           }
@@ -104,35 +101,40 @@ export default function Notifications() {
   }
 
   const getUserType = async (userId) => {
-
     const { data: doctorData } = await supabase
       .from('medicalprofessionals')
       .select('med_id')
       .eq('med_id', userId)
       .single();
-    
+
     if (doctorData) return 'doctor';
-    
-    
+
     const { data: patientData } = await supabase
       .from('patients')
       .select('patient_id')
       .eq('patient_id', userId)
       .single();
-    
+
     if (patientData) return 'patient';
-    
+
     return null;
   };
 
   async function fetchNotifications(userId) {
     setLoading(true);
-    
+
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
+
+    // Debug: log fetched notifications and error
+    if (error) {
+      console.error("Fetch notifications error:", error);
+    } else {
+      console.log("Fetched notifications:", data);
+    }
 
     if (!error) {
       setNotifications(data || []);
@@ -171,15 +173,13 @@ export default function Notifications() {
 
     if (error) {
       console.error("Error deleting notification:", error);
-      
+
       alert("Failed to delete notification. Please try again.");
       return;
     }
 
-  
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-    
-   
+
     const deletedNotification = notifications.find(
       (n) => n.id === notificationId
     );
@@ -188,6 +188,7 @@ export default function Notifications() {
     }
   }
 
+  // --- file_shared additions for icon ---
   const getNotificationIcon = (type) => {
     switch (type) {
       case "connection_request":
@@ -202,11 +203,14 @@ export default function Notifications() {
         return <Calendar className="w-5 h-5 text-purple-500" />;
       case "announcement":
         return <Bell className="w-5 h-5 text-orange-500" />;
+      case "file_shared":
+        return <FileIcon className="w-5 h-5 text-cyan-500" />;
       default:
         return <Bell className="w-5 h-5 text-gray-500" />;
     }
   };
 
+  // --- file_shared additions for color ---
   const getNotificationColor = (type, isRead) => {
     const baseClasses = isRead
       ? "bg-gray-50 border-gray-200"
@@ -227,6 +231,8 @@ export default function Notifications() {
         return `${baseClasses} border-l-purple-500`;
       case "announcement":
         return `${baseClasses} border-l-orange-500`;
+      case "file_shared":
+        return `${baseClasses} border-l-cyan-500`;
       default:
         return `${baseClasses} border-l-gray-500`;
     }
@@ -237,14 +243,13 @@ export default function Notifications() {
       notification.type.includes("appointment") &&
       notification.metadata.appointment_id
     ) {
-      
       console.log("Appointment notification clicked:", notification.metadata);
 
-     
       if (!notification.is_read) {
         await markAsRead(notification.id);
       }
     }
+    // Optionally, handle file_shared click actions here
   };
 
   return (
@@ -309,9 +314,8 @@ export default function Notifications() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <h3
-                        className={`font-semibold ${
-                          notif.is_read ? "text-gray-700" : "text-gray-900"
-                        }`}
+                        className={`font-semibold ${notif.is_read ? "text-gray-700" : "text-gray-900"
+                          }`}
                       >
                         {notif.title}
                       </h3>
@@ -321,12 +325,18 @@ export default function Notifications() {
                     </div>
 
                     <p
-                      className={`text-sm ${
-                        notif.is_read ? "text-gray-600" : "text-gray-800"
-                      }`}
+                      className={`text-sm ${notif.is_read ? "text-gray-600" : "text-gray-800"
+                        }`}
                     >
                       {notif.message}
                     </p>
+
+                    {/* Show file name for file_shared */}
+                    {notif.type === "file_shared" && notif.metadata?.file_name && (
+                      <div className="mt-2 text-xs text-cyan-700">
+                        File: <span className="font-medium">{notif.metadata.file_name}</span>
+                      </div>
+                    )}
 
                     <div className="flex items-center gap-4 mt-2">
                       <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -350,6 +360,11 @@ export default function Notifications() {
                             {notif.type === "announcement" && (
                               <span className="px-2 py-1 bg-orange-100 text-orange-600 rounded">
                                 Announcement
+                              </span>
+                            )}
+                            {notif.type === "file_shared" && (
+                              <span className="px-2 py-1 bg-cyan-100 text-cyan-600 rounded">
+                                File Shared
                               </span>
                             )}
                           </div>
