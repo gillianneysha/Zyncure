@@ -2,11 +2,8 @@ import React from "react";
 import { MoreVertical, ChevronLast, ChevronFirst, ChevronDown, ChevronRight, X } from "lucide-react";
 import { useContext, createContext, useState, useEffect } from "react";
 
-
 const SidebarContext = createContext();
 
-
-// Add CSS for hiding scrollbar
 const hiddenScrollbarStyle = `
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
@@ -17,14 +14,10 @@ const hiddenScrollbarStyle = `
   }
 `;
 
-
 export default function Sidebar({ children }) {
   const [expanded, setExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-
-
 
   useEffect(() => {
     const checkMobile = () => {
@@ -40,7 +33,6 @@ export default function Sidebar({ children }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-
   const toggleSidebar = () => {
     if (isMobile) {
       setMobileMenuOpen(!mobileMenuOpen);
@@ -49,13 +41,11 @@ export default function Sidebar({ children }) {
     }
   };
 
-
   const closeMobileMenu = () => {
     if (isMobile) {
       setMobileMenuOpen(false);
     }
   };
-
 
   return (
     <>
@@ -72,7 +62,6 @@ export default function Sidebar({ children }) {
         </button>
       )}
 
-
       {/* Overlay for mobile */}
       {isMobile && mobileMenuOpen && (
         <div
@@ -80,7 +69,6 @@ export default function Sidebar({ children }) {
           onClick={closeMobileMenu}
         />
       )}
-
 
       {/* Sidebar */}
       <aside className={`
@@ -111,15 +99,14 @@ export default function Sidebar({ children }) {
             )}
           </div>
 
-
           <SidebarContext.Provider value={{
             expanded: isMobile ? mobileMenuOpen : expanded,
             isMobile,
             closeMobileMenu
           }}>
             <ul className={`flex-1 px-3 ${(isMobile && mobileMenuOpen) || (!isMobile && expanded)
-                ? 'overflow-y-auto'
-                : 'overflow-visible'
+              ? 'overflow-y-auto'
+              : 'overflow-visible'
               } ${!expanded && !isMobile ? 'scrollbar-hide' : ''}`} style={{
                 scrollbarWidth: !expanded && !isMobile ? 'none' : 'auto',
                 msOverflowStyle: !expanded && !isMobile ? 'none' : 'auto'
@@ -133,14 +120,11 @@ export default function Sidebar({ children }) {
   );
 }
 
-
 export function SidebarItem({ icon, text, active, alert, onClick, children, disabled = false }) {
   const { expanded, isMobile, closeMobileMenu } = useContext(SidebarContext);
   const [isOpen, setIsOpen] = useState(false);
 
-
   const hasChildren = children && children.length > 0;
-
 
   const handleClick = () => {
     if (disabled) return;
@@ -157,10 +141,7 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
     }
   };
 
-
-
   const [hovered, setHovered] = useState(false);
-
 
   return (
     <>
@@ -254,7 +235,6 @@ export function SidebarItem({ icon, text, active, alert, onClick, children, disa
   );
 }
 
-
 export function SidebarSubItem({ icon, text, active, onClick, submenu = false, disabled = false }) {
   const { isMobile, closeMobileMenu } = useContext(SidebarContext);
 
@@ -268,7 +248,6 @@ export function SidebarSubItem({ icon, text, active, onClick, submenu = false, d
       }
     }
   };
-
 
   return (
     <li
@@ -295,12 +274,8 @@ export function SidebarSubItem({ icon, text, active, onClick, submenu = false, d
   );
 }
 
-
-
-
 function BarItems() {
   const [activeItem, setActiveItem] = useState('dashboard');
-
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -363,6 +338,4 @@ function BarItems() {
   );
 }
 
-
 export { BarItems };
-
