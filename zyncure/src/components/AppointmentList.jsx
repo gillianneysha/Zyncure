@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { appointmentService } from "../services/AppointmentService"; // Adjust path as needed
 
 const AppointmentList = ({
@@ -6,16 +6,24 @@ const AppointmentList = ({
   appointments = [],
   doctors = [],
   emptyStateMessage = "No appointments scheduled for this date",
-  emptyStateSubtext = 'Click "Book New Appointment" to schedule one',
+  emptyStateSubtext = 'Click "Request New Appointment" to schedule one',
   onRescheduleRequest,
   onCancelRequest,
   onPermanentRemove, 
   onRefresh, 
+  canCancelAppointment,
 }) => {
   const [expandedAppointment, setExpandedAppointment] = useState(null);
   const [isRemoving, setIsRemoving] = useState(null); 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [appointmentToRemove, setAppointmentToRemove] = useState(null);
+
+ 
+  useEffect(() => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  }, [selectedDate, onRefresh]);
 
   const formatDate = (date) => {
     const year = date.getFullYear();
@@ -26,85 +34,104 @@ const AppointmentList = ({
 
   const getStatusConfig = (status) => {
     const configs = {
+      requested: {
+        color: "bg-blue-100 text-blue-800 border-blue-200",
+        icon: "⏳",
+        label: "Pending Confirmation",
+        description: "Waiting for doctor's confirmation"
+      },
       confirmed: {
         color: "bg-green-100 text-green-800 border-green-200",
         icon: "✓",
         label: "Confirmed",
-      },
-      pending: {
-        color: "bg-yellow-100 text-yellow-800 border-yellow-200",
-        icon: "⏳",
-        label: "Pending",
+        description: "Approved by doctor"
       },
       cancelled: {
         color: "bg-red-100 text-red-800 border-red-200",
         icon: "✕",
         label: "Cancelled",
+        description: "Appointment was cancelled"
       },
       rescheduled: {
-        color: "bg-blue-100 text-blue-800 border-blue-200",
+        color: "bg-purple-100 text-purple-800 border-purple-200",
         icon: "📅",
         label: "Rescheduled",
+        description: "Moved to different time"
       },
       completed: {
         color: "bg-gray-100 text-gray-800 border-gray-200",
         icon: "✅",
         label: "Completed",
+        description: "Appointment finished"
       },
+      no_show: {
+        color: "bg-orange-100 text-orange-800 border-orange-200",
+        icon: "⚠",
+        label: "No Show",
+        description: "Patient did not attend"
+      }
     };
-    return configs[status] || configs.pending;
+    return configs[status] || configs.requested;
   };
 
   const canReschedule = (appointment) => {
-    return (
-      ["cancelled", "rescheduled"].includes(appointment.status) ||
-      (appointment.status === "confirmed" &&
-        new Date(`${appointment.date}T${appointment.time}`) > new Date())
-    );
+    // Can reschedule if:
+    // 1. Status is requested (before doctor confirmation)
+    // 2. Status is confirmed and appointment is in the future
+    // 3. Cannot reschedule cancelled, completed, or no_show appointments
+    if (['cancelled', 'completed', 'no_show'].includes(appointment.status)) {
+      return false;
+    }
+
+    if (appointment.status === 'requested') {
+      return true; // Can always reschedule before confirmation
+    }
+
+    if (appointment.status === 'confirmed') {
+      const appointmentDateTime = new Date(`${appointment.requested_date || appointment.date}T${appointment.requested_time || appointment.time}`);
+      return appointmentDateTime > new Date();
+    }
+
+    return false;
   };
 
   const canCancel = (appointment) => {
-    
-    if (appointment.status !== 'confirmed') return false;
-    
-    
-    if (!appointment.created_at) {
-      console.warn('No created_at field found for appointment:', appointment.id);
-     
-      return true;
+    // Can cancel if:
+    // 1. Status is requested (anytime before confirmation)
+    // 2. Status is confirmed and follows the cancellation policy set by canCancelAppointment prop
+    if (appointment.status === 'requested') {
+      return true; // Can always cancel requests before confirmation
     }
-    
-    try {
-      const now = new Date();
-      const appointmentCreatedAt = new Date(appointment.created_at);
-      
-     
-      if (isNaN(appointmentCreatedAt.getTime())) {
-        console.warn('Invalid created_at date for appointment:', appointment.id);
-       
-        return true;
-      }
-      
-      const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
-      
-      
-      console.log('Appointment:', appointment.id, 'Hours from creation:', hoursFromCreation);
-      
-      return hoursFromCreation <= 24;
-    } catch (error) {
-      console.error('Error checking cancellation eligibility:', error);
-      
-      return true;
+
+    if (appointment.status === 'confirmed') {
+      return canCancelAppointment ? canCancelAppointment(appointment) : false;
     }
+
+    return false;
   };
 
+  const getTimeUntilAppointment = (appointment) => {
+    const now = new Date();
+  const appointmentDate = appointment.appointment_date || appointment.requested_date || appointment.date;
+  const appointmentTime = appointment.appointment_time || appointment.requested_time || appointment.time;
+  const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+    const diff = appointmentDateTime.getTime() - now.getTime();
+    
+    if (diff < 0) return "Past";
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days} day${days !== 1 ? 's' : ''} away`;
+    if (hours > 0) return `${hours} hour${hours !== 1 ? 's' : ''} away`;
+    return "Soon";
+  };
   
   const handleRemoveClick = (appointment) => {
     setAppointmentToRemove(appointment);
     setShowConfirmModal(true);
   };
 
-  
   const handleConfirmRemove = async () => {
     if (!appointmentToRemove) return;
 
@@ -112,7 +139,6 @@ const AppointmentList = ({
       setIsRemoving(appointmentToRemove.id);
       setShowConfirmModal(false);
 
-     
       const { error } = await appointmentService.deleteAppointment(
         appointmentToRemove.id
       );
@@ -123,17 +149,14 @@ const AppointmentList = ({
         return;
       }
 
-     
       if (onPermanentRemove) {
         onPermanentRemove(appointmentToRemove);
       }
 
-      
       if (onRefresh) {
         onRefresh();
       }
 
-      
       console.log("Appointment removed successfully");
     } catch (error) {
       console.error("Error removing appointment:", error);
@@ -144,15 +167,14 @@ const AppointmentList = ({
     }
   };
 
- 
   const handleCancelRemove = () => {
     setShowConfirmModal(false);
     setAppointmentToRemove(null);
   };
 
   const selectedDateAppointments = appointments.filter(
-    (apt) => apt.date === formatDate(selectedDate)
-  );
+  (apt) => (apt.appointment_date || apt.requested_date || apt.date) === formatDate(selectedDate)
+);
 
   const toggleExpanded = (appointmentId) => {
     setExpandedAppointment(
@@ -190,7 +212,7 @@ const AppointmentList = ({
           ) : (
             selectedDateAppointments.map((appointment) => {
               const doctor = doctors.find(
-                (d) => d.id === appointment.doctor_id
+                (d) => d.id === appointment.med_id || d.id === appointment.doctor_id
               );
               const statusConfig = getStatusConfig(appointment.status);
               const isExpanded = expandedAppointment === appointment.id;
@@ -198,6 +220,7 @@ const AppointmentList = ({
                 appointment.status
               );
               const isBeingRemoved = isRemoving === appointment.id;
+              const timeUntil = getTimeUntilAppointment(appointment);
 
               return (
                 <div
@@ -206,7 +229,9 @@ const AppointmentList = ({
                     needsAction
                       ? "bg-red-50 border-l-4 border-l-red-400"
                       : appointment.status === "confirmed"
-                      ? "bg-teal-50 border-l-4 border-l-teal-500"
+                      ? "bg-green-50 border-l-4 border-l-green-500"
+                      : appointment.status === "requested"
+                      ? "bg-blue-50 border-l-4 border-l-blue-500"
                       : "bg-gray-50 border-l-4 border-l-gray-400"
                   }`}
                 >
@@ -217,7 +242,7 @@ const AppointmentList = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <div className="text-gray-600 font-bold text-lg">
-                              {appointment.time}
+                              {appointment.requested_time || appointment.time}
                             </div>
                             <span
                               className={`px-2 py-1 rounded-full text-xs font-medium border ${statusConfig.color} flex items-center gap-1`}
@@ -228,12 +253,22 @@ const AppointmentList = ({
                           </div>
                           <div className="mb-2">
                             <span className="font-semibold text-gray-800 text-base">
-                              {doctor?.name || "Unknown Doctor"}
+                              Dr. {doctor?.name || "Unknown Doctor"}
                             </span>
+                            {appointment.status === 'confirmed' && (
+                              <div className="text-xs text-green-600 mt-1">
+                                {timeUntil}
+                              </div>
+                            )}
                           </div>
                           <div className="text-sm text-gray-600 pr-2">
-                            {appointment.reason}
+                            {appointment.patient_notes || appointment.reason}
                           </div>
+                          {appointment.status === 'requested' && (
+                            <div className="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              Waiting for doctor confirmation
+                            </div>
+                          )}
                         </div>
                         
                         <button
@@ -267,18 +302,28 @@ const AppointmentList = ({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-6 flex-1">
                           <div className="text-gray-600 font-bold text-lg min-w-[100px]">
-                            {appointment.time}
+                            {appointment.requested_time || appointment.time}
                           </div>
                           <div className="flex items-center gap-6 flex-1">
                             <div className="flex flex-col">
                               <span className="font-semibold text-gray-800 text-lg">
-                                {doctor?.name || "Unknown Doctor"}
+                                Dr. {doctor?.name || "Unknown Doctor"}
                               </span>
+                              {appointment.status === 'confirmed' && (
+                                <span className="text-xs text-green-600">
+                                  {timeUntil}
+                                </span>
+                              )}
                             </div>
                             <div className="flex flex-col flex-1">
                               <span className="text-sm text-gray-500 line-clamp-1">
-                                {appointment.reason}
+                                {appointment.patient_notes || appointment.reason}
                               </span>
+                              {appointment.status === 'requested' && (
+                                <span className="text-xs text-blue-600 mt-1">
+                                  Awaiting confirmation
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -287,6 +332,7 @@ const AppointmentList = ({
                           {/* Status Badge */}
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-medium border ${statusConfig.color} flex items-center gap-1`}
+                            title={statusConfig.description}
                           >
                             <span>{statusConfig.icon}</span>
                             {statusConfig.label}
@@ -320,6 +366,29 @@ const AppointmentList = ({
                       </div>
                     </div>
 
+                    {/* Status-specific Information */}
+                    {appointment.status === 'requested' && (
+                      <div className="mt-4 p-3 sm:p-4 bg-blue-100 border border-blue-200 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <div className="text-blue-600 mt-0.5 flex-shrink-0">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-blue-800 text-sm sm:text-base">
+                              Pending Doctor Confirmation
+                            </h4>
+                            <p className="text-xs sm:text-sm text-blue-700 mt-1">
+                              Your appointment request has been sent to Dr. {doctor?.name || "the doctor"}. 
+                              They will review and confirm your appointment soon. You can cancel or reschedule 
+                              this request anytime before confirmation.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Action Alert for Cancelled/Rescheduled */}
                     {needsAction && (
                       <div className="mt-4 p-3 sm:p-4 bg-red-100 border border-red-200 rounded-lg">
@@ -345,8 +414,8 @@ const AppointmentList = ({
                             </h4>
                             <p className="text-xs sm:text-sm text-red-700 mt-1">
                               {appointment.status === "cancelled"
-                                ? "This appointment has been cancelled. Would you like to reschedule or remove it from your schedule?"
-                                : "This appointment has been rescheduled. Please book a new time slot or remove it from your schedule."}
+                                ? "This appointment has been cancelled. Would you like to request a new appointment or remove it from your schedule?"
+                                : "This appointment has been rescheduled. Please request a new time slot or remove it from your schedule."}
                             </p>
                             <div className="mt-2 flex flex-col sm:flex-row gap-2">
                               <button
@@ -369,7 +438,7 @@ const AppointmentList = ({
                                     d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                                   />
                                 </svg>
-                                Reschedule
+                                Request New Appointment
                               </button>
                               <button
                                 onClick={() => handleRemoveClick(appointment)}
@@ -436,71 +505,107 @@ const AppointmentList = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="font-medium text-gray-700">
-                              Appointment ID:
+                              Request ID:
                             </span>
                             <span className="ml-2 text-gray-600">
-                              #{appointment.id}
+                              #{appointment.appointment_id || appointment.id}
                             </span>
                           </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Status:
+                            </span>
+                            <span className="ml-2 text-gray-600">
+                              {statusConfig.description}
+                            </span>
+                          </div>
+                          {appointment.duration_minutes && (
+                            <div>
+                              <span className="font-medium text-gray-700">
+                                Duration:
+                              </span>
+                              <span className="ml-2 text-gray-600">
+                                {appointment.duration_minutes} minutes
+                              </span>
+                            </div>
+                          )}
+                          {appointment.confirmed_at && (
+                            <div>
+                              <span className="font-medium text-gray-700">
+                                Confirmed:
+                              </span>
+                              <span className="ml-2 text-gray-600">
+                                {new Date(appointment.confirmed_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          )}
                           <div className="md:col-span-2">
                             <span className="font-medium text-gray-700">
-                              Reason:
+                              Reason for Visit:
                             </span>
                             <p className="mt-1 text-gray-600">
-                              {appointment.reason}
+                              {appointment.patient_notes || appointment.reason}
                             </p>
                           </div>
+                          {appointment.doctor_notes && (
+                            <div className="md:col-span-2">
+                              <span className="font-medium text-gray-700">
+                                Doctor's Notes:
+                              </span>
+                              <p className="mt-1 text-gray-600 bg-blue-50 p-3 rounded-lg">
+                                {appointment.doctor_notes}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Action Buttons */}
-                        {appointment.status === "confirmed" && (
-                          <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                            {canReschedule(appointment) && (
-                              <button
-                                onClick={() =>
-                                  onRescheduleRequest?.(appointment)
-                                }
-                                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                          {canReschedule(appointment) && (
+                            <button
+                              onClick={() =>
+                                onRescheduleRequest?.(appointment)
+                              }
+                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <svg
+                                className="w-4 h-4 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
                               >
-                                <svg
-                                  className="w-4 h-4 flex-shrink-0"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                  />
-                                </svg>
-                                Reschedule
-                              </button>
-                            )}
-                            {canCancel(appointment) && (
-                              <button
-                                onClick={() => onCancelRequest?.(appointment)}
-                                className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              {appointment.status === 'requested' ? 'Reschedule Request' : 'Reschedule'}
+                            </button>
+                          )}
+                          {canCancel(appointment) && (
+                            <button
+                              onClick={() => onCancelRequest?.(appointment)}
+                              className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <svg
+                                className="w-4 h-4 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
                               >
-                                <svg
-                                  className="w-4 h-4 flex-shrink-0"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                                Cancel Appointment
-                              </button>
-                            )}
-                          </div>
-                        )}
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                              {appointment.status === 'requested' ? 'Cancel Request' : 'Cancel Appointment'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -544,12 +649,12 @@ const AppointmentList = ({
             <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-6">
               <div className="text-sm">
                 <div className="font-medium text-gray-900 mb-1">
-                  {appointmentToRemove.time} -{" "}
-                  {doctors.find((d) => d.id === appointmentToRemove.doctor_id)
+                  {appointmentToRemove.requested_time || appointmentToRemove.time} -{" "}
+                  Dr. {doctors.find((d) => d.id === (appointmentToRemove.med_id || appointmentToRemove.doctor_id))
                     ?.name || "Unknown Doctor"}
                 </div>
                 <div className="text-gray-600 text-xs sm:text-sm">
-                  {appointmentToRemove.date} • {appointmentToRemove.reason}
+                  {appointmentToRemove.requested_date || appointmentToRemove.date} • {appointmentToRemove.patient_notes || appointmentToRemove.reason}
                 </div>
               </div>
             </div>

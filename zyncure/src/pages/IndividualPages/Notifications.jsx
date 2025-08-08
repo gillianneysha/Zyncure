@@ -322,6 +322,23 @@ const handleReminderNotificationsToggle = (value) => {
           </div>
         </div>
       </div>
+        <div className="mb-8 flex items-center gap-4">
+  <span className="text-profileHeader font-semibold">Push notifications on your device?</span>
+  <button
+    type="button"
+    className="px-4 py-2 bg-[#55A1A4] text-white rounded-lg hover:bg-[#368487] transition"
+    onClick={() => {
+      if (window.Progressier) {
+        window.Progressier.subscribe();
+      } else {
+        alert("Push notification service not loaded yet.");
+      }
+    }}
+    disabled={!reminderPush}
+  >
+    Enable Push Notifications
+  </button>
+</div>
 
       <NotificationCategory
         title="All Notifications"
