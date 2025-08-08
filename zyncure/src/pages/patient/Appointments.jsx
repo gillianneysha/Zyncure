@@ -28,24 +28,51 @@ const PersonalAppointmentTracker = () => {
     reason: ''
   });
 
-  const refreshAppointments = async () => {
-    if (!userData.id || userData.id === "----") return;
+const fetchAppointments = async () => {
+  try {
+    const { data, error } = await appointmentService.getUserAppointments();
     
-    try {
-      const { data: refreshedAppointments, error: refreshError } = 
-        await appointmentService.getUserAppointments(userData.id);
-      
-      if (refreshError) {
-        console.error('Error refreshing appointments:', refreshError);
-        setError('Failed to refresh appointments');
-      } else if (refreshedAppointments) {
-        setAppointments(refreshedAppointments);
-      }
-    } catch (err) {
-      console.error('Error refreshing appointments:', err);
-      setError('Failed to refresh appointments');
+    if (error) {
+      console.error('Error fetching appointments:', error);
+      // Don't return here - set empty array instead
+      setAppointments([]);
+      return;
     }
-  };
+    
+    // Make sure data exists and is an array
+    if (data && Array.isArray(data)) {
+      setAppointments(data);
+    } else {
+      console.warn('Invalid appointment data received:', data);
+      setAppointments([]);
+    }
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    setAppointments([]);
+  }
+};
+
+// Call this on component mount
+useEffect(() => {
+  fetchAppointments();
+}, []);
+
+  const refreshAppointments = async () => {
+  if (!userData.id || userData.id === "----") return;
+  try {
+    const { data: refreshedAppointments, error: refreshError } = 
+      await appointmentService.getUserAppointments(userData.id);
+    if (refreshError) {
+      setError('Failed to refresh appointments');
+    } else if (refreshedAppointments) {
+      setAppointments(refreshedAppointments); // <-- This updates the appointments prop!
+    }
+  } catch  {
+    setError('Failed to refresh appointments');
+  }
+};
+
+
 
   useEffect(() => {
     const initializeData = async () => {
@@ -83,7 +110,6 @@ const PersonalAppointmentTracker = () => {
       }
     };
 
-    
     const setupNotificationSubscription = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
@@ -104,10 +130,10 @@ const PersonalAppointmentTracker = () => {
                 filter: `user_id=eq.${user.id}`
               }, 
               (payload) => {
-                
                 if (payload.new.type.includes('appointment')) {
                   console.log('New appointment notification:', payload.new);
-                  
+                  // Refresh appointments when there's a new notification
+                  refreshAppointments();
                 }
               }
             )
@@ -122,7 +148,6 @@ const PersonalAppointmentTracker = () => {
       return null;
     };
 
-  
     initializeData();
     
     let notificationSubscription = null;
@@ -130,7 +155,6 @@ const PersonalAppointmentTracker = () => {
       notificationSubscription = subscription;
     });
 
-   
     return () => {
       if (notificationSubscription) {
         notificationSubscription.unsubscribe();
@@ -139,7 +163,6 @@ const PersonalAppointmentTracker = () => {
   }, []);
 
   const formatDateForStorage = (date) => {
-   
     const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
     const year = localDate.getFullYear();
     const month = String(localDate.getMonth() + 1).padStart(2, '0');
@@ -150,11 +173,12 @@ const PersonalAppointmentTracker = () => {
   const handleDateSelect = (date) => {
     setSelectedDate(date);
     setError('');
-   
     if (window.innerWidth < 768) {
       setActiveTab('appointments');
     }
   };
+
+  
 
   const handleMonthNavigate = (direction) => {
     const newDate = new Date(currentDate);
@@ -181,38 +205,48 @@ const PersonalAppointmentTracker = () => {
         setError('Please provide a more detailed reason (at least 10 characters)');
         return false;
       }
+
       const dateStr = formatDateForStorage(selectedDate);
-      const { data: availableSlots, error: slotsError } = 
-        await appointmentService.getAvailableTimeSlots(newAppointment.doctor_id, dateStr);
+      
+      // Check doctor's availability for the selected time slot
+const { data: availabilityData, error: availabilityError } = 
+  await appointmentService.getDoctorAvailability(
+    newAppointment.doctor_id, 
+    dateStr,
+    newAppointment.time
+  );
 
-      if (slotsError) {
-        setError('Failed to verify time slot availability. Please try again.');
-        return false;
-      }
+if (availabilityError) {
+  setError('Failed to verify doctor availability. Please try again.');
+  return false;
+}
 
-      if (!availableSlots || !availableSlots.includes(newAppointment.time)) {
-        setError('This time slot is no longer available. Please select a different time.');
-        return false;
-      }
+if (!availabilityData || !availabilityData.available) {
+  setError(availabilityData?.reason || 'This time slot is not available. Please select a different time.');
+  return false;
+}
 
       const appointmentData = {
-        ...newAppointment,
-        date: dateStr,
-        status: 'confirmed',
-        patient_id: userData.id
+        med_id: newAppointment.doctor_id,
+        patient_id: userData.id,
+        requested_date: dateStr,
+        requested_time: newAppointment.time,
+        patient_notes: newAppointment.reason,
+        status: 'requested', // Changed from 'confirmed' to 'requested'
+        duration_minutes: 30
       };
 
-      console.log('Submitting appointment:', appointmentData);
+      console.log('Submitting appointment request:', appointmentData);
 
-      const { data, error: submitError } = await appointmentService.createAppointment(appointmentData);
+      const { data, error: submitError } = await appointmentService.requestAppointment(appointmentData);
       
       if (submitError) {
-        console.error('Appointment creation error:', submitError);
+        console.error('Appointment request error:', submitError);
         
         if (submitError.includes('no longer available') || 
             submitError.includes('time slot') || 
             submitError.includes('conflict')) {
-          setError('This time slot was just booked by someone else. Please select a different time.');
+          setError('This time slot was just requested by someone else. Please select a different time.');
         } else {
           setError(submitError);
         }
@@ -220,7 +254,7 @@ const PersonalAppointmentTracker = () => {
       }
 
       if (data && data.length > 0) {
-        console.log('Appointment created successfully:', data[0]);
+        console.log('Appointment requested successfully:', data[0]);
         
         setAppointments(prevAppointments => [...prevAppointments, data[0]]);
         
@@ -231,17 +265,21 @@ const PersonalAppointmentTracker = () => {
           reason: ''
         });
 
-       
+        // Show success message
+        setError(''); // Clear any existing errors
+        // You might want to show a success notification here
+        alert('Appointment request submitted successfully! The doctor will review and confirm your appointment.');
+
         setTimeout(refreshAppointments, 1000);
 
         return true;
       } else {
-        setError('Failed to create appointment. Please try again.');
+        setError('Failed to submit appointment request. Please try again.');
         return false;
       }
 
     } catch (err) {
-      console.error('Unexpected error during appointment booking:', err);
+      console.error('Unexpected error during appointment request:', err);
       setError('An unexpected error occurred. Please try again.');
       return false;
     } finally {
@@ -266,13 +304,21 @@ const PersonalAppointmentTracker = () => {
   };
 
   const handleCancelRequest = async (appointment) => {
-   
+    // Updated cancellation logic for requested appointments
     if (!canCancelAppointment(appointment)) {
-      setError('Appointments can only be cancelled up to 24 hours before the scheduled time.');
+      if (appointment.status === 'requested') {
+        setError('You can cancel requested appointments anytime before doctor confirmation.');
+      } else {
+        setError('Confirmed appointments can only be cancelled up to 24 hours before the scheduled time.');
+      }
       return;
     }
 
-    if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+    const confirmMessage = appointment.status === 'requested' 
+      ? 'Are you sure you want to cancel this appointment request?' 
+      : 'Are you sure you want to cancel this confirmed appointment?';
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
     
@@ -286,7 +332,6 @@ const PersonalAppointmentTracker = () => {
       if (cancelError) {
         setError(`Failed to cancel appointment: ${cancelError}`);
       } else {
-      
         setAppointments(prevAppointments => 
           prevAppointments.map(apt => 
             apt.id === appointment.id 
@@ -303,7 +348,6 @@ const PersonalAppointmentTracker = () => {
     }
   };
 
-
   const handlePermanentRemove = (removedAppointment) => {
     setAppointments(prevAppointments => 
       prevAppointments.filter(apt => apt.id !== removedAppointment.id)
@@ -311,7 +355,6 @@ const PersonalAppointmentTracker = () => {
   };
 
   const handleRescheduleComplete = (updatedAppointment) => {
-  
     setAppointments(prevAppointments => 
       prevAppointments.map(apt => 
         apt.id === updatedAppointment.id 
@@ -331,17 +374,27 @@ const PersonalAppointmentTracker = () => {
   };
 
   const canCancelAppointment = (appointment) => {
-    const now = new Date();
-    const appointmentCreatedAt = new Date(appointment.created_at);
-    const hoursFromCreation = (now.getTime() - appointmentCreatedAt.getTime()) / (1000 * 60 * 60);
-    
-    // Allow cancellation only if within 24 hours of creation AND appointment is confirmed
-    return appointment.status === 'confirmed' && hoursFromCreation <= 24;
+    // Requested appointments can be cancelled anytime before confirmation
+    if (appointment.status === 'requested') {
+      return true;
+    }
+
+    // Confirmed appointments follow the 24-hour rule
+    if (appointment.status === 'confirmed') {
+      const now = new Date();
+      const appointmentDate = appointment.appointment_date || appointment.requested_date || appointment.date;
+const appointmentTime = appointment.appointment_time || appointment.requested_time || appointment.time;
+const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+      const hoursUntilAppointment = (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      
+      return hoursUntilAppointment > 24;
+    }
+
+    return false;
   };
 
- 
   const selectedDateAppointments = appointments.filter(
-    (apt) => apt.date === formatDateForStorage(selectedDate)
+    (apt) => (apt.requested_date || apt.date) === formatDateForStorage(selectedDate)
   );
 
   return (
@@ -403,7 +456,7 @@ const PersonalAppointmentTracker = () => {
             disabled={loading || doctors.length === 0}
             className="w-full mt-6 bg-myHeader text-white py-4 px-6 rounded-2xl font-semibold hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Loading...' : 'Book New Appointment'}
+            {loading ? 'Loading...' : 'Request New Appointment'}
           </button>
           
           {doctors.length === 0 && !loading && (
@@ -421,7 +474,9 @@ const PersonalAppointmentTracker = () => {
             doctors={doctors}
             onRescheduleRequest={handleRescheduleRequest}
             onCancelRequest={handleCancelRequest}
-            onPermanentRemove={handlePermanentRemove}
+             onPermanentRemove={(removedAppointment) => {
+    setAppointments(prev => prev.filter(apt => apt.id !== removedAppointment.id));
+  }}
             onRefresh={refreshAppointments}
             canCancelAppointment={canCancelAppointment}
           />
@@ -446,7 +501,7 @@ const PersonalAppointmentTracker = () => {
               disabled={loading || doctors.length === 0}
               className="w-full bg-myHeader text-white py-3 px-4 rounded-xl font-semibold hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Loading...' : 'Book New Appointment'}
+              {loading ? 'Loading...' : 'Request New Appointment'}
             </button>
             
             {doctors.length === 0 && !loading && (
@@ -496,7 +551,6 @@ const PersonalAppointmentTracker = () => {
         )}
       </div>
 
-      
       <AppointmentModal
         isOpen={showModal}
         onClose={handleCloseModal}
