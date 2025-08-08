@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FileDown } from 'lucide-react';
+import { FileDown, Shield, Clock } from 'lucide-react';
 import PatientCharts from '../../components/PatientCharts';
+import PatientVerificationModal from '../../components/PatientVerificationModal';
 import { supabase } from '../../client';
 import { generatePDF } from '../../utils/generateTrackingReport';
 
@@ -20,10 +21,69 @@ const Home = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
 
+  // Add verification modal states
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+
+  // Add timeout states
+  const [isVerificationLocked, setIsVerificationLocked] = useState(false);
+  const [timeoutRemaining, setTimeoutRemaining] = useState(0);
+
   useEffect(() => {
     fetchSymptomStats();
     fetchUserInfo();
+    checkVerificationStatus();
   }, []);
+
+  // Timeout countdown effect
+  useEffect(() => {
+    let interval = null;
+    if (timeoutRemaining > 0) {
+      interval = setInterval(() => {
+        setTimeoutRemaining(time => {
+          if (time <= 1000) {
+            setIsVerificationLocked(false);
+            return 0;
+          }
+          return time - 1000;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [timeoutRemaining]);
+
+  const checkVerificationStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Check if user has been verified
+        const verified = user.user_metadata?.identity_verified || false;
+        setIsVerified(verified);
+
+        // Check if there's an active timeout
+        const timeoutUntil = user.user_metadata?.verification_timeout_until;
+        if (timeoutUntil && !verified) {
+          const timeoutDate = new Date(timeoutUntil);
+          const now = new Date();
+
+          if (timeoutDate > now) {
+            const remainingTime = timeoutDate.getTime() - now.getTime();
+            setIsVerificationLocked(true);
+            setTimeoutRemaining(remainingTime);
+          } else {
+            // Timeout has expired, clear it
+            await supabase.auth.updateUser({
+              data: { verification_timeout_until: null }
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking verification status:', error);
+    }
+  };
 
   const fetchUserInfo = async () => {
     try {
@@ -33,7 +93,6 @@ const Home = () => {
         return;
       }
 
-      
       const { data: profile, error: profileError } = await supabase
         .from('patients')
         .select('first_name, last_name, email, birthdate')
@@ -57,11 +116,9 @@ const Home = () => {
 
   const fetchSymptomStats = async () => {
     try {
-    
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
         console.error('User fetch failed:', authError?.message);
-      
         setSymptomStats({
           totalLogs: 47,
           lastLogged: 'Today',
@@ -71,7 +128,6 @@ const Home = () => {
         return;
       }
 
-   
       const { data: symptomLogs, error: fetchError } = await supabase
         .from('symptomlog')
         .select('*')
@@ -80,7 +136,6 @@ const Home = () => {
 
       if (fetchError) {
         console.error('Error fetching symptom data:', fetchError.message);
-
         setSymptomStats({
           totalLogs: 47,
           lastLogged: 'Today',
@@ -90,7 +145,6 @@ const Home = () => {
         return;
       }
 
-     
       if (symptomLogs) {
         const normalizedLogs = symptomLogs.map(entry => ({
           ...entry,
@@ -99,15 +153,11 @@ const Home = () => {
         setLoggedDates(normalizedLogs);
       }
 
-     
       if (symptomLogs && symptomLogs.length > 0) {
         const totalLogs = symptomLogs.length;
-
-       
         const lastLoggedDate = new Date(symptomLogs[0].date_logged);
         const lastLogged = formatLastLogged(lastLoggedDate);
 
-        
         const symptomCounts = {};
         symptomLogs.forEach(log => {
           const symptom = log.symptoms;
@@ -128,7 +178,6 @@ const Home = () => {
           recentMood
         });
       } else {
-      
         setSymptomStats({
           totalLogs: 0,
           lastLogged: 'Never',
@@ -138,7 +187,6 @@ const Home = () => {
       }
     } catch (error) {
       console.error('Error in fetchSymptomStats:', error);
-    
       setSymptomStats({
         totalLogs: 47,
         lastLogged: 'Today',
@@ -157,6 +205,12 @@ const Home = () => {
     if (diffDays === 2) return 'Yesterday';
     if (diffDays <= 7) return `${diffDays - 1} days ago`;
     return date.toLocaleDateString();
+  };
+
+  const formatTimeRemaining = (milliseconds) => {
+    const minutes = Math.floor(milliseconds / (1000 * 60));
+    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const handleDownload = async () => {
@@ -207,16 +261,114 @@ const Home = () => {
     }
   };
 
+  // Verification handlers
+  const handleVerifyIdentity = () => {
+    if (isVerificationLocked) {
+      setModalContent({
+        title: 'Verification Temporarily Locked',
+        message: `For security reasons, identity verification is temporarily disabled. Please try again in ${formatTimeRemaining(timeoutRemaining)}.`,
+        isError: true
+      });
+      setShowModal(true);
+      return;
+    }
+    setShowVerificationModal(true);
+  };
+
+  const handleVerificationComplete = async () => {
+    try {
+      // Update user metadata to mark as verified and clear timeout
+      await supabase.auth.updateUser({
+        data: {
+          identity_verified: true,
+          verification_timeout_until: null
+        }
+      });
+
+      setIsVerified(true);
+      setIsVerificationLocked(false);
+      setTimeoutRemaining(0);
+      setShowVerificationModal(false);
+
+      // Show success message
+      setModalContent({
+        title: 'Identity Verified!',
+        message: 'Your identity has been successfully verified. You now have full access to all features.',
+        isError: false
+      });
+      setShowModal(true);
+    } catch (error) {
+      console.error('Error updating verification status:', error);
+    }
+  };
+
+  const handleVerificationFailed = (message) => {
+    setShowVerificationModal(false);
+    setIsVerificationLocked(true);
+    setTimeoutRemaining(30 * 60 * 1000); // 30 minutes in milliseconds
+
+    setModalContent({
+      title: 'Verification Failed',
+      message: message || 'Identity verification failed. Please try again or contact support.',
+      isError: true
+    });
+    setShowModal(true);
+  };
+
   return (
     <div className="min-h-screen from-pink-50 to-orange-50">
+      {/* Verification Modal */}
+      <PatientVerificationModal
+        isOpen={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onVerified={handleVerificationComplete}
+        onVerificationFailed={handleVerificationFailed}
+        patientData={userInfo}
+      />
+
       {/* Header Section */}
       <div className="px-6 py-4">
-        <h1 className="text-4xl font-bold" style={{ color: '#55A1A4' }}>
-          Welcome!
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Track your symptoms, mood, and wellness journey.
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold" style={{ color: '#55A1A4' }}>
+              Welcome!
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Track your symptoms, mood, and wellness journey.
+            </p>
+          </div>
+
+          {/* Verification Status */}
+          <div className="flex items-center space-x-3">
+            {!isVerified && !isVerificationLocked && (
+              <button
+                onClick={handleVerifyIdentity}
+                className="flex items-center space-x-2 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors border border-yellow-300"
+              >
+                <Shield className="w-4 h-4" />
+                <span className="text-sm font-medium">Verify Identity</span>
+              </button>
+            )}
+            {!isVerified && isVerificationLocked && (
+              <button
+                onClick={handleVerifyIdentity}
+                disabled={true}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-800 rounded-lg border border-red-300 cursor-not-allowed opacity-75"
+              >
+                <Clock className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  Locked ({formatTimeRemaining(timeoutRemaining)})
+                </span>
+              </button>
+            )}
+            {isVerified && (
+              <div className="flex items-center space-x-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg border border-green-300">
+                <Shield className="w-4 h-4" />
+                <span className="text-sm font-medium">Identity Verified ✓</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Quick Stats Cards */}
