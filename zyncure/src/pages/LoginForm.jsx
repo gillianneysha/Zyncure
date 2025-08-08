@@ -4,9 +4,7 @@ import { supabase } from "../client";
 import { Eye, EyeOff } from "lucide-react";
 import PasswordInput from "../components/PasswordInput";
 import GoogleIcon from "../components/GoogleIcon";
-
-
-
+import PatientVerificationModal from "../components/PatientVerificationModal";
 
 const FormField = React.memo(({
   label,
@@ -44,9 +42,6 @@ const FormField = React.memo(({
   </div>
 ));
 
-
-
-
 export default function LoginForm({ setToken }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -58,9 +53,11 @@ export default function LoginForm({ setToken }) {
   const [emailVerification, setEmailVerification] = useState(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationError, setVerificationError] = useState("");
-
-
-
+  
+  // New state for identity verification
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [pendingSession, setPendingSession] = useState(null);
+  const [verificationAlert, setVerificationAlert] = useState(null);
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -68,9 +65,6 @@ export default function LoginForm({ setToken }) {
       ...prev,
       [name]: value
     }));
-
-
-
 
     if (errors[name]) {
       setErrors(prev => ({
@@ -80,15 +74,8 @@ export default function LoginForm({ setToken }) {
     }
   }, [errors]);
 
-
-
-
   const validateForm = useCallback(() => {
     const newErrors = {};
-
-
-
-
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else {
@@ -98,23 +85,13 @@ export default function LoginForm({ setToken }) {
       }
     }
 
-
-
-
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
     }
 
-
-
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData]);
-
-
-
-
 
   const getRedirectPath = (user) => {
     const userRole = user.user_metadata?.user_type;
@@ -124,17 +101,13 @@ export default function LoginForm({ setToken }) {
     return "/home";
   };
 
-
-
-
-
   const check2FAEnabled = (user) => {
     return user.user_metadata?.two_factor_enabled || false;
   };
 
-
-
-
+  const checkPatientRole = (user) => {
+    return user.user_metadata?.user_type === "patient" || !user.user_metadata?.user_type;
+  };
 
   const sendVerificationCode = async (email) => {
     try {
@@ -145,10 +118,6 @@ export default function LoginForm({ setToken }) {
           emailRedirectTo: window.location.origin
         }
       });
-
-
-
-
       if (error) throw error;
       return true;
     } catch (error) {
@@ -157,9 +126,6 @@ export default function LoginForm({ setToken }) {
     }
   };
 
-
-
-
   const verifyEmailCode = async (email, code) => {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
@@ -167,10 +133,6 @@ export default function LoginForm({ setToken }) {
         token: code,
         type: 'email'
       });
-
-
-
-
       if (error) throw error;
       return data;
     } catch (error) {
@@ -179,60 +141,68 @@ export default function LoginForm({ setToken }) {
     }
   };
 
+  const fetchPatientData = async (userId) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('patients')
+        .select('first_name, last_name, email, birthdate, phone, address')
+        .eq('patient_id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching patient data:', error);
+        return null;
+      }
+      
+      return profile;
+    } catch (error) {
+      console.error('Error in fetchPatientData:', error);
+      return null;
+    }
+  };
 
-
-
+const handleSuccessfulLogin = async (sessionData, userData) => {
+  const isPatient = checkPatientRole(userData);
+  
+  if (isPatient) {
+    // For testing: Always require verification for patients
+    // You can later add conditions here based on your business logic
+    console.log("Patient detected, showing verification modal");
+    
+    const patientData = await fetchPatientData(userData.id);
+    setPendingSession({ session: sessionData, user: userData, patientData });
+    setShowVerificationModal(true);
+    return; // Don't redirect yet
+  }
+  
+  // For doctors, proceed normally
+  console.log("Non-patient user, proceeding to dashboard");
+  setToken(sessionData);
+  const redirectPath = getRedirectPath(userData);
+  navigate(redirectPath);
+};
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validateForm()) return;
-
-
-
-
     setIsLoading(true);
     setErrors({});
     setVerificationError("");
-
-
-
-
+    setVerificationAlert(null); // Clear any previous alerts
+    
     try {
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
-
-
-
-
       if (error) {
         throw error;
       }
 
-
-
-
-
       const has2FA = check2FAEnabled(data.user);
-
-
-
-
       if (has2FA) {
-
         await supabase.auth.signOut();
-
-
-
-
-
         const codeSent = await sendVerificationCode(formData.email);
-
-
-
-
         if (codeSent) {
           setEmailVerification({
             email: formData.email,
@@ -243,14 +213,9 @@ export default function LoginForm({ setToken }) {
           throw new Error("Failed to send verification code");
         }
       } else {
-
-        setToken(data.session);
-        const redirectPath = getRedirectPath(data.user);
-        navigate(redirectPath);
+        // Handle successful login (with potential identity verification)
+        await handleSuccessfulLogin(data.session, data.user);
       }
-
-
-
 
     } catch (error) {
       console.error("Login error:", error);
@@ -262,45 +227,24 @@ export default function LoginForm({ setToken }) {
     }
   };
 
-
-
-
-
   const handleEmailVerification = async (event) => {
     event.preventDefault();
     setVerificationError("");
     setIsLoading(true);
-
-
-
-
     if (!verificationCode.trim()) {
       setVerificationError("Please enter the verification code.");
       setIsLoading(false);
       return;
     }
-
-
-
-
     try {
-
       const verificationData = await verifyEmailCode(emailVerification.email, verificationCode);
 
-
-
-
       if (verificationData.session) {
-
-        setToken(verificationData.session);
-        const redirectPath = getRedirectPath(verificationData.user);
-        navigate(redirectPath);
+        // Handle successful login (with potential identity verification)
+        await handleSuccessfulLogin(verificationData.session, verificationData.user);
       } else {
         throw new Error("Email verification failed");
       }
-
-
-
 
     } catch (error) {
       console.error("Email verification error:", error);
@@ -318,27 +262,64 @@ export default function LoginForm({ setToken }) {
     }
   };
 
+  const handleIdentityVerified = async () => {
+    if (pendingSession) {
+      // Mark user as verified (you might want to update this in your database)
+      try {
+        // Optional: Update user metadata to mark as verified
+        await supabase.auth.updateUser({
+          data: { requires_verification: false }
+        });
+      } catch (error) {
+        console.error("Error updating verification status:", error);
+        // Continue anyway as verification was successful
+      }
+      
+      setToken(pendingSession.session);
+      const redirectPath = getRedirectPath(pendingSession.user);
+      navigate(redirectPath);
+      
+      // Clean up
+      setPendingSession(null);
+      setShowVerificationModal(false);
+    }
+  };
 
+  const handleVerificationFailed = (message) => {
+    setVerificationAlert({
+      type: 'error',
+      message: message
+    });
+    setShowVerificationModal(false);
+    setPendingSession(null);
+    
+    // Sign out the user since verification failed
+    supabase.auth.signOut();
+  };
 
+  const handleVerificationModalClose = () => {
+    setShowVerificationModal(false);
+    if (pendingSession) {
+      // If user closes modal without verification, sign them out
+      supabase.auth.signOut();
+      setPendingSession(null);
+      setVerificationAlert({
+        type: 'warning',
+        message: 'Identity verification is required to access your account. Please try again.'
+      });
+    }
+  };
 
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrors({});
-
-
-
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       });
-
-
-
-
       if (error) throw error;
     } catch (error) {
       console.error("Google sign in error:", error);
@@ -350,32 +331,17 @@ export default function LoginForm({ setToken }) {
     }
   }, []);
 
-
-
-
   const handleForgotPassword = async () => {
     if (!formData.email) {
       setErrors({ email: "Please enter your email address first" });
       return;
     }
-
-
-
-
     try {
       setIsLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
         redirectTo: `${window.location.origin}/reset-password`
       });
-
-
-
-
       if (error) throw error;
-
-
-
-
       alert("Password reset email sent! Please check your inbox.");
     } catch (error) {
       console.error("Password reset error:", error);
@@ -387,21 +353,41 @@ export default function LoginForm({ setToken }) {
     }
   };
 
-
-
-
   return (
     <>
+      {/* Identity Verification Modal */}
+      <PatientVerificationModal
+        isOpen={showVerificationModal}
+        onClose={handleVerificationModalClose}
+        onVerified={handleIdentityVerified}
+        onVerificationFailed={handleVerificationFailed}
+        patientData={pendingSession?.patientData}
+      />
+
       <form onSubmit={emailVerification ? handleEmailVerification : handleSubmit}>
+        {/* Verification Alert */}
+        {verificationAlert && (
+          <div className={`w-4/5 mx-auto mb-4 p-3 border rounded-lg text-sm ${
+            verificationAlert.type === 'error' 
+              ? 'bg-red-200 border-red-400 text-red-800'
+              : 'bg-yellow-200 border-yellow-400 text-yellow-800'
+          }`}>
+            {verificationAlert.message}
+            <button
+              onClick={() => setVerificationAlert(null)}
+              className="ml-2 text-xs underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Error Message */}
         {errors.submit && (
           <div className="w-4/5 mx-auto mb-4 p-3 bg-red-200 border border-red-400 text-red-800 rounded-lg text-sm">
             {errors.submit}
           </div>
         )}
-
-
-
 
         {/* Email Verification Form */}
         {emailVerification && (
@@ -436,9 +422,6 @@ export default function LoginForm({ setToken }) {
           </div>
         )}
 
-
-
-
         {/* Regular Login Form */}
         {!emailVerification && (
           <>
@@ -454,10 +437,6 @@ export default function LoginForm({ setToken }) {
               labelClassName="text-[#F5E0D9]"
               inputClassName="bg-[#FFEDE7]"
             />
-
-
-
-
             <div className="w-4/5 mx-auto">
               <PasswordInput
                 label="Password:"
@@ -471,10 +450,6 @@ export default function LoginForm({ setToken }) {
                 inputClassName="bg-[#FFEDE7]"
               />
             </div>
-
-
-
-
             <div className="w-4/5 mx-auto flex items-center justify-between mb-4">
               <div />
               <button
@@ -488,10 +463,7 @@ export default function LoginForm({ setToken }) {
             </div>
           </>
         )}
-
-
-
-
+        
         <button
           type="submit"
           disabled={isLoading}
@@ -502,9 +474,6 @@ export default function LoginForm({ setToken }) {
         >
           {isLoading ? "Processing..." : (emailVerification ? "Verify Code" : "Log In")}
         </button>
-
-
-
 
         {!emailVerification && (
           <>
@@ -519,20 +488,12 @@ export default function LoginForm({ setToken }) {
                 </a>
               </span>
             </div>
-
-
-
-
             <div className="w-4/5 mx-auto text-[#F5E0D9] text-xs text-center mt-6">
               <div className="flex items-center justify-center my-4">
                 <div className="flex-grow h-px bg-[#FEDED2]"></div>
                 <span className="px-2">OR</span>
                 <div className="flex-grow h-px bg-[#FEDED2]"></div>
               </div>
-
-
-
-
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
