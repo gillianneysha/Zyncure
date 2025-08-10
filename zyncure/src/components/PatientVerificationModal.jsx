@@ -21,6 +21,7 @@ const PatientVerificationModal = ({
     const [isLoading, setIsLoading] = useState(false);
     const [attempts, setAttempts] = useState(0);
     const [actualPatientData, setActualPatientData] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
     const maxAttempts = 3;
 
     // Reset modal state when opened
@@ -36,29 +37,78 @@ const PatientVerificationModal = ({
             });
             setErrors({});
             setAttempts(0);
-            fetchFullPatientData();
+            fetchCurrentUserAndPatientData();
         }
     }, [isOpen]);
 
-    const fetchFullPatientData = async () => {
+    // Check if user has verification timeout
+    const checkVerificationTimeout = (userData) => {
+        if (userData?.user_metadata?.verification_timeout_until) {
+            const timeoutExpiry = new Date(userData.user_metadata.verification_timeout_until);
+            const now = new Date();
+            
+            if (now < timeoutExpiry) {
+                const remainingMinutes = Math.ceil((timeoutExpiry - now) / (1000 * 60));
+                return remainingMinutes;
+            }
+        }
+        return null;
+    };
+
+    const fetchCurrentUserAndPatientData = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data: profile, error } = await supabase
-                .from('patients')
-                .select('first_name, last_name, email, birthdate, contact_no, user_type, status')
-                .eq('patient_id', user.id)
-                .single();
-
-            if (error) {
-                console.error('Error fetching patient data:', error);
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+                console.error('Error fetching current user:', userError);
+                onVerificationFailed('Unable to verify user session. Please try logging in again.');
                 return;
             }
 
-            setActualPatientData(profile);
+            setCurrentUser(user);
+
+            // Check for verification timeout
+            const timeoutMinutes = checkVerificationTimeout(user);
+            if (timeoutMinutes) {
+                onVerificationFailed(`For security reasons, verification is temporarily disabled. Please try again in ${timeoutMinutes} minute${timeoutMinutes !== 1 ? 's' : ''}.`);
+                return;
+            }
+
+            // Fetch patient data from the patients table
+            const { data: patientProfile, error: patientError } = await supabase
+                .from('patients')
+                .select('patient_id, first_name, last_name, email, birthdate, contact_no, user_type, status')
+                .eq('patient_id', user.id)
+                .single();
+
+            if (patientError) {
+                console.error('Error fetching patient data:', patientError);
+                
+                // If no patient record found, check if user is a medical professional
+                const { data: medicalProfile, error: medError } = await supabase
+                    .from('medicalprofessionals')
+                    .select('med_id, first_name, last_name, email, birthdate, contact_no, user_type, status')
+                    .eq('med_id', user.id)
+                    .single();
+
+                if (medError) {
+                    console.error('Error fetching medical professional data:', medError);
+                    onVerificationFailed('Unable to retrieve your profile information. Please contact support.');
+                    return;
+                }
+
+                // Use medical professional data
+                setActualPatientData({
+                    ...medicalProfile,
+                    patient_id: medicalProfile.med_id, // Normalize the ID field
+                    user_type: 'medical_professional'
+                });
+            } else {
+                setActualPatientData(patientProfile);
+            }
+
         } catch (error) {
-            console.error('Error in fetchFullPatientData:', error);
+            console.error('Error in fetchCurrentUserAndPatientData:', error);
+            onVerificationFailed('An unexpected error occurred. Please try again.');
         }
     };
 
@@ -86,7 +136,8 @@ const PatientVerificationModal = ({
             // Basic date validation
             const inputDate = new Date(verificationData.dateOfBirth);
             const today = new Date();
-            if (inputDate >= today || inputDate < new Date('1900-01-01')) {
+            const minDate = new Date('1900-01-01');
+            if (inputDate >= today || inputDate < minDate) {
                 newErrors.dateOfBirth = 'Please enter a valid date of birth';
             }
         }
@@ -154,16 +205,17 @@ const PatientVerificationModal = ({
         if (!actualPatientData) {
             return {
                 isValid: false,
-                errors: ['Unable to retrieve patient data for verification.']
+                errors: ['Unable to retrieve your profile data for verification.'],
+                matchedFields: 0,
+                totalFields: 5
             };
         }
 
         const validationErrors = [];
         let validFields = 0;
-        let totalRequiredFields = 0;
+        const totalRequiredFields = 5;
 
         // Validate date of birth (required)
-        totalRequiredFields++;
         if (!compareDates(verificationData.dateOfBirth, actualPatientData.birthdate)) {
             validationErrors.push('Date of birth does not match our records.');
         } else {
@@ -171,18 +223,26 @@ const PatientVerificationModal = ({
         }
 
         // Validate phone number (required)
-        totalRequiredFields++;
         const inputPhone = normalizePhoneNumber(verificationData.phoneNumber);
         const storedPhone = normalizePhoneNumber(actualPatientData.contact_no);
 
-        if (!inputPhone || !storedPhone || !inputPhone.includes(storedPhone.slice(-10)) && !storedPhone.includes(inputPhone.slice(-10))) {
+        // More flexible phone number matching
+        if (!inputPhone || !storedPhone) {
             validationErrors.push('Phone number does not match our records.');
         } else {
-            validFields++;
+            // Check if either number contains the other (for international vs local formats)
+            const phoneMatch = inputPhone.includes(storedPhone.slice(-10)) || 
+                             storedPhone.includes(inputPhone.slice(-10)) ||
+                             inputPhone.slice(-10) === storedPhone.slice(-10);
+            
+            if (!phoneMatch) {
+                validationErrors.push('Phone number does not match our records.');
+            } else {
+                validFields++;
+            }
         }
 
         // Validate email (required)
-        totalRequiredFields++;
         const inputEmail = normalizeString(verificationData.email);
         const storedEmail = normalizeString(actualPatientData.email);
 
@@ -193,7 +253,6 @@ const PatientVerificationModal = ({
         }
 
         // Validate first name (required)
-        totalRequiredFields++;
         const inputFirstName = normalizeString(verificationData.firstName);
         const storedFirstName = normalizeString(actualPatientData.first_name);
 
@@ -204,7 +263,6 @@ const PatientVerificationModal = ({
         }
 
         // Validate last name (required)
-        totalRequiredFields++;
         const inputLastName = normalizeString(verificationData.lastName);
         const storedLastName = normalizeString(actualPatientData.last_name);
 
@@ -214,9 +272,8 @@ const PatientVerificationModal = ({
             validFields++;
         }
 
-        // Consider verification successful if at least 80% of required fields match
-        const successThreshold = Math.ceil(totalRequiredFields * 0.8);
-        const isValid = validFields >= successThreshold;
+        // For identity verification, require 100% accuracy - all fields must match
+        const isValid = validFields === totalRequiredFields;
 
         return {
             isValid,
@@ -231,11 +288,15 @@ const PatientVerificationModal = ({
         try {
             const timeoutExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
 
-            await supabase.auth.updateUser({
+            const { error } = await supabase.auth.updateUser({
                 data: {
                     verification_timeout_until: timeoutExpiry.toISOString()
                 }
             });
+
+            if (error) {
+                console.error('Error setting verification timeout:', error);
+            }
         } catch (error) {
             console.error('Error setting verification timeout:', error);
         }
@@ -252,21 +313,30 @@ const PatientVerificationModal = ({
             const validationResult = validatePatientData();
 
             if (validationResult.isValid) {
-                // Verification successful
+                // Verification successful - clear any existing timeout
+                if (currentUser?.user_metadata?.verification_timeout_until) {
+                    await supabase.auth.updateUser({
+                        data: {
+                            verification_timeout_until: null
+                        }
+                    });
+                }
+
                 setStep(3); // Success step
                 setTimeout(() => {
-                    onVerified();
+                    onVerified(actualPatientData);
                     onClose();
                 }, 2000);
             } else {
                 // Verification failed
-                setAttempts(prev => prev + 1);
-                const remainingAttempts = maxAttempts - attempts - 1;
+                const newAttemptCount = attempts + 1;
+                setAttempts(newAttemptCount);
+                const remainingAttempts = maxAttempts - newAttemptCount;
 
                 if (remainingAttempts <= 0) {
                     // Set timeout when max attempts exceeded
                     await setVerificationTimeout();
-                    onVerificationFailed('Maximum verification attempts exceeded. For security reasons, please contact our support team to verify your identity.');
+                    onVerificationFailed('Maximum verification attempts exceeded. For security reasons, please wait 30 minutes before trying again or contact our support team.');
                 } else {
                     const errorMessage = validationResult.errors.length > 0
                         ? `Verification failed: ${validationResult.errors.join(' ')} Please check your information and try again. ${remainingAttempts} attempt${remainingAttempts !== 1 ? 's' : ''} remaining.`
@@ -317,15 +387,17 @@ const PatientVerificationModal = ({
                     <div className="flex items-center space-x-2">
                         {[1, 2, 3].map((stepNum) => (
                             <div key={stepNum} className="flex items-center">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step > stepNum ? 'bg-green-500 text-white' :
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                                    step > stepNum ? 'bg-green-500 text-white' :
                                     step === stepNum ? 'bg-[#55A1A4] text-white' :
-                                        'bg-gray-200 text-gray-600'
-                                    }`}>
+                                    'bg-gray-200 text-gray-600'
+                                }`}>
                                     {step > stepNum ? <Check className="w-4 h-4" /> : stepNum}
                                 </div>
                                 {stepNum < 3 && (
-                                    <div className={`h-1 w-12 mx-2 ${step > stepNum ? 'bg-green-500' : 'bg-gray-200'
-                                        }`} />
+                                    <div className={`h-1 w-12 mx-2 ${
+                                        step > stepNum ? 'bg-green-500' : 'bg-gray-200'
+                                    }`} />
                                 )}
                             </div>
                         ))}
@@ -350,8 +422,9 @@ const PatientVerificationModal = ({
                                     type="date"
                                     value={verificationData.dateOfBirth}
                                     onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${
+                                        errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                     disabled={isLoading}
                                 />
                                 {errors.dateOfBirth && (
@@ -369,8 +442,9 @@ const PatientVerificationModal = ({
                                     value={verificationData.phoneNumber}
                                     onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
                                     placeholder="Enter your phone number exactly as registered"
-                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${errors.phoneNumber ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${
+                                        errors.phoneNumber ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                     disabled={isLoading}
                                 />
                                 {errors.phoneNumber && (
@@ -388,8 +462,9 @@ const PatientVerificationModal = ({
                                     value={verificationData.email}
                                     onChange={(e) => handleInputChange('email', e.target.value)}
                                     placeholder="Enter your email address exactly as registered"
-                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${errors.email ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${
+                                        errors.email ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                     disabled={isLoading}
                                 />
                                 {errors.email && (
@@ -429,8 +504,9 @@ const PatientVerificationModal = ({
                                     value={verificationData.firstName}
                                     onChange={(e) => handleInputChange('firstName', e.target.value)}
                                     placeholder="Enter your first name exactly as registered"
-                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${errors.firstName ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${
+                                        errors.firstName ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                     disabled={isLoading}
                                 />
                                 {errors.firstName && (
@@ -448,8 +524,9 @@ const PatientVerificationModal = ({
                                     value={verificationData.lastName}
                                     onChange={(e) => handleInputChange('lastName', e.target.value)}
                                     placeholder="Enter your last name exactly as registered"
-                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${errors.lastName ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#55A1A4] focus:border-[#55A1A4] ${
+                                        errors.lastName ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                     disabled={isLoading}
                                 />
                                 {errors.lastName && (

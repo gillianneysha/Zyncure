@@ -620,7 +620,7 @@ const DoctorAppointments = () => {
 
                     <div className="mb-3 text-sm">
                       <p className="text-gray-700">
-                        <strong>Reason:</strong> {appointment.reason}
+                        <strong>Reason:</strong> {appointment.patient_notes}
                       </p>
                       <p className="text-gray-700 mt-1">
                         <strong>Patient ID:</strong> {appointment.patient_id}
@@ -746,15 +746,7 @@ const DoctorAppointments = () => {
                   </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Appointment Time
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-gray-400" />
-                    <span className="text-lg font-semibold">{selectedAppointment.time}</span>
-                  </div>
-                </div>
+               
               </div>
 
               <div>
@@ -779,7 +771,7 @@ const DoctorAppointments = () => {
                   Reason for Visit
                 </label>
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-800">{selectedAppointment.reason || 'No reason provided'}</p>
+                  <p className="text-gray-800">{selectedAppointment.patient_notes || 'No reason provided'}</p>
                 </div>
               </div>
 
@@ -917,13 +909,6 @@ const DoctorAppointments = () => {
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
                 <div className="grid grid-cols-1 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">Patient ID</span>
-                    </div>
-                    <p className="text-gray-800 font-mono text-sm">{selectedAppointment.patient_id}</p>
-                  </div>
                   
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
