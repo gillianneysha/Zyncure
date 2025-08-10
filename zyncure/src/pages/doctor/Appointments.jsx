@@ -398,7 +398,13 @@ const DoctorAppointments = () => {
     );
   };
 
-  const selectedDateAppointments = getAppointmentsForDate();
+  const selectedDateAppointments = appointments.filter((apt) => {
+    const selectedDateString = formatDateForStorage(selectedDate);
+    // Check both appointment_date (for confirmed) and requested_date (for requested)
+    const appointmentDate = apt.appointment_date || apt.requested_date || apt.date;
+    return appointmentDate === selectedDateString;
+  });
+
   const filteredAppointments = getFilteredAppointments();
   const paginatedAppointments = getPaginatedAppointments();
   const confirmedCount = selectedDateAppointments.filter(apt => apt.status === 'confirmed').length;
