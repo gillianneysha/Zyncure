@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../client';
 import {
   X, Folder, FileText, Download, ArrowLeft, User, Clock,
-  SquarePlus, ChevronDown, MoreVertical, Trash2
+  SquarePlus, ChevronDown, MoreVertical, Trash2, Upload
 } from 'lucide-react';
 import ActionModal from "../../components/ActionModal";
 import SuccessModal from "../../components/SuccessModal";
@@ -48,7 +48,7 @@ function FolderCard({ folder, onClick }) {
   );
 }
 
-function FileCard({ file, onPreview, onAddNote, onDelete, currentUser }) {
+function FileCard({ file, onPreview, onAddNote, onDelete, onRename, currentUser }) {
   const ext = file.name?.split(".").pop().toLowerCase() || 'file';
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -69,6 +69,9 @@ function FileCard({ file, onPreview, onAddNote, onDelete, currentUser }) {
   const isLoneDoctorNote = file.owner_id === currentUser?.id
     && file.mime_type === "application/pdf"
     && file.name && file.name.startsWith('Consultation Notes - DR.');
+
+  // Doctor-uploaded file: owned by doctor but NOT a consultation note PDF
+  const isDoctorUploadedFile = file.owner_id === currentUser?.id && !isLoneDoctorNote;
 
   const showAddNoteOption = !isLoneDoctorNote && file.owner_id !== currentUser?.id;
 
@@ -96,7 +99,34 @@ function FileCard({ file, onPreview, onAddNote, onDelete, currentUser }) {
           </button>
           {dropdownOpen && (
             <div className="absolute right-0 top-full w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-              {showAddNoteOption && (
+              {/* For doctor-uploaded files: show Rename and Add Notes */}
+              {isDoctorUploadedFile && (
+                <>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onRename(file);
+                    }}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-blue-50 transition-colors"
+                  >
+                    <FileText size={18} className="text-blue-500" />
+                    Rename File
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onAddNote(file);
+                    }}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-emerald-50 transition-colors"
+                  >
+                    <FileText size={18} className="text-emerald-500" />
+                    Add Consultation Notes
+                  </button>
+                </>
+              )}
+
+              {/* For patient files: show Add Notes option */}
+              {showAddNoteOption && !isDoctorUploadedFile && (
                 <button
                   onClick={() => {
                     setDropdownOpen(false);
@@ -108,17 +138,23 @@ function FileCard({ file, onPreview, onAddNote, onDelete, currentUser }) {
                   Add Consultation Notes
                 </button>
               )}
-              <a
-                href={file.file_url}
-                download={file.name}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
-              >
-                <Download size={18} className="text-indigo-500" />
-                Download
-              </a>
-              {currentUser?.id === file.owner_id && (
+
+              {/* Download option for all files except doctor-uploaded ones */}
+              {!isDoctorUploadedFile && (
+                <a
+                  href={file.file_url}
+                  download={file.name}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-indigo-50 transition-colors"
+                >
+                  <Download size={18} className="text-indigo-500" />
+                  Download
+                </a>
+              )}
+
+              {/* Delete option only for consultation note PDFs */}
+              {isLoneDoctorNote && currentUser?.id === file.owner_id && (
                 <button
                   onClick={() => {
                     setDropdownOpen(false);
@@ -246,6 +282,181 @@ function NotesModal({ open, onClose, onSave, file, folder }) {
   );
 }
 
+function RenameFileModal({ open, onClose, onRename, file }) {
+  const [newFileName, setNewFileName] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  useEffect(() => {
+    if (open && file) {
+      setNewFileName(file.name || "");
+    }
+  }, [open, file]);
+
+  if (!open || !file) return null;
+
+  const handleRename = async () => {
+    if (!newFileName.trim() || newFileName.trim() === file.name) {
+      onClose();
+      return;
+    }
+
+    setRenaming(true);
+    await onRename(file, newFileName.trim());
+    setRenaming(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full relative shadow-lg">
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+          title="Close"
+        >
+          <X size={22} />
+        </button>
+        <h3 className="font-bold text-lg mb-3">Rename File</h3>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            File Name
+          </label>
+          <input
+            type="text"
+            value={newFileName}
+            onChange={e => setNewFileName(e.target.value)}
+            className="w-full border border-gray-300 rounded p-2"
+            placeholder="Enter new file name..."
+            disabled={renaming}
+            autoFocus
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+            disabled={renaming}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleRename}
+            className="px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+            disabled={renaming || !newFileName.trim() || newFileName.trim() === file.name}
+          >
+            {renaming ? "Renaming..." : "Rename"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FileUploadModal({ open, onClose, onUpload, selectedPatient, openedFolder }) {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedFile(null);
+      setFileName("");
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (selectedFile) {
+      setFileName(selectedFile.name);
+    }
+  }, [selectedFile]);
+
+  if (!open) return null;
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setFileName(file.name);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !fileName.trim()) return;
+
+    setUploading(true);
+    await onUpload(selectedFile, fileName.trim());
+    setUploading(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full relative shadow-lg">
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+          title="Close"
+        >
+          <X size={22} />
+        </button>
+        <h3 className="font-bold text-lg mb-3">
+          Upload File {openedFolder ? `to "${openedFolder.name}"` : `for ${selectedPatient?.name}`}
+        </h3>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select File
+          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            className="w-full border border-gray-300 rounded p-2"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            disabled={uploading}
+          />
+        </div>
+
+        {selectedFile && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              File Name
+            </label>
+            <input
+              type="text"
+              value={fileName}
+              onChange={e => setFileName(e.target.value)}
+              className="w-full border border-gray-300 rounded p-2"
+              placeholder="Enter file name..."
+              disabled={uploading}
+            />
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+            disabled={uploading}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpload}
+            className="px-4 py-2 bg-[#55A1A4] text-white rounded hover:bg-[#478384]"
+            disabled={uploading || !selectedFile || !fileName.trim()}
+          >
+            {uploading ? "Uploading..." : "Upload"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function fetchConsultationNotes(fileIds) {
   if (!fileIds.length) return {};
   const { data, error } = await supabase
@@ -276,6 +487,10 @@ export default function DoctorsPatientsFolders() {
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notesFileTarget, setNotesFileTarget] = useState(null);
   const [notesFolderTarget, setNotesFolderTarget] = useState(null);
+
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameFileTarget, setRenameFileTarget] = useState(null);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -485,26 +700,26 @@ export default function DoctorsPatientsFolders() {
     }));
   }
 
- async function handleOpenSharedFolder(folder) {
-  setOpenedFolder(folder);
-  setPreviewFile(null);
-  let folderFiles = [];
+  async function handleOpenSharedFolder(folder) {
+    setOpenedFolder(folder);
+    setPreviewFile(null);
+    let folderFiles = [];
 
-  if (sharedFiles && folder) {
-    folderFiles = sharedFiles.filter(f => f.folder_id === folder.id);
+    if (sharedFiles && folder) {
+      folderFiles = sharedFiles.filter(f => f.folder_id === folder.id);
+    }
+
+    if (folder && selectedPatient?.id) {
+      const filesFromPatientWithNotes = await fetchFolderFilesWithNotes(folder.id, selectedPatient.id);
+      const existingFileIds = new Set(folderFiles.map(f => f.id));
+      filesFromPatientWithNotes.forEach(f => {
+        if (!existingFileIds.has(f.id)) {
+          folderFiles.push(f);
+        }
+      });
+    }
+    setFolderFiles(folderFiles);
   }
-  
-  if (folder && selectedPatient?.id) {
-    const filesFromPatientWithNotes = await fetchFolderFilesWithNotes(folder.id, selectedPatient.id);
-    const existingFileIds = new Set(folderFiles.map(f => f.id));
-    filesFromPatientWithNotes.forEach(f => {
-      if (!existingFileIds.has(f.id)) {
-        folderFiles.push(f);
-      }
-    });
-  }
-  setFolderFiles(folderFiles);
-}
 
   function handlePreviewFile(file) {
     setPreviewFile({
@@ -559,10 +774,175 @@ export default function DoctorsPatientsFolders() {
     setDropdownOpen(v => !v);
   }
 
+  async function handleRenameFile(file, newFileName) {
+    if (!currentUser || currentUser.id !== file.owner_id) return;
+
+    try {
+      const { error } = await supabase
+        .from('medical_files')
+        .update({ name: newFileName })
+        .eq('id', file.id);
+
+      if (error) {
+        setSuccessModal({
+          open: true,
+          title: "Rename Failed",
+          message: "Failed to rename file: " + error.message,
+        });
+      } else {
+        setSuccessModal({
+          open: true,
+          title: "File Renamed",
+          message: `File has been renamed to "${newFileName}".`,
+        });
+
+        // Refresh data
+        await loadPatientsWithInfo();
+        if (openedFolder) {
+          await handleOpenSharedFolder(openedFolder);
+        }
+
+        // Update preview if this file is being previewed
+        if (previewFile && previewFile.id === file.id) {
+          setPreviewFile(prev => ({
+            ...prev,
+            name: newFileName
+          }));
+        }
+      }
+    } catch (error) {
+      setSuccessModal({
+        open: true,
+        title: "Rename Failed",
+        message: "An unexpected error occurred: " + error.message,
+      });
+    }
+  }
+
+  async function handleUploadFile(file, fileName) {
+    if (!currentUser || !selectedPatient) return;
+
+    try {
+      // Get file extension and determine MIME type
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      let mimeType = file.type;
+
+      // Fallback MIME type detection
+      if (!mimeType) {
+        const mimeTypes = {
+          'pdf': 'application/pdf',
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'doc': 'application/msword',
+          'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        };
+        mimeType = mimeTypes[fileExtension] || 'application/octet-stream';
+      }
+
+      // Create storage path
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const storagePath = `doctor-uploads/${selectedPatient.id}/${timestamp}-${fileName}`;
+
+      // Upload file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('medical-files')
+        .upload(storagePath, file, {
+          contentType: mimeType,
+          upsert: false
+        });
+
+      if (uploadError) {
+        setSuccessModal({
+          open: true,
+          title: "Upload Failed",
+          message: "Failed to upload file: " + uploadError.message,
+        });
+        return;
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('medical-files')
+        .getPublicUrl(storagePath);
+
+      if (!publicUrlData?.publicUrl) {
+        setSuccessModal({
+          open: true,
+          title: "Upload Failed",
+          message: "Failed to get public URL for uploaded file.",
+        });
+        return;
+      }
+
+      // Insert file record
+      const { data: insertedFiles, error: fileInsertError } = await supabase
+        .from('medical_files')
+        .insert([{
+          name: fileName,
+          file_path: storagePath,
+          file_url: publicUrlData.publicUrl,
+          preview_url: publicUrlData.publicUrl,
+          owner_id: currentUser.id,
+          folder_id: openedFolder?.id || null,
+          mime_type: mimeType
+        }])
+        .select();
+
+      if (fileInsertError || !insertedFiles || !insertedFiles[0]) {
+        setSuccessModal({
+          open: true,
+          title: "Upload Failed",
+          message: "Failed to create file record: " + (fileInsertError?.message || "Unknown error"),
+        });
+        return;
+      }
+
+      // Share file with patient
+      const { error: shareError } = await supabase
+        .from('file_shares')
+        .insert([{
+          file_id: insertedFiles[0].id,
+          owner_id: currentUser.id,
+          shared_with_id: selectedPatient.id,
+          share_type: 'file',
+          is_active: true,
+          folder_id: openedFolder?.id || null
+        }]);
+
+      if (shareError) {
+        setSuccessModal({
+          open: true,
+          title: "Upload Failed",
+          message: "Failed to share file with patient: " + shareError.message,
+        });
+        return;
+      }
+
+      setSuccessModal({
+        open: true,
+        title: "File Uploaded",
+        message: `"${fileName}" has been uploaded and shared with ${selectedPatient.name}.`,
+      });
+
+      // Refresh data
+      await loadPatientsWithInfo();
+      if (openedFolder) {
+        await handleOpenSharedFolder(openedFolder);
+      }
+
+    } catch (error) {
+      setSuccessModal({
+        open: true,
+        title: "Upload Failed",
+        message: "An unexpected error occurred: " + error.message,
+      });
+    }
+  }
+
   async function handleSaveNote(noteText) {
     if (!currentUser || !selectedPatient) return;
     let now = new Date();
-
 
     const doctorInfo = {
       first_name: currentUser.user_metadata?.first_name,
@@ -571,7 +951,6 @@ export default function DoctorsPatientsFolders() {
       email: currentUser.email
     };
 
-    
     const patientInfo = {
       name: selectedPatient.name,
       email: selectedPatient.email
@@ -768,9 +1147,8 @@ export default function DoctorsPatientsFolders() {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
         <div
-          className={`bg-white rounded-lg p-4 w-full relative shadow-2xl border flex flex-col ${
-            showNotesSidebar ? "max-w-4xl md:flex-row" : "max-w-md"
-          }`}
+          className={`bg-white rounded-lg p-4 w-full relative shadow-2xl border flex flex-col ${showNotesSidebar ? "max-w-4xl md:flex-row" : "max-w-md"
+            }`}
         >
           <button
             onClick={() => setPreviewFile(null)}
@@ -836,8 +1214,8 @@ export default function DoctorsPatientsFolders() {
                       {note.doctor_id && doctorMap[note.doctor_id]
                         ? <>Doctor {doctorMap[note.doctor_id]}</>
                         : note.doctor_id
-                        ? `Doctor ${note.doctor_id}`
-                        : ""}
+                          ? `Doctor ${note.doctor_id}`
+                          : ""}
                       {note.created_at ? ` on ${new Date(note.created_at).toLocaleString()}` : ""}
                     </span>
                     <div className="relative flex items-center">
@@ -905,27 +1283,27 @@ export default function DoctorsPatientsFolders() {
           <h1 className="text-3xl font-bold text-[#55A1A4] text-left flex items-center">
             {selectedPatient
               ? <>
-                  <button
-                    title="Back"
-                    className="mr-1 text-[#55A1A4] hover:text-[#478384]"
-                    onClick={() => {
-                      if (openedFolder) {
-                        setOpenedFolder(null);
-                        setPreviewFile(null);
-                      } else {
-                        setSelectedPatient(null);
-                        setOpenedFolder(null);
-                        setPreviewFile(null);
-                      }
-                    }}
-                  >
-                    <ArrowLeft size={22} />
-                  </button>
-                  {openedFolder
-                    ? `${openedFolder.name} (from ${selectedPatient.name})`
-                    : `${selectedPatient.name}'s Shared Records`
-                  }
-                </>
+                <button
+                  title="Back"
+                  className="mr-1 text-[#55A1A4] hover:text-[#478384]"
+                  onClick={() => {
+                    if (openedFolder) {
+                      setOpenedFolder(null);
+                      setPreviewFile(null);
+                    } else {
+                      setSelectedPatient(null);
+                      setOpenedFolder(null);
+                      setPreviewFile(null);
+                    }
+                  }}
+                >
+                  <ArrowLeft size={22} />
+                </button>
+                {openedFolder
+                  ? `${openedFolder.name} (from ${selectedPatient.name})`
+                  : `${selectedPatient.name}'s Shared Records`
+                }
+              </>
               : "Patients who shared with you"
             }
           </h1>
@@ -939,7 +1317,7 @@ export default function DoctorsPatientsFolders() {
                 <ChevronDown size={16} />
               </button>
               {dropdownOpen && (
-                <div className="absolute right-0 top-full w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <div className="absolute right-0 top-full w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
@@ -951,6 +1329,16 @@ export default function DoctorsPatientsFolders() {
                   >
                     <FileText size={18} className="text-emerald-500" />
                     Add Consultation Notes
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setShowUploadModal(true);
+                    }}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-gray-700 hover:bg-blue-50 transition-colors"
+                  >
+                    <Upload size={18} className="text-blue-500" />
+                    Upload File
                   </button>
                 </div>
               )}
@@ -1008,23 +1396,27 @@ export default function DoctorsPatientsFolders() {
               {sharedFiles.length === 0 && (
                 <div className="col-span-4 text-gray-400">No files shared.</div>
               )}
-             
-{sharedFiles
-  .filter(() => !openedFolder) 
-  .map(file => (
-    <FileCard
-      key={file.id}
-      file={file}
-      onPreview={handlePreviewFile}
-      onAddNote={fileObj => {
-        setNotesFileTarget(fileObj);
-        setNotesFolderTarget(null);
-        setShowNotesModal(true);
-      }}
-      onDelete={handleDelete}
-      currentUser={currentUser}
-    />
-  ))}
+
+              {sharedFiles
+                .filter(() => !openedFolder)
+                .map(file => (
+                  <FileCard
+                    key={file.id}
+                    file={file}
+                    onPreview={handlePreviewFile}
+                    onAddNote={fileObj => {
+                      setNotesFileTarget(fileObj);
+                      setNotesFolderTarget(null);
+                      setShowNotesModal(true);
+                    }}
+                    onDelete={handleDelete}
+                    onRename={(fileObj) => {
+                      setRenameFileTarget(fileObj);
+                      setShowRenameModal(true);
+                    }}
+                    currentUser={currentUser}
+                  />
+                ))}
             </div>
             {previewFile && renderPreviewModal(previewFile)}
             <ActionModal
@@ -1061,6 +1453,10 @@ export default function DoctorsPatientsFolders() {
                       setShowNotesModal(true);
                     }}
                     onDelete={handleDelete}
+                    onRename={(fileObj) => {
+                      setRenameFileTarget(fileObj);
+                      setShowRenameModal(true);
+                    }}
                     currentUser={currentUser}
                   />
                 ))
@@ -1094,6 +1490,24 @@ export default function DoctorsPatientsFolders() {
           onSave={handleSaveNote}
           file={notesFileTarget}
           folder={notesFolderTarget}
+        />
+
+        <RenameFileModal
+          open={showRenameModal}
+          onClose={() => {
+            setShowRenameModal(false);
+            setRenameFileTarget(null);
+          }}
+          onRename={handleRenameFile}
+          file={renameFileTarget}
+        />
+
+        <FileUploadModal
+          open={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          onUpload={handleUploadFile}
+          selectedPatient={selectedPatient}
+          openedFolder={openedFolder}
         />
       </div>
       <SuccessModal
