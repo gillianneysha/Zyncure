@@ -3,7 +3,7 @@ import Calendar from '../../components/Calendar';
 import AppointmentModal from '../../components/AppointmentModal';
 import AppointmentList from '../../components/AppointmentList';
 import { appointmentService, userService } from '../../services/AppointmentService';
-import RescheduleModal from '../../components/RescheduleModal'; 
+import RescheduleModal from '../../components/RescheduleModal';
 import { supabase } from "../../client";
 
 const PersonalAppointmentTracker = () => {
@@ -13,7 +13,7 @@ const PersonalAppointmentTracker = () => {
   });
 
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
-  const [appointmentToReschedule, setAppointmentToReschedule] = useState(null); 
+  const [appointmentToReschedule, setAppointmentToReschedule] = useState(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [appointments, setAppointments] = useState([]);
@@ -21,58 +21,61 @@ const PersonalAppointmentTracker = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('calendar'); 
+  const [activeTab, setActiveTab] = useState('calendar');
   const [newAppointment, setNewAppointment] = useState({
     doctor_id: '',
     time: '',
     reason: ''
   });
 
-const fetchAppointments = async () => {
-  try {
-    const { data, error } = await appointmentService.getUserAppointments();
-    
-    if (error) {
-      console.error('Error fetching appointments:', error);
-      // Don't return here - set empty array instead
-      setAppointments([]);
-      return;
-    }
-    
-    // Make sure data exists and is an array
-    if (data && Array.isArray(data)) {
-      setAppointments(data);
-    } else {
-      console.warn('Invalid appointment data received:', data);
-      setAppointments([]);
-    }
-  } catch (error) {
-    console.error('Error fetching appointments:', error);
-    setAppointments([]);
-  }
-};
+  const fetchAppointments = async () => {
+    try {
+      const { data, error } = await appointmentService.getUserAppointments();
 
-// Call this on component mount
-useEffect(() => {
-  fetchAppointments();
-}, []);
+      if (error) {
+        console.error('Error fetching appointments:', error);
+        setAppointments([]);
+        return;
+      }
+
+      if (data && Array.isArray(data)) {
+        console.log('Fetched appointments:', data);
+        setAppointments(data);
+      } else {
+        console.warn('Invalid appointment data received:', data);
+        setAppointments([]);
+      }
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      setAppointments([]);
+    }
+  };
+
+  // Call this on component mount
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
 
   const refreshAppointments = async () => {
-  if (!userData.id || userData.id === "----") return;
-  try {
-    const { data: refreshedAppointments, error: refreshError } = 
-      await appointmentService.getUserAppointments(userData.id);
-    if (refreshError) {
+    if (!userData.id || userData.id === "----") return;
+
+    try {
+      // Don't pass userData.id since service uses current authenticated user
+      const { data: refreshedAppointments, error: refreshError } =
+        await appointmentService.getUserAppointments();
+
+      if (refreshError) {
+        setError('Failed to refresh appointments');
+        console.error('Refresh error:', refreshError);
+      } else if (refreshedAppointments) {
+        console.log('Refreshed appointments:', refreshedAppointments);
+        setAppointments(refreshedAppointments);
+      }
+    } catch (err) {
+      console.error('Error refreshing appointments:', err);
       setError('Failed to refresh appointments');
-    } else if (refreshedAppointments) {
-      setAppointments(refreshedAppointments); // <-- This updates the appointments prop!
     }
-  } catch  {
-    setError('Failed to refresh appointments');
-  }
-};
-
-
+  };
 
   useEffect(() => {
     const initializeData = async () => {
@@ -81,10 +84,10 @@ useEffect(() => {
         const user = await userService.getUserData();
         if (user) {
           setUserData(user);
-          
-          const { data: userAppointments, error: appointmentsError } = 
-            await appointmentService.getUserAppointments(user.id);
-          
+
+          const { data: userAppointments, error: appointmentsError } =
+            await appointmentService.getUserAppointments();
+
           if (appointmentsError) {
             console.error('Error loading appointments:', appointmentsError);
             setError('Failed to load your appointments');
@@ -93,9 +96,9 @@ useEffect(() => {
           }
         }
 
-        const { data: connectedDoctors, error: doctorsError } = 
+        const { data: connectedDoctors, error: doctorsError } =
           await appointmentService.getConnectedDoctors();
-        
+
         if (doctorsError) {
           console.error('Error loading doctors:', doctorsError);
           setError('Failed to load connected doctors');
@@ -113,22 +116,22 @@ useEffect(() => {
     const setupNotificationSubscription = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
-        
+
         if (error) {
           console.error('Error getting user:', error);
           return null;
         }
-        
+
         if (user?.id) {
           const notificationSubscription = supabase
             .channel('appointment_notifications')
-            .on('postgres_changes', 
-              { 
-                event: 'INSERT', 
-                schema: 'public', 
+            .on('postgres_changes',
+              {
+                event: 'INSERT',
+                schema: 'public',
                 table: 'notifications',
                 filter: `user_id=eq.${user.id}`
-              }, 
+              },
               (payload) => {
                 if (payload.new.type.includes('appointment')) {
                   console.log('New appointment notification:', payload.new);
@@ -149,7 +152,7 @@ useEffect(() => {
     };
 
     initializeData();
-    
+
     let notificationSubscription = null;
     setupNotificationSubscription().then((subscription) => {
       notificationSubscription = subscription;
@@ -178,8 +181,6 @@ useEffect(() => {
     }
   };
 
-  
-
   const handleMonthNavigate = (direction) => {
     const newDate = new Date(currentDate);
     newDate.setMonth(currentDate.getMonth() + direction);
@@ -189,6 +190,15 @@ useEffect(() => {
   const handleSetAppointment = () => {
     setError('');
     setShowModal(true);
+  };
+
+  const convertTo24Hour = (time12h) => {
+    const [time, modifier] = time12h.split(' ');
+    let [hours, minutes] = time.split(':');
+    hours = parseInt(hours, 10);
+    if (modifier === 'PM' && hours !== 12) hours += 12;
+    if (modifier === 'AM' && hours === 12) hours = 0;
+    return `${hours.toString().padStart(2, '0')}:${minutes}:00`;
   };
 
   const handleSubmitAppointment = async () => {
@@ -207,45 +217,45 @@ useEffect(() => {
       }
 
       const dateStr = formatDateForStorage(selectedDate);
-      
+
       // Check doctor's availability for the selected time slot
-const { data: availabilityData, error: availabilityError } = 
-  await appointmentService.getDoctorAvailability(
-    newAppointment.doctor_id, 
-    dateStr,
-    newAppointment.time
-  );
+      const { data: availabilityData, error: availabilityError } =
+        await appointmentService.getDoctorAvailability(
+          newAppointment.doctor_id,
+          dateStr,
+          newAppointment.time
+        );
 
-if (availabilityError) {
-  setError('Failed to verify doctor availability. Please try again.');
-  return false;
-}
+      if (availabilityError) {
+        setError('Failed to verify doctor availability. Please try again.');
+        return false;
+      }
 
-if (!availabilityData || !availabilityData.available) {
-  setError(availabilityData?.reason || 'This time slot is not available. Please select a different time.');
-  return false;
-}
+      if (!availabilityData || !availabilityData.available) {
+        setError(availabilityData?.reason || 'This time slot is not available. Please select a different time.');
+        return false;
+      }
 
       const appointmentData = {
         med_id: newAppointment.doctor_id,
         patient_id: userData.id,
         requested_date: dateStr,
-        requested_time: newAppointment.time,
+        requested_time: convertTo24Hour(newAppointment.time), // <-- FIX HERE
         patient_notes: newAppointment.reason,
-        status: 'requested', // Changed from 'confirmed' to 'requested'
+        status: 'requested',
         duration_minutes: 30
       };
 
       console.log('Submitting appointment request:', appointmentData);
 
       const { data, error: submitError } = await appointmentService.requestAppointment(appointmentData);
-      
+
       if (submitError) {
         console.error('Appointment request error:', submitError);
-        
-        if (submitError.includes('no longer available') || 
-            submitError.includes('time slot') || 
-            submitError.includes('conflict')) {
+
+        if (submitError.includes('no longer available') ||
+          submitError.includes('time slot') ||
+          submitError.includes('conflict')) {
           setError('This time slot was just requested by someone else. Please select a different time.');
         } else {
           setError(submitError);
@@ -255,9 +265,9 @@ if (!availabilityData || !availabilityData.available) {
 
       if (data && data.length > 0) {
         console.log('Appointment requested successfully:', data[0]);
-        
+
         setAppointments(prevAppointments => [...prevAppointments, data[0]]);
-        
+
         setShowModal(false);
         setNewAppointment({
           doctor_id: '',
@@ -314,27 +324,27 @@ if (!availabilityData || !availabilityData.available) {
       return;
     }
 
-    const confirmMessage = appointment.status === 'requested' 
-      ? 'Are you sure you want to cancel this appointment request?' 
+    const confirmMessage = appointment.status === 'requested'
+      ? 'Are you sure you want to cancel this appointment request?'
       : 'Are you sure you want to cancel this confirmed appointment?';
 
     if (!window.confirm(confirmMessage)) {
       return;
     }
-    
+
     setLoading(true);
     try {
       const { error: cancelError } = await appointmentService.updateAppointment(
-        appointment.id, 
+        appointment.id,
         { status: 'cancelled' }
       );
-      
+
       if (cancelError) {
         setError(`Failed to cancel appointment: ${cancelError}`);
       } else {
-        setAppointments(prevAppointments => 
-          prevAppointments.map(apt => 
-            apt.id === appointment.id 
+        setAppointments(prevAppointments =>
+          prevAppointments.map(apt =>
+            apt.id === appointment.id
               ? { ...apt, status: 'cancelled' }
               : apt
           )
@@ -349,20 +359,20 @@ if (!availabilityData || !availabilityData.available) {
   };
 
   const handlePermanentRemove = (removedAppointment) => {
-    setAppointments(prevAppointments => 
+    setAppointments(prevAppointments =>
       prevAppointments.filter(apt => apt.id !== removedAppointment.id)
     );
   };
 
   const handleRescheduleComplete = (updatedAppointment) => {
-    setAppointments(prevAppointments => 
-      prevAppointments.map(apt => 
-        apt.id === updatedAppointment.id 
-          ? updatedAppointment 
+    setAppointments(prevAppointments =>
+      prevAppointments.map(apt =>
+        apt.id === updatedAppointment.id
+          ? updatedAppointment
           : apt
       )
     );
-    
+
     setShowRescheduleModal(false);
     setAppointmentToReschedule(null);
   };
@@ -382,25 +392,58 @@ if (!availabilityData || !availabilityData.available) {
     // Confirmed appointments follow the 24-hour rule
     if (appointment.status === 'confirmed') {
       const now = new Date();
+
+      // Use appointment_date/appointment_time for confirmed appointments
       const appointmentDate = appointment.appointment_date || appointment.requested_date || appointment.date;
-const appointmentTime = appointment.appointment_time || appointment.requested_time || appointment.time;
-const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
-      const hoursUntilAppointment = (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-      
-      return hoursUntilAppointment > 24;
+      const appointmentTime = appointment.appointment_time || appointment.requested_time || appointment.time;
+
+      if (!appointmentDate || !appointmentTime) {
+        return false;
+      }
+
+      // Handle time format conversion for proper Date parsing
+      let timeForParsing = appointmentTime;
+      if (timeForParsing && (timeForParsing.includes('AM') || timeForParsing.includes('PM'))) {
+        const [time, period] = timeForParsing.split(' ');
+        const [hours, minutes] = time.split(':');
+        let hour24 = parseInt(hours);
+
+        if (period === 'PM' && hour24 !== 12) {
+          hour24 += 12;
+        } else if (period === 'AM' && hour24 === 12) {
+          hour24 = 0;
+        }
+
+        timeForParsing = `${hour24.toString().padStart(2, '0')}:${minutes}`;
+      }
+
+      try {
+        const appointmentDateTime = new Date(`${appointmentDate}T${timeForParsing}`);
+        const hoursUntilAppointment = (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+        return hoursUntilAppointment > 24;
+      } catch (error) {
+        console.error('Error parsing appointment date/time:', error);
+        return false;
+      }
     }
 
     return false;
   };
 
-  const selectedDateAppointments = appointments.filter(
-    (apt) => (apt.requested_date || apt.date) === formatDateForStorage(selectedDate)
-  );
+  const selectedDateAppointments = appointments.filter((apt) => {
+    const selectedDateString = formatDateForStorage(selectedDate);
+    // apt.date is a string in YYYY-MM-DD format
+    const appointmentDateOnly = apt.date
+      ? apt.date.toString().split('T')[0]
+      : null;
+    return appointmentDateOnly === selectedDateString;
+  });
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <h1 className="text-2xl sm:text-3xl font-bold text-myHeader mb-4 sm:mb-6">My Appointments</h1>
-      
+
       {/* Global Error Display */}
       {error && !showModal && (
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
@@ -413,21 +456,19 @@ const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
         <div className="flex bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
-              activeTab === 'calendar'
-                ? 'bg-myHeader text-white'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${activeTab === 'calendar'
+              ? 'bg-myHeader text-white'
+              : 'text-gray-600 hover:text-gray-900'
+              }`}
           >
             Calendar
           </button>
           <button
             onClick={() => setActiveTab('appointments')}
-            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors relative ${
-              activeTab === 'appointments'
-                ? 'bg-myHeader text-white'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors relative ${activeTab === 'appointments'
+              ? 'bg-myHeader text-white'
+              : 'text-gray-600 hover:text-gray-900'
+              }`}
           >
             Appointments
             {selectedDateAppointments.length > 0 && (
@@ -438,7 +479,7 @@ const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
           </button>
         </div>
       </div>
-      
+
       {/* Desktop Layout */}
       <div className="hidden md:flex gap-8">
         {/* Left Calendar Section */}
@@ -450,7 +491,7 @@ const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
             onDateSelect={handleDateSelect}
             onMonthNavigate={handleMonthNavigate}
           />
-          
+
           <button
             onClick={handleSetAppointment}
             disabled={loading || doctors.length === 0}
@@ -458,7 +499,7 @@ const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
           >
             {loading ? 'Loading...' : 'Request New Appointment'}
           </button>
-          
+
           {doctors.length === 0 && !loading && (
             <p className="text-sm text-amber-600 mt-2 text-center">
               No connected doctors found. Please connect with doctors first.
@@ -474,9 +515,9 @@ const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
             doctors={doctors}
             onRescheduleRequest={handleRescheduleRequest}
             onCancelRequest={handleCancelRequest}
-             onPermanentRemove={(removedAppointment) => {
-    setAppointments(prev => prev.filter(apt => apt.id !== removedAppointment.id));
-  }}
+            onPermanentRemove={(removedAppointment) => {
+              setAppointments(prev => prev.filter(apt => apt.id !== removedAppointment.id));
+            }}
             onRefresh={refreshAppointments}
             canCancelAppointment={canCancelAppointment}
           />
@@ -495,7 +536,7 @@ const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
               onDateSelect={handleDateSelect}
               onMonthNavigate={handleMonthNavigate}
             />
-            
+
             <button
               onClick={handleSetAppointment}
               disabled={loading || doctors.length === 0}
@@ -503,7 +544,7 @@ const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
             >
               {loading ? 'Loading...' : 'Request New Appointment'}
             </button>
-            
+
             {doctors.length === 0 && !loading && (
               <p className="text-sm text-amber-600 text-center px-4">
                 No connected doctors found. Please connect with doctors first.
