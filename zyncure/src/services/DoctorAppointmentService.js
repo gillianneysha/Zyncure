@@ -243,22 +243,24 @@ export const doctorAppointmentService = {
       }
 
       const transformedData = (data || []).map(apt => {
-        const { time } = formatAppointmentDateTime(apt.appointment_date);
-        return {
-          id: apt.appointment_id,
-          time: time,
-          patient_name: apt.patient_name,
-          patient_id: apt.patient_id,
-          patient_email: apt.patient_email,
-          type: 'Consultation',
-          status: apt.status,
-          reason: apt.reason,
-          created_at: apt.created_at,
-          updated_at: apt.updated_at,
-          doctor_name: apt.doctor_name,
-          doctor_email: apt.doctor_email
-        };
-      });
+  const { time } = formatAppointmentDateTime(apt.appointment_date);
+return {
+    id: apt.appointment_id,
+    time: time,
+    patient_name: apt.patient_name,
+    patient_id: apt.patient_id,
+    patient_email: apt.patient_email,
+    type: 'Consultation',
+    status: apt.status,
+    reason: apt.patient_notes || 'No reason provided',  // Use patient_notes instead of reason
+    patient_notes: apt.patient_notes,
+    doctor_notes: apt.doctor_notes,
+    created_at: apt.created_at,
+    updated_at: apt.updated_at,
+    doctor_name: apt.doctor_name,
+    doctor_email: apt.doctor_email
+  };
+});
 
       console.log('Debug - Transformed data:', {
         transformedCount: transformedData.length,
@@ -304,24 +306,24 @@ export const doctorAppointmentService = {
       }
 
       const transformedData = (data || []).map(apt => {
-        const { date: appointmentDate, time } = formatAppointmentDateTime(apt.appointment_date);
-        return {
-          id: apt.appointment_id,
-          date: appointmentDate,
-          time,
-          patient_name: apt.patient_name,
-          patient_id: apt.patient_id,
-          patient_email: apt.patient_email,
-          type: 'Consultation',
-          status: apt.status,
-          reason: apt.reason,
-          created_at: apt.created_at,
-          updated_at: apt.updated_at,
-          doctor_name: apt.doctor_name,
-          doctor_email: apt.doctor_email
-        };
-      });
-
+  const { date: appointmentDate, time } = formatAppointmentDateTime(apt.appointment_date);
+  return {
+    id: apt.appointment_id,
+    date: appointmentDate,
+    time,
+    patient_name: apt.patient_name,
+    patient_id: apt.patient_id,
+    patient_email: apt.patient_email,
+    type: 'Consultation',
+    status: apt.status,
+    reason: apt.patient_notes || apt.reason,  // ← FIXED: Use patient_notes first
+    patient_notes: apt.patient_notes,         // ← ADDED: Include patient_notes field
+    created_at: apt.created_at,
+    updated_at: apt.updated_at,
+    doctor_name: apt.doctor_name,
+    doctor_email: apt.doctor_email
+  };
+});
       return { data: transformedData, error: null };
     } catch (error) {
       console.error('Error in getDoctorAppointmentsByDateRange:', error);
@@ -369,16 +371,16 @@ export const doctorAppointmentService = {
       const padSeconds = (time) => time.length === 5 ? `${time}:00` : time;
 
       // Determine if the stored time is in 12-hour or 24-hour format
-      let displayTime, time24Hour;
+      let time24Hour;
 
       if (appointment.requested_time.includes('AM') || appointment.requested_time.includes('PM')) {
         // Stored time is in 12-hour format
-        displayTime = appointment.requested_time;
+        // displayTime = appointment.requested_time;
         time24Hour = convertTo24Hour(appointment.requested_time);
       } else {
         // Stored time is in 24-hour format
         time24Hour = appointment.requested_time;
-        displayTime = convertTo12Hour(padSeconds(appointment.requested_time));
+        // displayTime = convertTo12Hour(padSeconds(appointment.requested_time));
       }
 
       // Create proper ISO datetime for metadata
@@ -391,18 +393,23 @@ export const doctorAppointmentService = {
         originalTime: appointment.requested_time
       }); // Debug log
 
-      // Send notification to patient with CORRECT time display
-      await createNotification(
-        appointment.patient_id,
-        'appointment_confirmed',
-        'Appointment Confirmed',
-        `Your appointment has been confirmed for ${appointment.requested_date} at ${displayTime}.`,
-        {
-          appointment_id: appointmentId,
-          appointment_date: appointmentDateTime,  // Proper ISO format
-          reason: appointment.patient_notes
-        }
-      );
+      // ...existing code...
+const displayTime = appointment.requested_time.includes('AM') || appointment.requested_time.includes('PM')
+  ? appointment.requested_time
+  : convertTo12Hour(appointment.requested_time);
+
+await createNotification(
+  appointment.patient_id,
+  'appointment_confirmed',
+  'Appointment Confirmed',
+  `Your appointment has been confirmed for ${appointment.requested_date} at ${displayTime}`,
+  {
+    appointment_id: appointmentId,
+    appointment_date: `${appointment.requested_date}T${appointment.requested_time}`,
+    // doctor_id: doctorInfo.id
+  }
+);
+// ...existing code...
 
       return { error: null };
     } catch (err) {
@@ -652,16 +659,5 @@ export const doctorAppointmentService = {
     }
   },
 
-  /**
-   * Get patient details for an appointment
-   * @param {string} patientId 
-   * @returns {object} 
-   */
-  async getPatientDetails(patientId) {
-    try {
-      // your code here
-    } catch (error) {
-      // error handling here
-    }
-  }
+
 };

@@ -42,57 +42,45 @@ const RescheduleModal = ({
   }, [selectedDate, appointment]);
 
   const loadAvailableSlots = async () => {
-    if (!selectedDate || !appointment?.doctor_id) return;
+  if (!selectedDate || !appointment?.doctor_id) return;
+  
+  setLoadingSlots(true);
+  setSelectedTime('');
+  
+  try {
+    // Get available time slots from the service
+    const slotsResult = await appointmentService.getAvailableTimeSlots(appointment.doctor_id, selectedDate);
     
-    setLoadingSlots(true);
-    setSelectedTime('');
-    
-    try {
-    
-      const [slotsResult, appointmentsResult] = await Promise.all([
-        appointmentService.getAvailableTimeSlots(appointment.doctor_id, selectedDate),
-        appointmentService.getAppointments(selectedDate, appointment.doctor_id)
-      ]);
-      
-      if (slotsResult.error) {
-        setError('Failed to load available time slots');
-        setAvailableSlots([]);
-      } else {
-       
-        const allTimeSlots = [
-          '8:00 AM', '8:30 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM',
-          '11:00 AM', '11:30 AM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
-          '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM'
-        ];
-        
-        const availableSlots = slotsResult.data || [];
-        const bookedTimes = appointmentsResult.data ? 
-          appointmentsResult.data
-            .filter(apt => apt.id !== appointment.id) 
-            .map(apt => apt.time) : [];
-        
-              const slotsWithStatus = allTimeSlots.map(slot => ({
-          time: slot,
-          available: availableSlots.includes(slot),
-          booked: bookedTimes.includes(slot)
-        }));
-        
-        setAvailableSlots(slotsWithStatus);
-        
-        if (slotsWithStatus.filter(slot => slot.available && !slot.booked).length === 0) {
-          setError('No available time slots for this date');
-        } else {
-          setError('');
-        }
-      }
-    } catch (err) {
-      console.error('Error loading slots:', err);
+    if (slotsResult.error) {
       setError('Failed to load available time slots');
       setAvailableSlots([]);
-    } finally {
-      setLoadingSlots(false);
+    } else {
+      // The service already returns filtered available slots
+      const availableTimeSlots = slotsResult.data || [];
+      
+      // Transform to the format expected by the modal
+      const slotsWithStatus = availableTimeSlots.map(slot => ({
+        time: slot.time, // This is already in 12-hour format from the service
+        available: true, // All returned slots are available
+        booked: false    // Service already filtered out booked slots
+      }));
+      
+      setAvailableSlots(slotsWithStatus);
+      
+      if (slotsWithStatus.length === 0) {
+        setError('No available time slots for this date');
+      } else {
+        setError('');
+      }
     }
-  };
+  } catch (err) {
+    console.error('Error loading slots:', err);
+    setError('Failed to load available time slots');
+    setAvailableSlots([]);
+  } finally {
+    setLoadingSlots(false);
+  }
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -104,27 +92,27 @@ const RescheduleModal = ({
 
     
     const selectedSlot = availableSlots.find(slot => slot.time === selectedTime);
-    if (!selectedSlot || selectedSlot.booked || !selectedSlot.available) {
-      setError('Selected time slot is no longer available. Please choose a different time.');
-      await loadAvailableSlots();
-      return;
-    }
+if (!selectedSlot || !selectedSlot.available) {
+  setError('Selected time slot is no longer available. Please choose a different time.');
+  await loadAvailableSlots(); 
+  return;
+}
 
     setLoading(true);
     setError('');
 
     try {
       
-      const { data: currentSlots } = await appointmentService.getAvailableTimeSlots(
-        appointment.doctor_id, 
-        selectedDate
-      );
+      // const { data: currentSlots } = await appointmentService.getAvailableTimeSlots(
+      //   appointment.doctor_id, 
+      //   selectedDate
+      // );
       
-      if (!currentSlots || !currentSlots.includes(selectedTime)) {
-        setError('This time slot was just booked by someone else. Please select a different time.');
-        await loadAvailableSlots();
-        return;
-      }
+      // if (!currentSlots || !currentSlots.includes(selectedTime)) {
+      //   setError('This time slot was just booked by someone else. Please select a different time.');
+      //   await loadAvailableSlots();
+      //   return;
+      // }
 
       
       const updateData = {
@@ -245,30 +233,27 @@ const RescheduleModal = ({
               availableSlots.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                   {availableSlots.map((slot) => {
-                    const isBooked = slot.booked;
-                    const isAvailable = slot.available && !isBooked;
-                    const isSelected = selectedTime === slot.time;
-                    
-                    return (
-                      <button
-                        key={slot.time}
-                        type="button"
-                        onClick={() => isAvailable ? setSelectedTime(slot.time) : null}
-                        disabled={loading || !isAvailable}
-                        className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
-                          isSelected
-                            ? 'bg-teal-600 text-white border-teal-600'
-                            : isAvailable
-                              ? 'bg-white text-gray-700 border-gray-300 hover:border-teal-500 hover:bg-teal-50'
-                              : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                        }`}
-                      >
-                        {slot.time}
-                        {isBooked && <span className="block text-xs mt-1">Booked</span>}
-                        {!slot.available && !isBooked && <span className="block text-xs mt-1">N/A</span>}
-                      </button>
-                    );
-                  })}
+  const isAvailable = slot.available;
+  const isSelected = selectedTime === slot.time;
+  
+  return (
+    <button
+      key={slot.time}
+      type="button"
+      onClick={() => isAvailable ? setSelectedTime(slot.time) : null}
+      disabled={loading || !isAvailable}
+      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+        isSelected
+          ? 'bg-teal-600 text-white border-teal-600'
+          : isAvailable
+            ? 'bg-white text-gray-700 border-gray-300 hover:border-teal-500 hover:bg-teal-50'
+            : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+      }`}
+    >
+      {slot.time}
+    </button>
+  );
+})}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">

@@ -21,69 +21,69 @@ const Home = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalContent, setModalContent] = useState({ title: '', message: '', isError: false });
 
-  // Add verification modal states
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
+  // // Add verification modal states
+  // const [showVerificationModal, setShowVerificationModal] = useState(false);
+  // const [isVerified, setIsVerified] = useState(false);
 
-  // Add timeout states
-  const [isVerificationLocked, setIsVerificationLocked] = useState(false);
-  const [timeoutRemaining, setTimeoutRemaining] = useState(0);
+  // // Add timeout states
+  // const [isVerificationLocked, setIsVerificationLocked] = useState(false);
+  // const [timeoutRemaining, setTimeoutRemaining] = useState(0);
 
   useEffect(() => {
     fetchSymptomStats();
     fetchUserInfo();
-    checkVerificationStatus();
+    // checkVerificationStatus();
   }, []);
 
   // Timeout countdown effect
-  useEffect(() => {
-    let interval = null;
-    if (timeoutRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeoutRemaining(time => {
-          if (time <= 1000) {
-            setIsVerificationLocked(false);
-            return 0;
-          }
-          return time - 1000;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [timeoutRemaining]);
+  // useEffect(() => {
+  //   let interval = null;
+  //   if (timeoutRemaining > 0) {
+  //     interval = setInterval(() => {
+  //       setTimeoutRemaining(time => {
+  //         if (time <= 1000) {
+  //           setIsVerificationLocked(false);
+  //           return 0;
+  //         }
+  //         return time - 1000;
+  //       });
+  //     }, 1000);
+  //   }
+  //   return () => {
+  //     if (interval) clearInterval(interval);
+  //   };
+  // }, [timeoutRemaining]);
 
-  const checkVerificationStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Check if user has been verified
-        const verified = user.user_metadata?.identity_verified || false;
-        setIsVerified(verified);
+  // const checkVerificationStatus = async () => {
+  //   try {
+  //     const { data: { user } } = await supabase.auth.getUser();
+  //     if (user) {
+  //       // Check if user has been verified
+  //       const verified = user.user_metadata?.identity_verified || false;
+  //       setIsVerified(verified);
 
-        // Check if there's an active timeout
-        const timeoutUntil = user.user_metadata?.verification_timeout_until;
-        if (timeoutUntil && !verified) {
-          const timeoutDate = new Date(timeoutUntil);
-          const now = new Date();
+  //       // Check if there's an active timeout
+  //       const timeoutUntil = user.user_metadata?.verification_timeout_until;
+  //       if (timeoutUntil && !verified) {
+  //         const timeoutDate = new Date(timeoutUntil);
+  //         const now = new Date();
 
-          if (timeoutDate > now) {
-            const remainingTime = timeoutDate.getTime() - now.getTime();
-            setIsVerificationLocked(true);
-            setTimeoutRemaining(remainingTime);
-          } else {
-            // Timeout has expired, clear it
-            await supabase.auth.updateUser({
-              data: { verification_timeout_until: null }
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error checking verification status:', error);
-    }
-  };
+  //         if (timeoutDate > now) {
+  //           const remainingTime = timeoutDate.getTime() - now.getTime();
+  //           setIsVerificationLocked(true);
+  //           setTimeoutRemaining(remainingTime);
+  //         } else {
+  //           // Timeout has expired, clear it
+  //           await supabase.auth.updateUser({
+  //             data: { verification_timeout_until: null }
+  //           });
+  //         }
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('Error checking verification status:', error);
+  //   }
+  // };
 
   const fetchUserInfo = async () => {
     try {
@@ -207,11 +207,11 @@ const Home = () => {
     return date.toLocaleDateString();
   };
 
-  const formatTimeRemaining = (milliseconds) => {
-    const minutes = Math.floor(milliseconds / (1000 * 60));
-    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  // const formatTimeRemaining = (milliseconds) => {
+  //   const minutes = Math.floor(milliseconds / (1000 * 60));
+  //   const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+  //   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  // };
 
   const handleDownload = async () => {
     if (!userInfo.name) {
@@ -262,69 +262,69 @@ const Home = () => {
   };
 
   // Verification handlers
-  const handleVerifyIdentity = () => {
-    if (isVerificationLocked) {
-      setModalContent({
-        title: 'Verification Temporarily Locked',
-        message: `For security reasons, identity verification is temporarily disabled. Please try again in ${formatTimeRemaining(timeoutRemaining)}.`,
-        isError: true
-      });
-      setShowModal(true);
-      return;
-    }
-    setShowVerificationModal(true);
-  };
+  // const handleVerifyIdentity = () => {
+  //   if (isVerificationLocked) {
+  //     setModalContent({
+  //       title: 'Verification Temporarily Locked',
+  //       message: `For security reasons, identity verification is temporarily disabled. Please try again in ${formatTimeRemaining(timeoutRemaining)}.`,
+  //       isError: true
+  //     });
+  //     setShowModal(true);
+  //     return;
+  //   }
+  //   setShowVerificationModal(true);
+  // };
 
-  const handleVerificationComplete = async () => {
-    try {
-      // Update user metadata to mark as verified and clear timeout
-      await supabase.auth.updateUser({
-        data: {
-          identity_verified: true,
-          verification_timeout_until: null
-        }
-      });
+  // const handleVerificationComplete = async () => {
+  //   try {
+  //     // Update user metadata to mark as verified and clear timeout
+  //     await supabase.auth.updateUser({
+  //       data: {
+  //         identity_verified: true,
+  //         verification_timeout_until: null
+  //       }
+  //     });
 
-      setIsVerified(true);
-      setIsVerificationLocked(false);
-      setTimeoutRemaining(0);
-      setShowVerificationModal(false);
+  //     setIsVerified(true);
+  //     setIsVerificationLocked(false);
+  //     setTimeoutRemaining(0);
+  //     setShowVerificationModal(false);
 
-      // Show success message
-      setModalContent({
-        title: 'Identity Verified!',
-        message: 'Your identity has been successfully verified. You now have full access to all features.',
-        isError: false
-      });
-      setShowModal(true);
-    } catch (error) {
-      console.error('Error updating verification status:', error);
-    }
-  };
+  //     // Show success message
+  //     setModalContent({
+  //       title: 'Identity Verified!',
+  //       message: 'Your identity has been successfully verified. You now have full access to all features.',
+  //       isError: false
+  //     });
+  //     setShowModal(true);
+  //   } catch (error) {
+  //     console.error('Error updating verification status:', error);
+  //   }
+  // };
 
-  const handleVerificationFailed = (message) => {
-    setShowVerificationModal(false);
-    setIsVerificationLocked(true);
-    setTimeoutRemaining(30 * 60 * 1000); // 30 minutes in milliseconds
+  // const handleVerificationFailed = (message) => {
+  //   setShowVerificationModal(false);
+  //   setIsVerificationLocked(true);
+  //   setTimeoutRemaining(30 * 60 * 1000); // 30 minutes in milliseconds
 
-    setModalContent({
-      title: 'Verification Failed',
-      message: message || 'Identity verification failed. Please try again or contact support.',
-      isError: true
-    });
-    setShowModal(true);
-  };
+  //   setModalContent({
+  //     title: 'Verification Failed',
+  //     message: message || 'Identity verification failed. Please try again or contact support.',
+  //     isError: true
+  //   });
+  //   setShowModal(true);
+  // };
 
   return (
     <div className="min-h-screen from-pink-50 to-orange-50">
       {/* Verification Modal */}
-      <PatientVerificationModal
+      {/* <PatientVerificationModal
         isOpen={showVerificationModal}
         onClose={() => setShowVerificationModal(false)}
         onVerified={handleVerificationComplete}
         onVerificationFailed={handleVerificationFailed}
         patientData={userInfo}
-      />
+      /> */}
 
       {/* Header Section */}
       <div className="px-6 py-4">
@@ -339,7 +339,7 @@ const Home = () => {
           </div>
 
           {/* Verification Status */}
-          <div className="flex items-center space-x-3">
+          {/* <div className="flex items-center space-x-3">
             {!isVerified && !isVerificationLocked && (
               <button
                 onClick={handleVerifyIdentity}
@@ -367,7 +367,7 @@ const Home = () => {
                 <span className="text-sm font-medium">Identity Verified ✓</span>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
       </div>
 
