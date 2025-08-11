@@ -196,7 +196,7 @@ export const appointmentService = {
       }
 
       // Transform data for consistent format
-        const transformedData = [
+      const transformedData = [
         {
           id: data.appointment_id,
           patient_id: data.patient_id,
@@ -218,10 +218,11 @@ export const appointmentService = {
         },
       ];
 
-        // First convert the time to 12-hour format if needed
-      const displayTime = data.requested_time.includes("AM") || data.requested_time.includes("PM")
-        ? data.requested_time
-        : convertTo12Hour(data.requested_time);
+      // First convert the time to 12-hour format if needed
+      const displayTime =
+        data.requested_time.includes("AM") || data.requested_time.includes("PM")
+          ? data.requested_time
+          : convertTo12Hour(data.requested_time);
 
       const appointmentDateTime = `${data.requested_date}T${data.requested_time}`;
 
@@ -239,7 +240,6 @@ export const appointmentService = {
       );
 
       return { data: transformedData, error: null };
-
     } catch (error) {
       console.error("Appointment request error:", error);
       return { data: null, error: error.message };
@@ -347,6 +347,7 @@ export const appointmentService = {
               reason:
                 unavailableDate.reason ||
                 "Doctor is not available on this date",
+              slots: [],
             },
             error: null,
           };
@@ -357,8 +358,9 @@ export const appointmentService = {
       if (!availability || availability.length === 0) {
         return {
           data: {
-            available: false,
+            available: true, // Changed from false to true
             reason: "Doctor has no scheduled availability for this day",
+            slots: [],
           },
           error: null,
         };
@@ -455,18 +457,22 @@ export const appointmentService = {
         };
       }
 
-      // Return general availability information - THIS IS THE KEY FIX
+      // Return general availability information with slots array
       return {
         data: {
           available: true,
-          slots: availability,
+          slots: availability || [], // Ensure slots is always an array
         },
         error: null,
       };
     } catch (error) {
       console.error("Error in getDoctorAvailability:", error);
       return {
-        data: { available: false, reason: "System error occurred" },
+        data: {
+          available: false,
+          reason: "System error occurred",
+          slots: [], // Add empty slots for error case
+        },
         error: error.message,
       };
     }
@@ -885,7 +891,7 @@ export const appointmentService = {
         allowedUpdates.appointment_date = updateData.date;
         allowedUpdates.appointment_time = normalizedTime;
 
-       allowedUpdates.status = 'requested'; 
+        allowedUpdates.status = "requested";
       }
 
       // Patients can cancel their own 'requested' appointments
@@ -1375,17 +1381,14 @@ export const appointmentService = {
    * @returns {boolean}
    */
   canRescheduleAppointment(appointment) {
-    
     if (["cancelled", "completed", "no_show"].includes(appointment.status)) {
       return false;
     }
 
- 
     if (appointment.status === "requested") {
       return true;
     }
 
- 
     if (appointment.status === "confirmed") {
       const appointmentDateTime = new Date(
         `${appointment.requested_date || appointment.date}T${
@@ -1396,7 +1399,6 @@ export const appointmentService = {
       const hoursUntilAppointment =
         (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-   
       return hoursUntilAppointment > 4;
     }
 
@@ -1409,17 +1411,14 @@ export const appointmentService = {
    * @returns {boolean}
    */
   canCancelAppointment(appointment) {
-   
     if (["cancelled", "completed", "no_show"].includes(appointment.status)) {
       return false;
     }
 
-   
     if (appointment.status === "requested") {
       return true;
     }
 
-  
     if (appointment.status === "confirmed") {
       const appointmentDateTime = new Date(
         `${appointment.requested_date || appointment.date}T${
@@ -1430,7 +1429,6 @@ export const appointmentService = {
       const hoursUntilAppointment =
         (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-      
       return hoursUntilAppointment > 24;
     }
 
@@ -1469,7 +1467,7 @@ export const userService = {
         console.error("Error fetching patient data:", patientError);
         return {
           id: user.id,
-          name: user.email.split("@")[0], 
+          name: user.email.split("@")[0],
           email: user.email,
         };
       }
@@ -1503,7 +1501,6 @@ export const userService = {
         emergency_contact: updateData.emergencyContact,
       };
 
-      
       Object.keys(allowedFields).forEach((key) => {
         if (allowedFields[key] === undefined) {
           delete allowedFields[key];

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock, User, FileText, CheckCircle, XCircle, ChevronLeft, ChevronRight, Settings, AlertTriangle, Mail, Phone, MapPin, X } from 'lucide-react';
 import { doctorAppointmentService } from '../../services/DoctorAppointmentService';
-import { doctorAvailabilityService } from '../../services/DoctorAvailabilityService';
 import DoctorAvailabilityManager from '../../components/DoctorAvailabilityManager';
 
 const DoctorAppointments = () => {
@@ -68,13 +67,11 @@ const DoctorAppointments = () => {
   };
 
   const formatDateForStorage = (date) => {
-    const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-    const year = localDate.getFullYear();
-    const month = String(localDate.getMonth() + 1).padStart(2, '0');
-    const day = String(localDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
   const loadAppointments = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -129,32 +126,33 @@ const DoctorAppointments = () => {
   };
 
   const loadAppointmentsForCalendar = useCallback(async () => {
-    try {
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      
-      const { data, error } = await doctorAppointmentService.getDoctorAppointmentsByDateRange(
-        formatDateForStorage(firstDay),     
-        formatDateForStorage(lastDay)       
-      );
-      
-      if (!error && data) {
-        const appointmentsByDate = {};
-        data.forEach(apt => {
-          const date = apt.date;
-          if (!appointmentsByDate[date]) {
-            appointmentsByDate[date] = [];
-          }
-          appointmentsByDate[date].push(apt);
-        });
-        setAppointmentsByDate(appointmentsByDate);
-      }
-    } catch (err) {
-      console.error('Error loading calendar appointments:', err);
+  try {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const { data, error } = await doctorAppointmentService.getDoctorAppointmentsByDateRange(
+      formatDateForStorage(firstDay),     
+      formatDateForStorage(lastDay)       
+    );
+    
+    if (!error && data) {
+      const appointmentsByDate = {};
+      data.forEach(apt => {
+        // Use appointment_date or requested_date or date, ensuring proper date format
+        const appointmentDate = apt.appointment_date || apt.requested_date || apt.date;
+        if (!appointmentsByDate[appointmentDate]) {
+          appointmentsByDate[appointmentDate] = [];
+        }
+        appointmentsByDate[appointmentDate].push(apt);
+      });
+      setAppointmentsByDate(appointmentsByDate);
     }
-  }, [currentDate]);
+  } catch (err) {
+    console.error('Error loading calendar appointments:', err);
+  }
+}, [currentDate]);
 
   useEffect(() => {
     if (doctorAppointmentService.getDoctorAppointmentsByDateRange) {
@@ -308,10 +306,10 @@ const DoctorAppointments = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const today = new Date();
-    const firstDay = new Date(year, month, 1);
+    // const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+    // const startingDayOfWeek = firstDay.getDay();
 
     const monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -320,21 +318,18 @@ const DoctorAppointments = () => {
 
     const days = [];
     
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(<div key={`empty-${i}`} className="p-2"></div>);
-    }
+     for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const isToday = date.toDateString() === today.toDateString();
+    const isSelected = date.toDateString() === selectedDate.toDateString();
     
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const isToday = date.toDateString() === today.toDateString();
-      const isSelected = date.toDateString() === selectedDate.toDateString();
-      
-      const dateString = date.toISOString().split('T')[0];
-      const dayAppointments = appointmentsByDate[dateString] || [];
-      const hasAppointments = dayAppointments.length > 0;
-      const pendingAppointments = dayAppointments.filter(apt => 
-        apt.status === 'pending' || apt.status === 'requested'
-      ).length;
+    // Format date string consistently with how appointments are stored
+    const dateString = formatDateForStorage(date);
+    const dayAppointments = appointmentsByDate[dateString] || [];
+    const hasAppointments = dayAppointments.length > 0;
+    const pendingAppointments = dayAppointments.filter(apt => 
+      apt.status === 'pending' || apt.status === 'requested'
+    ).length;
 
       days.push(
         <button
