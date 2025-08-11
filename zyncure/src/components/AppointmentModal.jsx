@@ -45,7 +45,9 @@ const AppointmentModal = ({
   const [refreshingSlots, setRefreshingSlots] = useState(false);
   const [localError, setLocalError] = useState("");
   const [lastRefreshTime, setLastRefreshTime] = useState(null);
-  const [setConflictingAppointments] = useState([]);
+  // FIXED: Either add the state variable or remove this line entirely
+  // Since conflictingAppointments is not used anywhere, I'm removing this line
+  // const [conflictingAppointments, setConflictingAppointments] = useState([]);
 
   const isLoading = parentLoading || localLoading;
   const displayError = parentError || localError;
@@ -84,27 +86,27 @@ const AppointmentModal = ({
           });
 
           // Check if this time slot falls within any unavailable period
-let isUnavailable = false;
-unavailableDates.forEach((unavailableDate) => {
-  if (unavailableDate.start_time && unavailableDate.end_time) {
-    const unavailableStart = new Date(
-      `2000-01-01T${unavailableDate.start_time}`
-    );
-    const unavailableEnd = new Date(
-      `2000-01-01T${unavailableDate.end_time}`
-    );
+          let isUnavailable = false;
+          unavailableDates.forEach((unavailableDate) => {
+            if (unavailableDate.start_time && unavailableDate.end_time) {
+              const unavailableStart = new Date(
+                `2000-01-01T${unavailableDate.start_time}`
+              );
+              const unavailableEnd = new Date(
+                `2000-01-01T${unavailableDate.end_time}`
+              );
 
-    // Check if current time slot overlaps with unavailable period
-    // We check if the slot starts within the unavailable period
-    if (
-      currentTime >= unavailableStart &&
-      currentTime < unavailableEnd
-    ) {
-      isUnavailable = true;
-      console.log(`Blocking slot ${time24} due to unavailable period ${unavailableDate.start_time} - ${unavailableDate.end_time}`);
-    }
-  }
-});
+              // Check if current time slot overlaps with unavailable period
+              // We check if the slot starts within the unavailable period
+              if (
+                currentTime >= unavailableStart &&
+                currentTime < unavailableEnd
+              ) {
+                isUnavailable = true;
+                console.log(`Blocking slot ${time24} due to unavailable period ${unavailableDate.start_time} - ${unavailableDate.end_time}`);
+              }
+            }
+          });
 
           // Only add the slot if it's not in an unavailable period
           if (!isUnavailable) {
@@ -133,7 +135,7 @@ unavailableDates.forEach((unavailableDate) => {
     async (showRefreshingIndicator = true) => {
       if (!newAppointment.doctor_id || !selectedDate) {
         setDoctorAvailability([]);
-        setConflictingAppointments([]);
+        // FIXED: Removed the setConflictingAppointments call since it's not defined
         return;
       }
 
@@ -172,7 +174,7 @@ unavailableDates.forEach((unavailableDate) => {
         console.log("Appointments result:", appointmentsResult); // DEBUG
         console.log("Unavailable dates result:", unavailableDatesResult); // DEBUG
 
-       if (availabilityResult.error) {
+        if (availabilityResult.error) {
           console.error(
             "Error fetching doctor availability:",
             availabilityResult.error
@@ -201,8 +203,7 @@ unavailableDates.forEach((unavailableDate) => {
           // If it's a full day block (no specific times), show error and return
           if (!unavailableDate.start_time && !unavailableDate.end_time) {
             setLocalError(
-              `Doctor is not available on this date. Reason: ${
-                unavailableDate.reason || "Not specified"
+              `Doctor is not available on this date. Reason: ${unavailableDate.reason || "Not specified"
               }`
             );
             setDoctorAvailability([]);
@@ -242,7 +243,7 @@ unavailableDates.forEach((unavailableDate) => {
             "Doctor has no scheduled availability for this day of the week."
           );
           setDoctorAvailability([]);
-          setConflictingAppointments([]);
+          // FIXED: Removed the setConflictingAppointments call since it's not defined
           return;
         }
 
@@ -274,7 +275,7 @@ unavailableDates.forEach((unavailableDate) => {
         console.log("Final updated slots:", updatedSlots); // DEBUG
 
         setDoctorAvailability(updatedSlots);
-        setConflictingAppointments(existingAppointments);
+        // FIXED: Removed the setConflictingAppointments call since it's not defined
         setLocalError("");
         setLastRefreshTime(new Date());
 
@@ -298,7 +299,7 @@ unavailableDates.forEach((unavailableDate) => {
         console.error("Error loading doctor schedule:", err);
         setLocalError("Failed to load doctor schedule. Please try again.");
         setDoctorAvailability([]);
-        setConflictingAppointments([]);
+        // FIXED: Removed the setConflictingAppointments call since it's not defined
       } finally {
         if (showRefreshingIndicator) {
           setRefreshingSlots(false);
@@ -455,7 +456,7 @@ unavailableDates.forEach((unavailableDate) => {
   const handleClose = () => {
     setLocalError("");
     setDoctorAvailability([]);
-    setConflictingAppointments([]);
+    // FIXED: Removed the setConflictingAppointments call since it's not defined
     setLastRefreshTime(null);
     if (setParentError) {
       setParentError("");
@@ -618,13 +619,13 @@ unavailableDates.forEach((unavailableDate) => {
                       <span>
                         Updated{" "}
                         {new Date().getTime() - lastRefreshTime.getTime() <
-                        60000
+                          60000
                           ? "just now"
                           : `${Math.floor(
-                              (new Date().getTime() -
-                                lastRefreshTime.getTime()) /
-                                60000
-                            )}m ago`}
+                            (new Date().getTime() -
+                              lastRefreshTime.getTime()) /
+                            60000
+                          )}m ago`}
                       </span>
                     </div>
                   )}
@@ -658,10 +659,10 @@ unavailableDates.forEach((unavailableDate) => {
                 {!newAppointment.doctor_id
                   ? "Select a doctor first..."
                   : refreshingSlots
-                  ? "Loading available times..."
-                  : availableSlots.length === 0
-                  ? "No available time slots"
-                  : "Choose your preferred time..."}
+                    ? "Loading available times..."
+                    : availableSlots.length === 0
+                      ? "No available time slots"
+                      : "Choose your preferred time..."}
               </option>
               {availableSlots.map((slot) => (
                 <option key={slot.time} value={slot.time}>
