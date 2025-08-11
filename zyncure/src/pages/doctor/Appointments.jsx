@@ -303,22 +303,30 @@ const DoctorAppointments = () => {
   };
 
   const renderCalendar = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const today = new Date();
-    // const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    // const startingDayOfWeek = firstDay.getDay();
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const today = new Date();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
-    const days = [];
-    
-     for (let day = 1; day <= daysInMonth; day++) {
+  const days = [];
+  
+  // Add empty cells for days before the first day of the month
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    days.push(
+      <div key={`empty-${i}`} className="p-1 text-sm"></div>
+    );
+  }
+  
+  // Add all days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
     const isToday = date.toDateString() === today.toDateString();
     const isSelected = date.toDateString() === selectedDate.toDateString();
@@ -331,67 +339,67 @@ const DoctorAppointments = () => {
       apt.status === 'pending' || apt.status === 'requested'
     ).length;
 
-      days.push(
-        <button
-          key={day}
-          onClick={() => handleDateSelect(date)}
-          className={`
-            p-1 text-sm rounded transition-colors relative
-            ${isSelected 
-              ? 'bg-teal-500 text-white' 
-              : isToday 
-                ? 'bg-teal-100 text-teal-800' 
-                : 'hover:bg-gray-100'
-            }
-          `}
-        >
-          {day}
-          {hasAppointments && (
-            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
-              <div className="w-1 h-1 bg-orange-400 rounded-full"></div>
-              {pendingAppointments > 0 && (
-                <div className="w-1 h-1 bg-yellow-500 rounded-full"></div>
-              )}
-            </div>
-          )}
-        </button>
-      );
-    }
-
-    return (
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => handleMonthNavigate(-1)}
-            className="p-1 hover:bg-gray-100 rounded text-sm"
-          >
-            ←
-          </button>
-          <h3 className="font-semibold">
-            {monthNames[month]} {year}
-          </h3>
-          <button
-            onClick={() => handleMonthNavigate(1)}
-            className="p-1 hover:bg-gray-100 rounded text-sm"
-          >
-            →
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-7 gap-1 mb-1">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="p-1 text-xs font-medium text-gray-500 text-center">
-              {day}
-            </div>
-          ))}
-        </div>
-        
-        <div className="grid grid-cols-7 gap-1">
-          {days}
-        </div>
-      </div>
+    days.push(
+      <button
+        key={day}
+        onClick={() => handleDateSelect(date)}
+        className={`
+          p-1 text-sm rounded transition-colors relative
+          ${isSelected 
+            ? 'bg-teal-500 text-white' 
+            : isToday 
+              ? 'bg-teal-100 text-teal-800' 
+              : 'hover:bg-gray-100'
+          }
+        `}
+      >
+        {day}
+        {hasAppointments && (
+          <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
+            <div className="w-1 h-1 bg-orange-400 rounded-full"></div>
+            {pendingAppointments > 0 && (
+              <div className="w-1 h-1 bg-yellow-500 rounded-full"></div>
+            )}
+          </div>
+        )}
+      </button>
     );
-  };
+  }
+
+  return (
+    <div className="bg-white rounded-xl p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => handleMonthNavigate(-1)}
+          className="p-1 hover:bg-gray-100 rounded text-sm"
+        >
+          ←
+        </button>
+        <h3 className="font-semibold">
+          {monthNames[month]} {year}
+        </h3>
+        <button
+          onClick={() => handleMonthNavigate(1)}
+          className="p-1 hover:bg-gray-100 rounded text-sm"
+        >
+          →
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day} className="p-1 text-xs font-medium text-gray-500 text-center">
+            {day}
+          </div>
+        ))}
+      </div>
+      
+      <div className="grid grid-cols-7 gap-1">
+        {days}
+      </div>
+    </div>
+  );
+};
 
   const selectedDateAppointments = appointments.filter((apt) => {
     const selectedDateString = formatDateForStorage(selectedDate);
