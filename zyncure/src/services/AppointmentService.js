@@ -174,7 +174,7 @@ export const appointmentService = {
 
         throw new Error(
           error.message ||
-            "Failed to submit appointment request. Please try again."
+          "Failed to submit appointment request. Please try again."
         );
       }
 
@@ -480,6 +480,7 @@ export const appointmentService = {
 
   /**
    * Get available time slots for a doctor on a specific date
+   * FIXED: Properly handles unavailable date periods and time format conversion
    * @param {string} doctorId
    * @param {string} date
    * @returns {object}
@@ -512,6 +513,8 @@ export const appointmentService = {
         doctorId,
         date
       );
+
+      // If doctor is completely unavailable on this date
       if (unavailableDates && unavailableDates.length > 0) {
         const unavailableDate = unavailableDates[0];
         if (!unavailableDate.start_time && !unavailableDate.end_time) {
@@ -541,11 +544,68 @@ export const appointmentService = {
         }
       });
 
+      // Filter out slots that fall within unavailable time ranges
+      let filteredSlots = [...allSlots];
+
+      if (unavailableDates && unavailableDates.length > 0) {
+        unavailableDates.forEach(unavailableDate => {
+          if (unavailableDate.start_time && unavailableDate.end_time) {
+            // FIXED: Properly handle time format - remove seconds if present
+            const normalizeTime = (timeStr) => {
+              if (!timeStr) return null;
+              // Handle both HH:MM and HH:MM:SS formats
+              const parts = timeStr.split(':');
+              return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+            };
+
+            const unavailableStart = normalizeTime(unavailableDate.start_time);
+            const unavailableEnd = normalizeTime(unavailableDate.end_time);
+
+            if (!unavailableStart || !unavailableEnd) return;
+
+            // Parse unavailable times
+            const [unavailableStartHour, unavailableStartMinute] = unavailableStart.split(':').map(Number);
+            const [unavailableEndHour, unavailableEndMinute] = unavailableEnd.split(':').map(Number);
+
+            // Convert to minutes for easier comparison
+            const unavailableStartMinutes = (unavailableStartHour * 60) + unavailableStartMinute;
+            const unavailableEndMinutes = (unavailableEndHour * 60) + unavailableEndMinute;
+
+            console.log(`[getAvailableTimeSlots] Filtering slots for unavailable period: ${unavailableStart} - ${unavailableEnd}`);
+            console.log(`[getAvailableTimeSlots] Unavailable period in minutes: ${unavailableStartMinutes} - ${unavailableEndMinutes}`);
+
+            // Filter out slots that fall within or overlap with the unavailable range
+            filteredSlots = filteredSlots.filter(slot => {
+              const [slotHour, slotMinute] = slot.time24.split(':').map(Number);
+              const slotStartMinutes = (slotHour * 60) + slotMinute;
+              const slotEndMinutes = slotStartMinutes + slot.duration; // Add duration to get slot end time
+
+              // FIXED: More precise overlap detection
+              // A slot overlaps with unavailable period if:
+              // 1. Slot starts before unavailable period ends AND
+              // 2. Slot ends after unavailable period starts
+              const hasOverlap = (
+                slotStartMinutes < unavailableEndMinutes &&
+                slotEndMinutes > unavailableStartMinutes
+              );
+
+              if (hasOverlap) {
+                console.log(`[getAvailableTimeSlots] Filtering out slot: ${slot.time12} (${slot.time24}) - overlaps with unavailable period`);
+                console.log(`[getAvailableTimeSlots] Slot minutes: ${slotStartMinutes} - ${slotEndMinutes}`);
+              }
+
+              // Return true to keep the slot (it's available), false to remove it (it's unavailable)
+              return !hasOverlap;
+            });
+          }
+        });
+      }
+
       // Get existing appointments for this date
       const { data: existingAppointments, error: appointmentsError } =
         await supabase
           .from("appointments")
-          .select("appointment_id, requested_time, status")
+          .select("appointment_id, requested_time, appointment_time, status")
           .eq("med_id", doctorId)
           .eq("requested_date", date)
           .in("status", ["requested", "confirmed"]);
@@ -558,17 +618,44 @@ export const appointmentService = {
         return { data: [], error: appointmentsError.message };
       }
 
+      // FIXED: Better handling of booked time extraction and format conversion
+      const bookedTimes = (existingAppointments || []).map(apt => {
+        // Use appointment_time if confirmed, otherwise requested_time
+        let timeToCheck = apt.status === 'confirmed' && apt.appointment_time
+          ? apt.appointment_time
+          : apt.requested_time;
+
+        // Normalize the time format
+        if (timeToCheck) {
+          // Convert to 24-hour format if it's in 12-hour format
+          if (timeToCheck.includes('AM') || timeToCheck.includes('PM')) {
+            timeToCheck = convertTo24Hour(timeToCheck);
+          }
+
+          // Ensure HH:MM format (remove seconds if present)
+          const timeParts = timeToCheck.split(':');
+          timeToCheck = `${timeParts[0].padStart(2, '0')}:${timeParts[1].padStart(2, '0')}`;
+        }
+
+        return timeToCheck;
+      }).filter(Boolean); // Remove any null/undefined times
+
+      console.log(`[getAvailableTimeSlots] Booked times:`, bookedTimes);
+
       // Filter out booked slots
-      const bookedTimes = (existingAppointments || []).map(
-        (apt) => apt.requested_time
+      const availableSlots = filteredSlots.filter(slot =>
+        !bookedTimes.includes(slot.time24)
       );
-      const availableSlots = allSlots.filter(
-        (slot) => !bookedTimes.includes(slot.time24)
-      );
+
+      console.log(`[getAvailableTimeSlots] Doctor: ${doctorId}, Date: ${date}`);
+      console.log(`Total slots generated: ${allSlots.length}`);
+      console.log(`After filtering unavailable periods: ${filteredSlots.length}`);
+      console.log(`After filtering booked slots: ${availableSlots.length}`);
+      console.log('Final available slots:', availableSlots.map(s => `${s.time12} (${s.time24})`));
 
       // Return slots in 12-hour format for display
       return {
-        data: availableSlots.map((slot) => ({
+        data: availableSlots.map(slot => ({
           time: slot.time12,
           value: slot.time12, // For form values
           duration: slot.duration,
@@ -793,13 +880,13 @@ export const appointmentService = {
 
           doctor: apt.medicalprofessionals
             ? {
-                name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
-                specialty: apt.medicalprofessionals.user_type || "Unknown",
-              }
+              name: `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`,
+              specialty: apt.medicalprofessionals.user_type || "Unknown",
+            }
             : {
-                name: "Unknown Doctor",
-                specialty: "Unknown",
-              },
+              name: "Unknown Doctor",
+              specialty: "Unknown",
+            },
           doctor_name: apt.medicalprofessionals
             ? `Dr. ${apt.medicalprofessionals.first_name} ${apt.medicalprofessionals.last_name}`
             : "Unknown Doctor",
@@ -813,19 +900,17 @@ export const appointmentService = {
       // Sort the transformed data properly - confirmed appointments should show their confirmed date/time
       transformedData.sort((a, b) => {
         const aDate = new Date(
-          `${a.date}T${
-            (a.time && a.time.includes("AM")) ||
+          `${a.date}T${(a.time && a.time.includes("AM")) ||
             (a.time && a.time.includes("PM"))
-              ? convertTo24Hour(a.time)
-              : "00:00"
+            ? convertTo24Hour(a.time)
+            : "00:00"
           }`
         );
         const bDate = new Date(
-          `${b.date}T${
-            (b.time && b.time.includes("AM")) ||
+          `${b.date}T${(b.time && b.time.includes("AM")) ||
             (b.time && b.time.includes("PM"))
-              ? convertTo24Hour(b.time)
-              : "00:00"
+            ? convertTo24Hour(b.time)
+            : "00:00"
           }`
         );
         return aDate - bDate;
@@ -1077,16 +1162,13 @@ export const appointmentService = {
           user_id: originalAppointment.med_id,
           type: "appointment_rescheduled",
           title: "Appointment Reschedule Request",
-          message: `Patient has requested to reschedule their appointment from ${
-            originalAppointment.requested_date
-          } ${
-            originalAppointment.requested_time.includes("AM") ||
-            originalAppointment.requested_time.includes("PM")
+          message: `Patient has requested to reschedule their appointment from ${originalAppointment.requested_date
+            } ${originalAppointment.requested_time.includes("AM") ||
+              originalAppointment.requested_time.includes("PM")
               ? originalAppointment.requested_time
               : convertTo12Hour(originalAppointment.requested_time)
-          } to ${newAppointmentData.requested_date} ${
-            newAppointmentData.requested_time
-          }`,
+            } to ${newAppointmentData.requested_date} ${newAppointmentData.requested_time
+            }`,
           data: {
             original_appointment_id: originalAppointmentId,
             new_appointment_id: newAppointment.data[0].id,
@@ -1391,8 +1473,7 @@ export const appointmentService = {
 
     if (appointment.status === "confirmed") {
       const appointmentDateTime = new Date(
-        `${appointment.requested_date || appointment.date}T${
-          appointment.requested_time || appointment.time
+        `${appointment.requested_date || appointment.date}T${appointment.requested_time || appointment.time
         }`
       );
       const now = new Date();
@@ -1421,8 +1502,7 @@ export const appointmentService = {
 
     if (appointment.status === "confirmed") {
       const appointmentDateTime = new Date(
-        `${appointment.requested_date || appointment.date}T${
-          appointment.requested_time || appointment.time
+        `${appointment.requested_date || appointment.date}T${appointment.requested_time || appointment.time
         }`
       );
       const now = new Date();
@@ -1532,4 +1612,224 @@ export const userService = {
       return { data: null, error: error.message };
     }
   },
+
+  /**
+   * Get doctor's availability for a specific day of week (for modal time slot generation)
+   * Updated to properly handle unavailable dates
+   * @param {string} doctorId
+   * @param {string} date
+   * @param {string} time - optional specific time to check
+   * @returns {object}
+   */
+  async getDoctorAvailability(doctorId, date, time = null) {
+    try {
+      const selectedDate = new Date(date);
+      const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+      // Get doctor's general availability for this day of week
+      const { data: availability, error: availabilityError } = await supabase
+        .from("doctor_availability")
+        .select("*")
+        .eq("med_id", doctorId)
+        .eq("day_of_week", dayOfWeek)
+        .eq("is_active", true)
+        .order("start_time");
+
+      if (availabilityError) {
+        console.error("Error fetching doctor availability:", availabilityError);
+        return {
+          data: {
+            available: false,
+            reason: "Could not verify doctor availability",
+            slots: [],
+          },
+          error: availabilityError.message,
+        };
+      }
+
+      // Check if doctor has any unavailable dates for this specific date
+      const { data: unavailableDates, error: unavailableError } = await supabase
+        .from("doctor_unavailable_dates")
+        .select("*")
+        .eq("med_id", doctorId)
+        .eq("unavailable_date", date);
+
+      if (unavailableError) {
+        console.error("Error checking unavailable dates:", unavailableError);
+        return {
+          data: {
+            available: false,
+            reason: "Could not verify doctor availability",
+            slots: [],
+          },
+          error: unavailableError.message,
+        };
+      }
+
+      // If doctor is completely unavailable on this date
+      if (unavailableDates && unavailableDates.length > 0) {
+        const unavailableDate = unavailableDates[0];
+        if (!unavailableDate.start_time && !unavailableDate.end_time) {
+          return {
+            data: {
+              available: false,
+              reason: unavailableDate.reason || "Doctor is not available on this date",
+              slots: [],
+            },
+            error: null,
+          };
+        }
+      }
+
+      // If no availability set for this day of week
+      if (!availability || availability.length === 0) {
+        return {
+          data: {
+            available: true,
+            reason: "Doctor has no scheduled availability for this day",
+            slots: [],
+          },
+          error: null,
+        };
+      }
+
+      // If checking specific time
+      if (time) {
+        const requestedTime = time.includes("AM") || time.includes("PM")
+          ? convertTo24Hour(time)
+          : time;
+
+        const [requestedHour, requestedMinute] = requestedTime.split(":").map(Number);
+        const requestedMinutes = requestedHour * 60 + requestedMinute;
+
+        // First check if the time falls within unavailable periods
+        if (unavailableDates && unavailableDates.length > 0) {
+          for (const unavailableDate of unavailableDates) {
+            if (unavailableDate.start_time && unavailableDate.end_time) {
+              const [unavailableStartHour, unavailableStartMinute] = unavailableDate.start_time.split(':').map(Number);
+              const [unavailableEndHour, unavailableEndMinute] = unavailableDate.end_time.split(':').map(Number);
+              const unavailableStartMinutes = unavailableStartHour * 60 + unavailableStartMinute;
+              const unavailableEndMinutes = unavailableEndHour * 60 + unavailableEndMinute;
+
+              // If requested time falls within unavailable period
+              if (requestedMinutes >= unavailableStartMinutes && requestedMinutes < unavailableEndMinutes) {
+                return {
+                  data: {
+                    available: false,
+                    reason: unavailableDate.reason || "Doctor is not available during this time period",
+                  },
+                  error: null,
+                };
+              }
+            }
+          }
+        }
+
+        // Check if requested time falls within any availability slot
+        let isWithinAvailability = false;
+        let matchingSlot = null;
+
+        for (const slot of availability) {
+          const [startHour, startMinute] = slot.start_time.split(":").map(Number);
+          const [endHour, endMinute] = slot.end_time.split(":").map(Number);
+          const startMinutes = startHour * 60 + startMinute;
+          const endMinutes = endHour * 60 + endMinute;
+
+          if (requestedMinutes >= startMinutes && requestedMinutes < endMinutes) {
+            // Check if it aligns with appointment slots (duration intervals)
+            const minutesFromStart = requestedMinutes - startMinutes;
+            if (minutesFromStart % slot.duration_minutes === 0) {
+              isWithinAvailability = true;
+              matchingSlot = slot;
+              break;
+            }
+          }
+        }
+
+        if (!isWithinAvailability) {
+          return {
+            data: {
+              available: false,
+              reason: "Requested time is outside doctor's availability hours",
+            },
+            error: null,
+          };
+        }
+
+        // Check for existing appointments at this time
+        const { data: existingAppointments, error: appointmentsError } = await supabase
+          .from("appointments")
+          .select("appointment_id, status")
+          .eq("med_id", doctorId)
+          .eq("appointment_date", date)
+          .eq("requested_time", requestedTime)
+          .in("status", ["requested", "confirmed"]);
+
+        if (appointmentsError) {
+          console.error("Error checking existing appointments:", appointmentsError);
+          return {
+            data: {
+              available: false,
+              reason: "Could not verify appointment conflicts",
+            },
+            error: appointmentsError.message,
+          };
+        }
+
+        if (existingAppointments && existingAppointments.length > 0) {
+          return {
+            data: {
+              available: false,
+              reason: "Time slot is already requested or booked",
+            },
+            error: null,
+          };
+        }
+
+        return {
+          data: {
+            available: true,
+            duration: matchingSlot?.duration_minutes || 30,
+          },
+          error: null,
+        };
+      }
+
+      // Return general availability information with filtered slots
+      let availableSlots = [...availability];
+
+      // Filter slots based on unavailable periods
+      if (unavailableDates && unavailableDates.length > 0) {
+        unavailableDates.forEach(unavailableDate => {
+          if (unavailableDate.start_time && unavailableDate.end_time) {
+            // This would require more complex logic to partially filter slots
+            // For now, we'll mark the entire day as having limited availability
+            availableSlots = availableSlots.map(slot => ({
+              ...slot,
+              hasRestrictions: true,
+              unavailablePeriods: unavailableDates
+            }));
+          }
+        });
+      }
+
+      return {
+        data: {
+          available: true,
+          slots: availableSlots,
+        },
+        error: null,
+      };
+    } catch (error) {
+      console.error("Error in getDoctorAvailability:", error);
+      return {
+        data: {
+          available: false,
+          reason: "System error occurred",
+          slots: [],
+        },
+        error: error.message,
+      };
+    }
+  }
 };
